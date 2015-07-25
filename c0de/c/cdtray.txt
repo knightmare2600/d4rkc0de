@@ -1,0 +1,60 @@
+/* Cd-tray Open/Close
+          By Shoxin
+*/
+
+/*
+   compile: gcc.exe t.c -o t.exe -lwinmm
+*/
+
+#include <stdio.h>
+#include <windows.h>
+
+int menu(void);
+int cdtray(char);
+
+int main(int argc, char **argv)
+{
+   if(argc < 2 || strlen(*(argv + 1)) != 2 || **(argv + 1) != '-')
+   {
+      return menu();
+   }
+   switch(*(*(argv + 1) + 1))
+   {
+      case 'o':
+      case 'O':
+         cdtray(*(*(argv + 1) + 1));
+         break;
+      case 'c':
+      case 'C':
+         cdtray(*(*(argv + 1) + 1));
+         break;
+      default:
+         return menu();
+   }
+   return 0;
+}
+
+int menu(void)
+{
+   printf(
+"Usage:\n"
+"t.exe [-o] [-c]\n"
+   );
+   exit(1);
+}
+
+int cdtray(char c)
+{
+   switch(c)
+   {
+      case 'o':
+      case 'O':
+         mciSendString("set cdaudio door open", NULL, 0, NULL);
+         break;
+      case 'c':
+      case 'C':
+         mciSendString("set cdaudio door closed", NULL, 0, NULL);
+         break;
+   }
+   return 0;
+}

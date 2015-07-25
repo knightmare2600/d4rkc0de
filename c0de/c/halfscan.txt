@@ -1,0 +1,763 @@
+/*
+ * Half open port scanner. Send SYNs, and look for a SYN-ACK. If you see one,
+ * the port is listening.
+ *
+ * The whole point is to evade TCP-wrapper software and other alarm systems
+ * which look for a fully established connection. Since this never establishes
+ * a connection, its existance isn't logged.
+ *
+ * Note, this can be detected by things like TCPdump, or other raw network
+ * monitors.
+ *
+ * Runs under SunOS 4.x with NIT. This is a proof-of-concept toy, not a
+ * production model. :-)
+ *
+ * Mike Neuman
+ * 12/7/93
+ *
+ * You can do whatever you want with this code as long as you leave this
+ * header intact.
+ *
+ * Contact information:
+ *
+ * Mike Neuman (mcn@EnGarde.com) - http://www.engarde.com/~mcn
+ */
+
+#include <stdio.h>
+#include <netdb.h>
+#include <ctype.h>
+#include <signal.h>
+#include <errno.h>
+#include <malloc.h>
+#include <setjmp.h>
+#include <sys/types.h>
+#include <sys/time.h>
+#include <sys/timeb.h>
+#include <sys/socket.h>
+#include <sys/file.h>
+#include <sys/ioctl.h>
+#include <net/nit.h>
+#include <sys/fcntlcom.h>
+
+#include <sys/param.h>
+#include <sys/dir.h>
+#include <net/nit_if.h>
+#include <net/nit_pf.h>
+#include <net/nit_buf.h>
+#include <net/packetfilt.h>
+#include <sys/stropts.h>
+
+#include <net/if.h>
+#include <netinet/in.h>
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
+#include <netinet/if_ether.h>
+#include <netinet/ip_var.h>
+#include <netinet/udp.h>
+#include <netinet/udp_var.h>
+#include <netinet/tcp.h>
+#include <netinet/tcpip.h>
+#include <sys/stream.h>
+#include <sys/tihdr.h>
+
+#include <rpc/rpc.h>
+#include <rpc/pmap_prot.h>
+#include <rpc/pmap_clnt.h>
+
+/* RPC makes an rpcdump call, which may be logged by a secure portmapper.
+ * If you're paranoid and want to guess at rpc stuff, specify -r
+ */
+
+main(argc,argv)
+int argc;
+char *argv[];
+
+{
+  struct sockaddr_in server;
+  struct servent *sp;
+  struct hostent *hp;
+  int c, s, count, userpc=1, sock=RPC_ANYSOCK, minport = 1, maxport = 6001;
+  struct pmaplist *head = NULL, *headp=NULL;
+  struct timeval timeout;
+  register CLIENT *client;
+  struct rpcent *rpc;
+  unsigned long addr;
+  char *hostp;
+  extern char *optarg;
+  extern int optind;
+
+
+  /* 1: Parse options, get host addr */
+  while ((c = getopt(argc, argv, "rhm:M:")) != -1)
+    switch(c) {
+      case 'r':
+        userpc = 0;
+        break;
+      case 'm':
+        minport = atoi(optarg);
+        break;
+      case 'M':
+        maxport = atoi(optarg);
+        break;
+      case 'h':
+        usage(argv[0]);
+        exit(1);
+    }
+        
+  if (optind != argc-1) {
+    usage(argv[0]);
+    exit(1);
+  }
+
+  if (minport > maxport || minport <= 0) {
+    fprintf(stderr, "ERROR: minport must be > 0 and <= maxport\n");
+    usage(argv[0]);
+    exit(1);
+  }
+  hostp = argv[optind];
+
+  if ((hp=gethostbyname(hostp))==NULL) {
+    addr = inet_addr(hostp);
+    if (addr == (u_long)-1) {
+      fprintf(stderr, "Unknown host '%s'\n", hostp);
+      usage(argv[0]);
+      exit(1);
+    }
+    bcopy(&server.sin_addr, &addr, 4);
+  } else {
+    bzero((char *)&server, sizeof server);
+    bcopy(hp->h_addr, (char *)&server.sin_addr, hp->h_length);
+    server.sin_family=hp->h_addrtype;
+  }
+
+  printf("Connections established for host %s:\n",hostp);
+
+  /* 2: Call rpc and get its ports */
+  head=NULL;
+  if (userpc) {
+    server.sin_port=htons(PMAPPORT);
+    timeout.tv_sec=10;
+    timeout.tv_usec=0;
+    if ((client = clnttcp_create(&server, PMAPPROG,
+                                 PMAPVERS, &sock, 50, 500))!=NULL) {
+      if (clnt_call(client, PMAPPROC_DUMP, xdr_void, NULL,
+                    xdr_pmaplist, &head, timeout) != RPC_SUCCESS)
+        head=NULL;
+    }
+  }
+
+  /* 3: Try each port from minport - maxport */
+  for (count=minport;count<=maxport;count++) {
+    printf("\r%6d",count);
+    fflush(stdout);
+    server.sin_port=count;
+    if (!fakeconnect(&server, hostp)) {
+      printf("\r   %4d tcp   ",count);
+      sp=getservbyport(count,"tcp");
+      if (sp==NULL) {
+        switch(count) {
+          /* Put in known services not in /etc/services here */
+          case 2000: printf("(Xnews)");
+            break;
+          case 6000: printf("(X)");
+            break;
+          default:
+            if (userpc) {
+              headp=head;
+              while (headp!=NULL) {
+                if (headp->pml_map.pm_prot!=IPPROTO_TCP) {
+                  headp=headp->pml_next;
+                  continue;
+                }
+                if (count!=headp->pml_map.pm_port) {
+                  headp=headp->pml_next;
+                  continue;
+                }
+                rpc = getrpcbynumber(headp->pml_map.pm_prog);
+                if (rpc) {
+                  printf("%-15s [rpc]", rpc->r_name);
+                  break;
+                } else {
+                  headp=headp->pml_next;
+                  continue;
+                }
+              }
+              if (rpc==NULL)
+                printf("                [rpc]");
+            } else
+              printf("???\n");
+            break;
+        }
+      } else
+        printf("%-15s",sp->s_name);
+      printf("\n");
+    }
+  }
+  printf("\n");
+  exit(0);
+}
+
+usage(prog)
+char *prog;
+{
+  fprintf(stderr,"Usage: %s [-r] [-m minport] [-M maxport] host\n", prog);
+  fprintf(stderr,"Options:\n");
+  fprintf(stderr,"-r       Don't use RPC for port info\n");
+  fprintf(stderr,"-m port  Specify port number to start at (default 1)\n");
+  fprintf(stderr,"-M port  Specify port number to end at   (default 6001)\n");
+  return;
+}
+
+
+int scan_return(fd, iph, tcph)
+int fd;
+struct ip *iph;
+struct tcphdr *tcph;
+
+{
+  char buf[8*1024], *bp, *bufstop, *cp, abuf[2048];
+  int cc, done=0, retval=0;
+  struct nit_bufhdr *hdrp;
+  struct nit_iftime *ntp;
+  struct nit_ifdrops *ndp;
+  struct nit_iflen *nlp;
+  struct ether_header *ep;
+  u_short et;
+  register struct ip *ip;
+  struct tcphdr *tp;
+
+  while (!done) {
+    if ((cc=read(fd, buf, 8*1024)) >= 0) {
+      bp=buf;
+      bufstop = buf+cc;
+      while (bp < bufstop) {
+        cp = bp;
+        
+        /* Get past NIT buffer */
+        hdrp = (struct nit_bufhdr *)cp;
+        cp += sizeof(*hdrp);
+        
+        /* get past NIT timer   */
+        ntp = (struct nit_iftime *)cp;
+        cp += sizeof(*ntp);
+        
+        /* get past the drops */
+        ndp = (struct nit_ifdrops *)cp;
+        cp += sizeof(*ndp);
+
+        /* get past packet len  */
+        nlp = (struct nit_iflen *)cp;
+        cp += sizeof(*nlp);
+
+        /* next snapshot        */
+        bp += hdrp->nhb_totlen;
+
+        /* Okay, got the packet, make sure it's a SYN-ACK reply */
+        ep = (struct ether_header *)cp;
+        et = ntohs(ep->ether_type);
+        if ( et >= ETHERTYPE_TRAIL && et < ETHERTYPE_TRAIL+ETHERTYPE_NTRAILER)
+          continue;
+        cp += sizeof(struct ether_header);
+        nlp->nh_pktlen -= sizeof(struct ether_header);
+        if (et != ETHERTYPE_IP) continue;
+        
+        /* It's: ethernet + IP */
+
+        ip=(struct ip *)cp;
+        bcopy((char *)ip, (char *)abuf, nlp->nh_pktlen); /* Align */
+        ip = (struct ip *)abuf;
+
+        if (ip->ip_p != IPPROTO_TCP)
+          continue;
+
+        /* It's ethernet + IP + TCP */
+        if (ip->ip_src.s_addr != iph->ip_dst.s_addr)
+          continue;
+        if (ip->ip_dst.s_addr != iph->ip_src.s_addr)
+          continue;
+
+        /* It's ethernet + IP + TCP + from target + to us */
+        cp+=sizeof(struct ip);
+        tp = (struct tcphdr *)cp;
+        if (tp->th_sport != tcph->th_dport)
+          continue;
+        if (tp->th_dport != tcph->th_sport)
+          continue;
+
+        /* It's ethernet + IP + TCP + from target + to us + ports right */
+        if ((tp->th_flags & (TH_SYN|TH_ACK)) == (TH_SYN|TH_ACK)) {
+          retval=0;
+          done=1;
+        } else {
+          retval=1;
+          done=1;
+        }
+        break;
+      } /* While (bp<bufstop) */
+    } /* if read */
+  } /* while !done */
+  return(retval);
+}
+
+jmp_buf env_buf;
+
+/* Signal handler for receive timeout */
+handle_alarm()
+{
+  alarm(0); /* Clear the alarm */
+  longjmp(env_buf, 1);
+}
+
+/*
+ * Sends a packet, and waits for the reply
+ */
+int send_packet(fd, server, servername, localnet, netmask)
+int fd;
+struct sockaddr_in *server;
+char *servername;
+u_long localnet;
+u_long netmask;
+
+{
+  static struct sockaddr sa;
+  static struct strbuf ctl, datah;
+  static struct ip iph;
+  static char buf[2048], pbuf[2048], *oldbp;
+  static int computed=0;
+
+  struct ether_header eh;
+  struct tcphdr tcph;
+  char *bp, *pbp;
+  struct ether_addr myaddr, faddr;
+  FILE *fp;
+  struct hostent *he;
+  u_long x;
+  int retval;
+
+  if (!computed) {
+    /* ARP for the router/host, if possible */
+    int s;
+    struct arpreq arpreq;
+    struct sockaddr_in *s_arp;
+
+    if ((s = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+      perror("Socket");
+      exit(1);
+    }
+
+    arpreq.arp_pa.sa_family = AF_INET;
+    s_arp = (struct sockaddr_in *)&arpreq.arp_pa;
+    s_arp->sin_family = AF_INET;
+    s_arp->sin_addr.s_addr = server->sin_addr.s_addr;
+
+    /* First, send junk to it to get an ARP entry */
+    s_arp->sin_port = 9;
+    sendto(s, "blah", 4, 0, (struct sockaddr *)s_arp,
+           sizeof(struct sockaddr_in));
+    s_arp = (struct sockaddr_in *)&arpreq.arp_ha;
+    s_arp->sin_family = AF_UNSPEC;
+
+    if (ioctl(s, SIOCGARP, &arpreq) < 0) {
+      perror("ioctl");
+      close(s);
+      exit(1);
+    }
+
+    if (arpreq.arp_flags & ATF_COM) {
+      bcopy(arpreq.arp_ha.sa_data, &faddr, 6);
+    } else {
+      fprintf(stderr, "Can't find destination/router hardware address.\n");
+      exit(1);
+    }
+    /* faddr and myaddr are now computed, create the ether header */
+    bcopy(&faddr, &eh.ether_dhost, 6);
+    eh.ether_type = htons(ETHERTYPE_IP);
+    sa.sa_family = AF_UNSPEC;
+    bcopy((char *)&eh, (char *)sa.sa_data, sizeof(struct ether_header));
+    ctl.len = sizeof(struct sockaddr);
+    ctl.buf = (char *)&sa;
+    bp = buf;
+
+    iph.ip_v = IPVERSION;
+    iph.ip_hl = 5; /* 20 octets--no options */
+    iph.ip_tos = htons(0);   /* No special service */
+    iph.ip_len = htons(40);
+    iph.ip_id = htons(27); /* "unique" identification */
+    iph.ip_off = htons(0);
+    iph.ip_ttl = htons(60);
+    iph.ip_p = htons(IPPROTO_TCP);
+    iph.ip_dst.s_addr = server->sin_addr.s_addr;
+    gethostname(buf, 2048);
+    he = gethostbyname(buf);
+    bcopy((char *)he->h_addr,
+          (char *)&iph.ip_src.s_addr,
+          sizeof(iph.ip_src.s_addr));
+    iph.ip_sum = 0;
+    iph.ip_sum = htons(in_cksum_c(&iph, (iph.ip_hl << 2)));
+    bcopy((char *)&iph, bp, sizeof(struct ip));
+    bp += sizeof(struct ip);
+    oldbp = bp;
+    computed=1;
+  } /* if !computed */
+  /* Set up the TCP header */
+  bp = oldbp;
+  tcph.th_sport = 5894; /* Random number */
+  tcph.th_dport = server->sin_port;
+  tcph.th_seq = 59595; /* Random number */
+  tcph.th_ack = 0;
+  tcph.th_off = 5;
+  tcph.th_flags = TH_SYN;
+  tcph.th_win = 4096;
+  tcph.th_sum = 0;
+  /* Calculate the TCP checksum on the TCP pseudoheader*/
+  pbp=pbuf;
+  bcopy((char *)&iph.ip_src.s_addr, pbp, 4);
+  pbp+=4;
+  bcopy((char *)&iph.ip_dst.s_addr, pbp, 4);
+  pbp+=4;
+  *pbp=0;
+  pbp++;
+  *pbp=(char)iph.ip_p;
+  pbp++;
+  *(u_short *)pbp=(u_short)sizeof(struct tcphdr);
+  pbp+=2; /* go past the u_short */
+  bcopy((char *)&tcph, pbp, sizeof(struct tcphdr));
+  pbp+=sizeof(struct tcphdr);
+  if ((pbp-pbuf)%2) {
+    *pbp=(char)0;
+    pbp++;
+  }
+  tcph.th_sum = htons(in_cksum_c(pbuf, (int)(pbp-pbuf)));
+
+  bcopy((char *)&tcph, bp, sizeof(struct tcphdr));
+  bp += sizeof(struct tcphdr);
+
+  datah.len = (int)(bp-buf);
+  datah.buf = (char *)buf;
+
+  if (putmsg(fd, &ctl, &datah, 0) < 0) {
+    perror("putmsg (ctl)");
+    switch(errno) {
+      case EAGAIN: fprintf(stderr,"EAGAIN\n");break;
+      case EBADF: fprintf(stderr,"Bad FD\n");break;
+      case EFAULT: fprintf(stderr,"Bad ctlptr or dataptr\n");break;
+      case EINTR: fprintf(stderr,"Signal caught\n");break;
+      case EINVAL: fprintf(stderr,"undefined flag\n");break;
+      case ENOSTR: fprintf(stderr,"No stream\n");break;
+      case ENXIO: fprintf(stderr,"hangup downstream\n");break;
+      case ERANGE: fprintf(stderr,"data size problem\n");break;
+    }
+    exit(1);
+  }
+  /* Now that we've sent the syn, scan all return packets for reply */
+  if (!setjmp(env_buf)) {
+    signal(SIGALRM, handle_alarm, -1);
+    alarm(1);
+    retval=scan_return(fd, &iph, &tcph);
+    alarm(0);
+  } else retval=1;
+  return(retval);
+}
+
+int fakeconnect(server, servername)
+/*
+ * Fake the connection, return 1 on failure, 0 on success
+ */
+struct sockaddr_in *server;
+char *servername;
+{
+  static int if_fd = -1;
+  char *device=0;
+  u_long localnet;
+  u_long netmask;
+  int linktype;
+  char *lookup_device();
+  void lookup_net();
+
+  if (if_fd == -1) {
+    if (device==0) {
+      device = lookup_device();
+      if (device == 0)
+        perror("can't find any interfaces");
+    }
+    if_fd = initdevice(device, &linktype);
+    lookup_net(device, &localnet, &netmask);
+  }
+  return(send_packet(if_fd, server, servername, localnet, netmask));
+}
+
+
+/* ====================== begin nasty NIT stuff ======================= */
+
+
+/* Not all systems have IFF_LOOPBACK */
+#ifdef IFF_LOOPBACK
+#define ISLOOPBACK(p) ((p)->ifr_flags & IFF_LOOPBACK)
+#else
+#define ISLOOPBACK(p) (strcmp((p)->ifr_name, "lo0") == 0)
+#endif
+
+char *lookup_device()
+{
+  struct ifreq ibuf[16], *ifrp, *ifend, *mp;
+  struct ifconf ifc;
+  int fd;
+  int minunit, n;
+  char *cp;
+  static char device[sizeof(ifrp->ifr_name)];
+
+  fd = socket(AF_INET, SOCK_DGRAM, 0);
+  if (fd < 0) {
+    perror("newscan: socket");
+    exit(1);
+  }
+  ifc.ifc_len = sizeof(ibuf);
+  ifc.ifc_buf = (caddr_t)ibuf;
+
+  if (ioctl(fd, SIOCGIFCONF, (char *)&ifc) < 0 ||
+      ifc.ifc_len < sizeof(struct ifreq)) {
+    perror("newscan: SIOCGIFCONF: ");
+    exit(1);
+  }
+  ifrp = ibuf;
+  ifend = (struct ifreq *)((char *)ibuf + ifc.ifc_len);
+
+  mp = 0;
+  minunit = 666;
+  while (ifrp < ifend) {
+    struct ifreq ifr;
+    /*
+     * Need a template to preserve address info that is
+     * used below to locate the next entry.  (Otherwise,
+     * SIOCGIFFLAGS stomps over it because the requests
+     * are returned in a union.)
+     */
+    bcopy(ifrp->ifr_name, ifr.ifr_name, sizeof(ifr.ifr_name));
+    if (ioctl(fd, SIOCGIFFLAGS, (char *)&ifr) < 0) {
+      fprintf(stderr, "newscan: SIOCGIFFLAGS: ");
+      perror(ifrp->ifr_name);
+      exit(1);
+    }
+    if ((ifr.ifr_flags & IFF_UP) && !ISLOOPBACK(&ifr)) {
+      for (cp = ifrp->ifr_name; !isdigit(*cp); ++cp)
+        ;
+      n = atoi(cp);
+      if (n < minunit) {
+        minunit = n;
+        mp = ifrp;
+      }
+    }
+#if BSD >= 199006
+    n = ifrp->ifr_addr.sa_len + sizeof(ifrp->ifr_name);
+    if (n < sizeof(*ifrp))
+      ++ifrp;
+    else
+      ifrp = (struct ifreq *)((char *)ifrp + n);
+#else
+    ++ifrp;
+#endif
+  }
+  close(fd);
+  if (mp == 0)
+    return (0);
+
+  (void)strcpy(device, mp->ifr_name);
+  return (device);
+}
+
+/*
+ * Get the netmask of an IP address.  This routine is used if
+ * SIOCGIFNETMASK doesn't work.
+ */
+static u_long
+ipaddrtonetmask(addr)
+u_long addr;
+{
+  char str[80];
+
+  if (IN_CLASSA(addr))
+    return (IN_CLASSA_NET);
+  if (IN_CLASSB(addr))
+    return (IN_CLASSB_NET);
+  if (IN_CLASSC(addr))
+    return (IN_CLASSC_NET);
+  sprintf(str,"unknown IP address class: %08X", addr);
+  perror(str);
+  /* NOTREACHED */
+}
+
+void
+lookup_net(device, netp, maskp)
+char *device;
+u_long *netp;
+u_long *maskp;
+{
+  int fd;
+  struct ifreq ifr;
+  struct sockaddr_in *sin = (struct sockaddr_in *)&ifr.ifr_addr;
+
+  /* Use data gram socket to get IP address. */
+  if ((fd = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+    perror("newscan: socket");
+    exit(1);
+  }
+  (void)strncpy(ifr.ifr_name, device, sizeof(ifr.ifr_name));
+  if (ioctl(fd, SIOCGIFADDR, (char *)&ifr) < 0) {
+    /*
+     * This will fail if an IP address hasn't been assigned.
+     */
+    *netp = 0;
+    *maskp = 0;
+    return;
+  }
+  *netp = sin->sin_addr.s_addr;
+  if (ioctl(fd, SIOCGIFNETMASK, (char *)&ifr) < 0)
+    *maskp = 0;
+  else
+    *maskp = sin->sin_addr.s_addr;
+  if (*maskp == 0)
+    *maskp = ipaddrtonetmask(*netp);
+  *netp &= *maskp;
+  (void)close(fd);
+}
+
+u_long snaplen = 0;
+
+int
+initdevice(device,linktype)
+char *device;
+int *linktype;
+{
+  struct strioctl si;             /* struct for ioctl() */
+  struct timeval timeout;         /* timeout for ioctl() */
+  struct ifreq ifr;               /* interface request struct */
+  u_long if_flags;                /* modes for interface             */
+  int  ret;
+  /*  int chunksize = (8*1024); */
+  int chunksize = 0;
+  int if_fd;
+  char *dev = "/dev/nit";
+  int nonblock;
+
+  struct ether_header eh;
+  struct ip iptest;
+  struct packetfilt pf;
+  register u_short *fwp = pf.Pf_Filter;
+  u_short ethoffset;
+  u_short ipoffset;
+  u_short masker = 255;
+
+  si.ic_timout = INFTIM;
+
+  /* Set up the Packet Filter */
+  ethoffset=((u_int)&eh.ether_type-(u_int)&eh.ether_dhost)/(sizeof(u_short));
+  ipoffset = 11;
+  *fwp++ = ENF_PUSHZERO;
+  *fwp++ = ENF_PUSHWORD + ethoffset;
+  *fwp++ = ENF_PUSHLIT;
+  *fwp++ = htons(ETHERTYPE_IP);
+  *fwp++ = ENF_COR;
+  *fwp++ = ENF_PUSHWORD + ipoffset;
+  *fwp++ = ENF_PUSHLIT;
+  *fwp++ = (u_short)255;
+  *fwp++ = ENF_AND;
+  *fwp++ = ENF_PUSHLIT;
+  *fwp++ = (u_short)6;
+  *fwp++ = ENF_COR;
+  *fwp++ = ENF_PUSHLIT;
+  *fwp++ = (u_short)1;
+
+  /* open /dev/nit Read/write */
+  if ((if_fd = open(dev, O_RDWR)) < 0) {
+    (void) fprintf(stderr, "newscan: open: ");
+    perror(dev);
+    exit(-1);
+  }
+
+  /* arrange to get discrete messages from the STREAM and use NIT_BUF */
+  ioctl(if_fd, I_SRDOPT, (char*)RMSGD);
+
+  /* it is important to have this stuff in the stream BEFORE! the nbuf */
+  si.ic_cmd = NIOCSETF;
+  si.ic_len = sizeof(struct packetfilt);
+  si.ic_dp = (char*)&pf;
+  pf.Pf_FilterLen = fwp - &pf.Pf_Filter[0];
+  if (ioctl(if_fd, I_PUSH, "pf")<0) {
+    perror("I_PUSH pf");
+    fprintf(stderr,"No pf being used\n");
+  } else {
+    if ((ioctl(if_fd, I_STR, (char*)&si)) < 0) {
+      perror("newscan: NIOCSETF");
+      /* exit(-1); */
+      fprintf(stderr,"No pf being used (or one already applied)\n");
+    }
+  }
+
+  ioctl(if_fd, I_PUSH, "nbuf");
+
+  /* set the timeout */
+  timeout.tv_sec = 1;
+  timeout.tv_usec = 0;
+  si.ic_cmd = NIOCSTIME;
+  si.ic_len = sizeof(timeout);
+  si.ic_dp = (char*)&timeout;
+  if ((ret = ioctl(if_fd, I_STR, (char*)&si)) < 0) {
+    perror("newscan: NIOCSTIME");
+    exit(-1);
+  }
+
+  /* set the chunksize */
+  si.ic_cmd = NIOCSCHUNK;
+  si.ic_len = sizeof(chunksize);
+  si.ic_dp = (char*)&chunksize;
+  if ((ret = ioctl(if_fd, I_STR, (char*)&si)) < 0) {
+    perror("newscan: NIOCSCHUNK");
+    exit(-1);
+  }
+
+  /* Set up the NIT device (bind it,set snapshot length etc) */
+  /* bind the interface */
+  strncpy(ifr.ifr_name, device, sizeof(ifr.ifr_name));
+  ifr.ifr_name[sizeof(ifr.ifr_name) - 1] = ' ';
+  si.ic_cmd = NIOCBIND;
+  si.ic_len = sizeof(ifr);
+  si.ic_dp = (char*)&ifr;
+  if ((ret = ioctl(if_fd, I_STR, (char*)&si)) < 0) {
+    (void) fprintf(stderr, "newscan: NIOCBIND");
+    perror(ifr.ifr_name);
+    exit(1);
+  }
+
+  /* set the snapshot length */
+  si.ic_cmd = NIOCSSNAP;
+  si.ic_len = sizeof(snaplen);
+  si.ic_dp = (char*)&snaplen;
+  if ((ret = ioctl(if_fd, I_STR, (char*)&si)) < 0) {
+    perror("newscan: NIOCSSNAP");
+    exit(1);
+  }
+
+  /* set the interface flags */
+  si.ic_cmd = NIOCSFLAGS;
+  if_flags = NI_TIMESTAMP | NI_LEN | NI_DROPS;
+  if_flags |= NI_PROMISC;
+  si.ic_len = sizeof(if_flags);
+  si.ic_dp = (char*)&if_flags;
+  if ((ioctl(if_fd, I_STR, (char*)&si)) < 0) {
+    perror("newscan: NIOCSFLAGS");
+    exit(1);
+  }
+
+  nonblock = 1;
+  ioctl(if_fd, FIONBIO,&nonblock);
+
+  ioctl(if_fd, I_FLUSH, (char*)FLUSHR);
+  /*
+   * NIT supports only ethernets.
+   */
+  *linktype = 1;
+
+  return if_fd;
+}
+
+

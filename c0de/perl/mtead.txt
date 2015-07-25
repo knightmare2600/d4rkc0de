@@ -1,0 +1,440 @@
+#!/usr/bin/perl
+
+#*# All perl all modules download links #*#
+# Base64 - http://search.cpan.org/CPAN/authors/id/G/GA/GAAS/MIME-Base64-3.07.tar.gz
+# TripleDES - http://search.cpan.org/CPAN/authors/id/V/VI/VIPUL/Crypt-TripleDES-0.24.tar.gz
+# ROT13 - http://search.cpan.org/CPAN/authors/id/A/AY/AYRNIEU/Crypt-Rot13-0.6.tar.gz
+# SHA1 - http://search.cpan.org/CPAN/authors/id/G/GA/GAAS/Digest-SHA1-2.11.tar.gz
+# CRC32 - http://search.cpan.org/CPAN/authors/id/F/FA/FAYS/Digest-Crc32-0.01.tar.gz
+# MD5 - http://search.cpan.org/CPAN/authors/id/G/GA/GAAS/Digest-MD5-2.38.tar.gz
+# Vigenere - http://search.cpan.org/CPAN/authors/id/A/AL/ALIZTA/Crypt-Vigenere-0.07.tar.gz
+# ROT47 - http://search.cpan.org/CPAN/authors/id/Z/ZB/ZBLAIR/Crypt-Rot47-0.01.tar.gz
+
+##
+# By_KuNdUz
+##
+
+use Tk;
+use MIME::Base64;
+use Digest::SHA1;
+use Digest::Crc32;
+use Digest::MD5;
+use Crypt::TripleDES;
+use Crypt::Rot13;
+use Crypt::Rot47;
+use Crypt::Vigenere;
+
+if ($^O eq 'MSWin32') {
+    eval    { require Win32::Console; Win32::Console::Free() };
+    if ($@) { warn "Win32::Console is not installed.\n$@";   }
+}
+
+$mw = MainWindow->new(-background => "black", -foreground => "green", -cursor=> "crosshair");
+$mw->geometry("400x448+430+300");
+$mw->title("-= Multi Text Encoder & Decoder =-");
+
+$mw->Label(-background => "black", -foreground => "green")->pack();
+$mw->Label(-background => "black", -foreground => "green", -font => "Impact 12", -text => "-==- Multi Text Encoder & Decoder -==-")->pack();
+
+$mw->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -borderwidth => 5, -text => "-= Base64 =-", -command => \&base64 )->pack(-fill => "both");
+$mw->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -borderwidth => 5, -text => "-= TripleDES =-", -command => \&trible )->pack(-fill => "both");
+$mw->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -borderwidth => 5, -text => "-= ROT13 =-", -command => \&rot )->pack(-fill => "both");
+$mw->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -borderwidth => 5, -text => "-= ROT47 =-", -command => \&rot4 )->pack(-fill => "both");
+$mw->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -borderwidth => 5, -text => "-= SHA1 =-", -command => \&sha )->pack(-fill => "both");
+$mw->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -borderwidth => 5, -text => "-= CRC32 =-", -command => \&crc )->pack(-fill => "both");
+$mw->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -borderwidth => 5, -text => "-= MD5 =-", -command => \&md )->pack(-fill => "both");
+$mw->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -borderwidth => 5, -text => "-= Vigenere =-", -command => \&vigene )->pack(-fill => "both");
+
+$mw->Label(-background => "black", -foreground => "green", -font => "Impact 10", -text => "-==-")->pack();
+
+$mw->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -borderwidth => 5, -text => "About", -command => \&about )->pack(-fill => "both");
+$mw->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -borderwidth => 5, -text => "Exit", -command => \&exir )->pack(-fill => "both");
+			   
+MainLoop;
+
+############### -= Base64 =- #################
+
+sub base64 {
+
+$window = MainWindow->new(-background => "black", -cursor => "crosshair");
+$window->geometry("400x706+430+100");
+$window->title("-= Base64 =-");
+
+$window->Label(-background => "black", -foreground => "green", -font => "Impact 11", -text => "-==- BASE64 ENCODE -==-")->pack();
+$window->Label(-background => "black", -foreground => "green")->pack();
+
+$window->Label(-background => "black", -foreground => "green", -font => "Impact 9", -text => "-= Enter Encoding Text =-")->pack();
+$window->Entry(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -textvariable => \$base1 )->pack(-ipadx => "1i", -ipady => 30);
+
+$window->Label(-background => "black", -foreground => "green", -font => "Impact 9", -text => "-= Text Encoded =-")->pack();
+
+$text1 = $window->Text(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -width => 45, -height => 7)->pack();
+
+$window->Label(-background => "black", -foreground => "green", -font => "Impact 9", -text => "-=-")->pack();
+
+$window->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -text => "Encode", -command => \&encode )->pack(-fill => "both");
+
+$window->Label(-background => "black", -foreground => "green",  -font => "Impact 9", -text => "-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")->pack();
+
+$window->Label(-background => "black", -foreground => "green", -font => "Impact 11",  -text => "-==- BASE64 DECODE -==-")->pack();
+$window->Label(-background => "black", -foreground => "green")->pack();
+
+$window->Label(-background => "black", -foreground => "green", -font => "Impact 9",  -text => "-= Enter Decoding Text =-")->pack();
+$window->Entry(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red",  -textvariable => \$base2 )->pack(-ipadx => "1i", -ipady => 30);
+
+$window->Label(-background => "black", -foreground => "green", -font => "Impact 9", -text => "-= Text Decoded =-")->pack();
+
+$text2 = $window->Text(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -width => 45, -height => 7)->pack();
+
+$window->Label(-background => "black", -foreground =>"green", -font => "Impact 9", -text => "-=-")->pack();
+$window->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -text => "Decode", -command => \&decode )->pack(-fill => "both");
+$window->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -text => "Exit", -command => [$window => 'destroy'])->pack(-fill => "both");
+
+MainLoop;
+
+sub encode {
+
+$encoded = encode_base64( $base1 );
+$text1->insert('end', $encoded)->pack(); 
+}
+
+sub decode {
+
+$decode = decode_base64( $base2 );
+$text2->insert('end', $decode)->pack(); 
+}
+}
+
+############### -= TribleDES =- #################
+
+sub trible {
+
+$windo = MainWindow->new(-background => "black", -cursor => "crosshair");
+$windo->geometry("400x725+430+70");
+$windo->title("-= TripleDES =-");
+
+$windo->Label(-background => "black", -foreground => "green", -font => "Impact 11", -text => "-==- TripleDES ENCODE -==-")->pack();
+$windo->Label(-background => "black", -foreground => "green")->pack();
+
+$windo->Label(-background => "black", -foreground => "green", -font => "Impact 9", -text => "-= Enter Encoding Text =-")->pack();
+$windo->Entry(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -textvariable => \$base3 )->pack(-ipadx => "1i", -ipady => 30);
+
+$windo->Label(-background => "black", -foreground => "green", -font=> "Impact 9",  -text => "-= Enter Encoding Text Password =-")->pack();
+$windo->Entry(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -textvariable => \$password1 )->pack(-ipadx => "1i");
+
+$windo->Label(-background => "black", -foreground => "green", -font => "Impact 9", -text => "-= Text Encoded =-")->pack();
+
+$text3 = $windo->Text(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -width => 45, -height => 5)->pack();
+
+$windo->Label(-background => "black", -foreground => "green", -text => "-=-")->pack();
+$windo->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -text => "Encode", -command => \&encode1 )->pack(-fill => "both");
+
+$windo->Label(-background => "black", -foreground => "green", -font => "Impact 9", -text => "-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")->pack();
+
+$windo->Label(-background => "black", -foreground => "green", -font=> "Impact 11",  -text => "-==- TripleDES DECODE -==-")->pack();
+$windo->Label(-background => "black", -foreground => "green")->pack();
+
+$windo->Label(-background => "black", -foreground => "green", -font=> "Impact 9",  -text => "-= Enter Decoding Text =-")->pack();
+$windo->Entry(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red",  -textvariable => \$base4 )->pack(-ipadx => "1i", -ipady => 30);
+
+$windo->Label(-background => "black", -foreground => "green", -font=> "Impact 9",  -text => "-= Enter Decoding Text Password  =-")->pack();
+$windo->Entry(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -textvariable => \$password2 )->pack(-ipadx => "1i");
+
+$windo->Label(-background => "black", -foreground => "green", -font => "Impact 9",  -text => "-= Text Decoded =-")->pack();
+
+$text4 = $windo->Text(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -width => 45, -height => 5)->pack();
+
+$windo->Label(-background => "black", -foreground => "green", -text => "-=-")->pack();
+$windo->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -text => "Decode", -command => \&decode2 )->pack(-fill => "both");
+$windo->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -text => "Exit", -command => [$windo => 'destroy'])->pack(-fill => "both");
+
+MainLoop;
+
+sub encode1 {
+
+$des = Crypt::TripleDES->new;
+$cypher = $des->encrypt3( $base3, $password1 );
+$text3->insert('end', $cypher)->pack();
+}
+
+sub decode2 {
+
+$des = Crypt::TripleDES->new;
+$plain = $des->decrypt3( $base4, $password2 );
+$text4->insert('end', $plain)->pack();
+}
+}
+
+############### -= ROT13 =- #################
+
+sub rot {
+
+$wind = MainWindow->new(-background => "black", -cursor => "crosshair");
+$wind->geometry("400x358+430+326");
+$wind->title("-= ROT13 =-");
+
+$wind->Label(-background => "black", -foreground => "green", -font => "Impact 11", -text => "-==- ROT13 ENCODE -==-")->pack();
+$wind->Label(-background => "black", -foreground => "green")->pack();
+
+$wind->Label(-background => "black", -foreground => "green", -font => "Impact 9", -text => "-= Enter Encoding Text =-")->pack();
+$wind->Entry(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -textvariable => \$base5 )->pack(-ipadx => "1i", -ipady => 30);
+
+$wind->Label(-background => "black", -foreground => "green", -font => "Impact 9", -text => "-= Text Encoded =-")->pack();
+
+$text5 = $wind->Text(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -width => 45, -height => 7)->pack();
+$wind->Label(-background => "black", -foreground => "green", -font => "Impact 9", -text => "-=-")->pack();
+
+$wind->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -text => "Encode", -command => \&rote )->pack(-fill => "both");
+$wind->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -text => "Exit", -command => [$wind => 'destroy'])->pack(-fill => "both");
+
+MainLoop;
+
+sub rote {
+
+$rot13 = Crypt::Rot13->new;
+$rot13->charge ($base5);
+$text5->insert('end', $rot13->rot13 (245.333))->pack();
+}
+}
+
+############### -= SHA1 =- #################
+
+sub sha {
+
+$win = MainWindow->new(-background => "black", -cursor => "crosshair");
+$win->geometry("400x358+430+326");
+$win->title("-= SHA1 =-");
+
+$win->Label(-background => "black", -foreground => "green", -font => "Impact 11", -text => "-==- SHA1 ENCODE -==-")->pack();
+$win->Label(-background => "black", -foreground => "green")->pack();
+
+$win->Label(-background => "black", -foreground => "green", -font => "Impact 9", -text => "-= Enter Encoding Text =-")->pack();
+$win->Entry(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -textvariable => \$base6 )->pack(-ipadx => "1i", -ipady => 30);
+
+$win->Label(-background => "black", -foreground => "green", -font => "Impact 9", -text => "-= Text Encoded =-")->pack();
+
+$text6 = $win->Text(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -width => 45, -height => 7)->pack();
+$win->Label(-background => "black", -foreground => "green", -font => "Impact 9", -text => "-=-")->pack();
+
+$win->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -text => "Encode", -command => \&sah )->pack(-fill => "both");
+$win->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -text => "Exit", -command => [$win => 'destroy'])->pack(-fill => "both");
+
+MainLoop;
+
+sub sah {
+
+$sha1 = Digest::SHA1->new;
+$sha1->add($base6);
+$digest2 = $sha1->hexdigest;
+$text6->insert('end', $digest2)->pack;
+}
+}
+
+############### -= CRC32=- #################
+
+sub crc {
+
+$wi = MainWindow->new(-background => "black", -cursor => "crosshair");
+$wi->geometry("400x358+430+326");
+$wi->title("-= CRC32 =-");
+
+$wi->Label(-background => "black", -foreground => "green", -font=> "Impact 11", -text => "-==- CRC32 ENCODE -==-")->pack();
+$wi->Label(-background => "black", -foreground => "green")->pack();
+
+$wi->Label(-background => "black", -foreground => "green", -font=> "Impact 9", -text => "-= Enter Encoding Text =-")->pack();
+$wi->Entry(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -textvariable => \$base7 )->pack(-ipadx => "1i", -ipady => 30);
+
+$wi->Label(-background => "black", -foreground => "green", -font=> "Impact 9", -text => "-= Text Encoded =-")->pack();
+$text7 = $wi->Text(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -width => 45, -height => 7)->pack;
+
+$wi->Label(-background => "black", -foreground => "green", -font=> "Impact 9", -text => "-=-")->pack();
+
+$wi->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -text => "Encode", -command => \&cr )->pack(-fill => "both");
+$wi->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -text => "Exit", -command => [$wi => 'destroy'])->pack(-fill => "both");
+
+MainLoop;
+
+sub cr {
+
+$crc = new Digest::Crc32();
+$enc = $crc->strcrc32($base7);
+$text7->insert('end', $enc)->pack;
+}
+}
+
+############### -= MD5 =- #################
+
+sub md {
+
+$wdow = MainWindow->new(-background => "black", -cursor => "crosshair");
+$wdow->geometry("400x358+430+326");
+$wdow->title("-= MD5 =-");
+
+$wdow->Label(-background => "black", -foreground => "green", -font=> "Impact 11", -text => "-==- MD5 ENCODE -==-")->pack();
+$wdow->Label(-background => "black", -foreground => "green")->pack();
+
+$wdow->Label(-background => "black", -foreground => "green", -font=> "Impact 9", -text => "-= Enter Encoding Text =-")->pack();
+$wdow->Entry(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -textvariable => \$base8 )->pack(-ipadx => "1i", -ipady => 30);
+
+$wdow->Label(-background => "black", -foreground => "green", -font=> "Impact 9", -text => "-= Text Encoded =-")->pack();
+$text8 = $wdow->Text(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -width=> 45, -height=> 7)->pack();
+
+$wdow->Label(-background => "black", -foreground => "green", -font=> "Impact 9", -text => "-=-")->pack();
+
+$wdow->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -text => "Encode", -command => \&md_5 )->pack(-fill => "both");
+$wdow->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font => "Impact 10", -text => "Exit", -command => [$wdow => 'destroy'])->pack(-fill => "both");
+MainLoop;
+
+sub md_5 {
+
+$ctx = Digest::MD5->new;
+$ctx->add($base8);
+$digest1 = $ctx->hexdigest;
+$text8->insert('end', $digest1)->pack();
+}
+}
+
+############### -= Vigenere =- #################
+
+sub vigene {
+
+$winow = MainWindow->new(-background => "black", -cursor => "crosshair");
+$winow->geometry("400x725+430+70");
+$winow->title("-= Vigenere =-");
+
+$winow->Label(-background => "black", -foreground => "green", -font => "Impact 11", -text => "-==- Vigenere ENCODE -==-")->pack();
+$winow->Label(-background => "black", -foreground => "green")->pack();
+
+$winow->Label(-background => "black", -foreground => "green", -font => "Impact 9", -text => "-= Enter Encoding Text =-")->pack();
+$winow->Entry(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -textvariable => \$base9 )->pack(-ipadx => "1i", -ipady => 30);
+
+$winow->Label(-background => "black", -foreground => "green", -font => "Impact 9",  -text => "-= Enter Encoding Text Password =-")->pack();
+$winow->Entry(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -textvariable => \$password3 )->pack(-ipadx => "1i");
+
+$winow->Label(-background => "black", -foreground => "green", -font => "Impact 9", -text => "-= Text Encoded =-")->pack();
+
+$text01 = $winow->Text(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -width => 45, -height => 5)->pack();
+$winow->Label(-background => "black", -foreground => "green", -text => "-=-")->pack();
+
+$winow->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief=> "groove", -font=> "Impact 10", -text => "Encode", -command => \&vien )->pack(-fill => "both");
+
+$winow->Label(-background => "black", -foreground => "green", -font => "Impact 9", -text => "-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")->pack();
+
+$winow->Label(-background => "black", -foreground => "green", -font => "Impact 11",  -text => "-==- Vigenere DECODE -==-")->pack();
+$winow->Label(-background => "black", -foreground => "green")->pack();
+
+$winow->Label(-background => "black", -foreground => "green", -font => "Impact 9",  -text => "-= Enter Decoding Text =-")->pack();
+$winow->Entry(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red",  -textvariable => \$base01 )->pack(-ipadx => "1i", -ipady => 30);
+
+$winow->Label(-background => "black", -foreground => "green", -font => "Impact 9",  -text => "-= Enter Decoding Text Password  =-")->pack();
+$winow->Entry(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -textvariable => \$password4 )->pack(-ipadx => "1i");
+
+$winow->Label(-background => "black", -foreground => "green", -font => "Impact 9",  -text => "-= Text Decoded =-")->pack();
+
+$text02 = $winow->Text(-background => "black", -foreground=>"green", -selectbackground => "red", -insertbackground => "red", -width=> 45, -height=> 5)->pack();
+
+$winow->Label(-background => "black", -foreground => "green", -text => "-=-")->pack();
+
+$winow->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font=> "Impact 10",  -text => "Decode", -command => \&vide )->pack(-fill => "both");
+$winow->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font=> "Impact 10", -text => "Exit", -command => [$winow => 'destroy'])->pack(-fill => "both");
+
+MainLoop;
+
+sub vien {
+
+$vigenere = Crypt::Vigenere->new( $password3 );
+$encode = $vigenere->encodeMessage( $base9 );
+$text01->insert('end', $encode)->pack();
+}
+
+sub vide {
+
+$vigenere = Crypt::Vigenere->new( $password4 );
+$decode = $vigenere->decodeMessage( $base01 );
+$text02->insert('end', $decode)->pack();
+}
+}
+
+############### -= ROT47 =- #################
+
+sub rot4 {
+
+$windw = MainWindow->new(-background => "black", -cursor => "crosshair");
+$windw->geometry("400x643+430+140");
+$windw->title("-= ROT47 =-");
+
+$windw->Label(-background => "black", -foreground => "green", -font=> "Impact 11", -text => "-==- ROT47 ENCODE -==-")->pack();
+$windw->Label(-background => "black", -foreground => "green")->pack();
+
+$windw->Label(-background => "black", -foreground => "green", -font=> "Impact 9", -text => "-= Enter Encoding Text =-")->pack();
+$windw->Entry(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -textvariable => \$base02 )->pack(-ipadx => "1i", -ipady => 30);
+
+$windw->Label(-background => "black", -foreground => "green", -font=> "Impact 9", -text => "-= Text Encoded =-")->pack();
+
+$text03 = $windw->Text(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -width => 45, -height => 5)->pack;
+$windw->Label(-background => "black", -foreground => "green", -text => "-=-")->pack();
+
+$windw->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font=> "Impact 10", -text => "Encode", -command => \&rot47en )->pack(-fill => "both");
+
+$windw->Label(-background => "black", -foreground => "green", -font => "Impact 9", -text => "-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-=-")->pack();
+
+$windw->Label(-background => "black", -foreground => "green", -font => "Impact 11",  -text => "-==- ROT47 DECODE -==-")->pack();
+$windw->Label(-background => "black", -foreground => "green")->pack();
+
+$windw->Label(-background => "black", -foreground => "green", -font => "Impact 9",  -text => "-= Enter Decoding Text =-")->pack();
+$windw->Entry(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red",  -textvariable => \$base03 )->pack(-ipadx => "1i", -ipady => 30);
+
+$windw->Label(-background => "black", -foreground => "green", -font => "Impact 9",  -text => "-= Text Decoded =-")->pack();
+
+$text04 = $windw->Text(-background => "black", -foreground => "green", -selectbackground => "red", -insertbackground => "red", -width => 45, -height => 5)->pack();
+
+$windw->Label(-background => "black", -foreground => "green", -text => "-=-")->pack();
+
+$windw->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font=> "Impact 10",  -text => "Decode", -command => \&rot47de )->pack(-fill => "both");
+$windw->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font=> "Impact 10", -text => "Exit", -command => [$windw => 'destroy'])->pack(-fill => "both");
+
+MainLoop;
+
+sub rot47en{
+
+$cipher = new Crypt::Rot47();
+$ciphertext = $cipher->encrypt( $base02 );
+$text03->insert('end', $ciphertext)->pack();
+}
+
+sub rot47de {
+
+$cipher = new Crypt::Rot47();
+$plaintext = $cipher->decrypt( $base03 );
+$text04->insert('end', $plaintext)->pack();
+}
+}
+
+############### -= About =- #################
+
+sub about {
+
+$about = $mw->Toplevel(-background => "black", -cursor=>"crosshair");
+$about->geometry("410x235+425+353");
+$about->title("Multi Text Encoder & Decoder About");
+ 
+$about->Label(-background => "black", -foreground=>"green")->pack();
+$about->Label(-background => "black", -foreground=>"green", -font=> "Impact 12", -text => "-==- Multi Text Encoder & Decoder -==-\n")->pack();
+
+$about->Label(-background => "black",-foreground => "green",-font => "wingdings 22", -text => "7")->pack();
+$about->Label(-background => "black", -foreground=>"green", -font=> "Impact 10",  -text => "-= Coded By KuNdUz =-\n\n-= Greetz To =-")->pack();
+
+$about->Label(-background => "black", -foreground => "green", -font => "Impact 10",  -text => "www.cpan.org")->pack();
+$about->Label(-background => "black", -foreground => "green", -font => "Sylfaen 8",  -text => "09/12/2008")->pack(-anchor => "se");
+$about->Button(-activebackground => "green",  -activeforeground => "black",  -background => "black", -foreground => "green", -relief => "groove", -font=> "Sylfaen 9.5", -text => "Ok", -command => [$about => 'destroy'])->pack(-fill => "both");
+
+MainLoop;
+}
+
+sub exir {
+exit;
+}
+
+##
+# By_KuNdUz
+##

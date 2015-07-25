@@ -1,0 +1,31 @@
+#!/usr/bin/perl
+# cpanel11 - expcheck.pl          Copyright(c) 2006 cPanel Inc.
+#                                 All rights Reserved.
+# copyright@cpanel.net            http://www.cpanel.net
+print "cPanel Exploit Checker 3.0\n";
+my $notok=0;
+foreach my $script ('/usr/local/cpanel/bin/mysqladmin',
+                        '/usr/local/cpanel/bin/hooksadmin') {
+    my %TA=('unshift( @INC, "/usr/local/cpanel" );'=>0,,
+    '@INC=grep(!/(^\.|\.\.|\/\.+)/,@INC);'=>0,
+    '@INC=grep(/^(\/usr\/lib\d*\/perl|\/usr\/local\/lib\d*\/perl|\/usr\/local\/cpanel)/,@INC);'=>0);
+    print "Checking $script...";
+    if (! -e $script) { print 'not installed (ok) Done' . "\n"; next(); }
+    open(SS,'<',$script);
+    while(my $l = <SS>) {
+            foreach my $a (keys %TA) {
+                    if (index($l,$a) > -1) { delete $TA{$a}; next(); }
+            }
+    }
+    close(SS);
+    if ((scalar keys %TA) > 0) {
+        $notok++;
+            print "unsafe";
+    } else {
+        print "safe";
+    }
+    print "..Done\n";
+}
+if ($notok) { print "Your system has not been patched.  Please run 
+http://layer1.cpanel.net/installer/sec092406.pl \n"; } else { print "Your system has been 
+patched!\n"; }

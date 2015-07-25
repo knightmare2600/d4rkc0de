@@ -1,0 +1,76 @@
+
+
+// Simple brute Force code (C) by rattle
+// .aware security research
+// http://www.awarenetwork.org/
+
+
+#include <windows.h>
+
+typedef BOOL (CALLBACK *BRUTE_CALLBACK) (LPSTR pCurrent);
+
+
+BOOL CALLBACK BruteCallback(LPSTR pCurrent) {
+
+	printf("%s\n",pCurrent);
+	return FALSE;
+
+}
+
+BOOL BruteForce2(UINT iPassLen, LPCSTR szChars, BRUTE_CALLBACK pCall) 
+{
+	static BYTE bf[0xFF] = {0};
+	static BYTE out[0xFF]= {0};
+	static UINT i,j;
+
+	UINT iMax = strlen(szChars)-1;
+
+	if (!szChars || !pCall)
+		return;
+
+
+    for (i=0;i<=iPassLen;++i)
+		bf[i]=0;
+
+	(*bf)--;
+
+    while (!bf[iPassLen]) 
+    {
+        ++bf[0];
+
+        for (j=0;j<=iPassLen;++j) {
+			if (bf[j]>iMax) {
+				bf[j]=0;
+                ++bf[j+1];
+		}}
+
+		for (j=0;j<iPassLen;++j)
+			out[j]=szChars[bf[iPassLen-j-1]];
+
+		out[iPassLen]='\0';
+
+		if ((*pCall)(out)) return TRUE;
+
+    }
+
+	return FALSE;
+}
+
+
+VOID BruteForce(UINT iFrom, UINT iTo, LPCSTR szChars, BRUTE_CALLBACK pCall) {
+	
+	UINT i = 0;
+
+	for (i=iFrom;i<=iTo;i++) {
+		if (BruteForce2(i,szChars,pCall))
+			return TRUE;
+	}
+
+	return FALSE;
+}
+
+
+int main(int argc, char *argv[]) 
+{
+	BruteForce(6,8,"0123456789",(BRUTE_CALLBACK) &BruteCallback);
+}

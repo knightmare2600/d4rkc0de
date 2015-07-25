@@ -1,0 +1,46 @@
+/*
+	+ procmask.c +
+	Simple máscara de procesos
+	A simple process' masquerade
+	
+	It works on GNU/Linux
+
+	   Author: despai
+	   	   skkunk@gmail.com
+	   	   www.despai.es
+	   		  
+	Necesitas adaptar éste código al proceso que
+	quieras disimular
+	
+	You need to adapt the code to the process' code
+	u need to disguise
+	
+	PD: Just for fun o:)
+		 28/02/2008
+*/
+
+#include <stdio.h>
+#include <string.h>
+#define MASCARA "bash"
+
+main(int argc, char **argv)
+{
+	int short pos;
+	int short size;
+	char new_argv[15][30];
+	
+	strncpy(new_argv[0],argv[0],30);
+	bzero(argv[0],strlen(argv[0]));
+	strncpy(argv[0], MASCARA, 30);
+
+	if(argc >= 2) {
+		for(pos=1; pos<=argc-1; pos++)
+			strncpy(new_argv[pos], argv[pos],30);
+   
+      		for(pos=1; pos<=argc-1; pos++)
+			bzero(argv[pos],strlen(argv[pos]));
+	}
+
+	printf("\nType 'ps u' to check it works\n");
+	while(1);
+}

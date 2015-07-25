@@ -1,0 +1,109 @@
+#include <stdio.h>
+/* CRACKER  BY D4NB4R
+   Pandora's Box TEAM
+ d4nb4r[at]hotmail[dot]*/
+#define D4NB4R 0x7fffffffL
+#define MENOR_VARCH 50
+#define MAYOR_VARCH 200
+#define MAXIMO_PASS 50
+
+typedef unsigned long var64;
+int funcion(int var, var64 var1, var64 var2, int *pross)
+{
+  int aux,aux1;
+  var64 t1, t2, t3, t4, d, d1, d2, d3, d4, x, x1, x2, x3;
+  var64 f1[MAXIMO_PASS-2],f2[MAXIMO_PASS-2],f3[MAXIMO_PASS-3],f4[MAXIMO_PASS-3];
+ 
+  aux=-1;t3=7;f1[0]=1345345333L;f2[0]=0x12345671L;  
+
+  while (1) {
+    while (aux < var) {
+      aux++;
+      pross[aux] = MENOR_VARCH;
+      f4[aux]=(f1[aux]&0x3f)+t3;
+      f3[aux]=f4[aux]*MENOR_VARCH+(f1[aux] << 8);
+      t3+= MENOR_VARCH;f1[aux+1]=f1[aux]^f3[aux];      
+      f2[aux+1]=f2[aux]+((f2[aux]<< 8)^f1[aux+1]);}   
+      
+    d4=f1[aux+1];x=f2[aux+1];    
+    t4=(d4& 0x3f)+t3;d2=t4*MENOR_VARCH+(d4<< 8);d3=(x<< 8)^d4;    
+
+    for (aux1=MENOR_VARCH;aux1<=MAYOR_VARCH;aux1++,d2+=t4) {
+      x2=x+(d2^d3);x1=d4^d2;x3=(var2 -x2)^(x2<< 8);      
+      d1=(x1&0x3f)+t3+aux1;d=((x3^x1)-(x1<< 8))&D4NB4R;      
+      if (d%d1!= 0) continue;t1=d/d1;      
+      if (t1< MENOR_VARCH ||t1> MAYOR_VARCH) continue;
+
+      d1= (x3&0x3f)+t3+aux1+t1;
+      d= ((var1^x3)-(x3<< 8))&D4NB4R;
+      if (d%d1!= 0) continue;t2=d/d1;
+      
+      if (t2<MENOR_VARCH||t2>MAYOR_VARCH) continue;
+      pross[aux+1]=aux1;pross[aux+2] =t1;pross[aux+3] =t2;  
+      
+      return 1;}  
+
+    while(aux>=0&&pross[aux]>=MAYOR_VARCH) {
+      t3-= MAYOR_VARCH;
+      aux--;}
+    
+    if (aux<0) break;
+    pross[aux]++;f3[aux]+=f4[aux];     
+    t3++;
+    f1[aux+1]=f1[aux]^f3[aux];
+    f2[aux+1]=f2[aux]+((f2[aux]<<8)^f1[aux+1]);}  
+
+  return 0;}
+
+void d4nb4r(char *password){
+  int cont,cont1,pass[MAXIMO_PASS];
+  var64 t1,t2,t3;  
+
+  if(sscanf(password,"%8lx%lx",&t1,&t2)!=2){
+    printf("Hash Incorrecto: %s\n",password);
+    return;
+  }
+  printf("Hash: %08lx%08lx\n",t1,t2);
+  t3=t2-t1; t3=t2-((t3<<8)^t1);
+  t3=t2-((t3<<8)^t1);t3=t2-((t3<<8)^t1);  
+
+  for(cont1=3;cont1<=MAXIMO_PASS;cont1++) {
+    printf("Eatapa.....  %d\n",cont1);
+    if(funcion(cont1-4,t1,t3,pass) ) {
+      printf("Encontrado : ");
+      for(cont=0;cont<cont1;cont++)
+      putchar(pass[cont]);
+      printf("\n");
+      break;}
+  }  
+ 
+  if (cont1>MAXIMO_PASS)
+    printf("Password No Encontrado\n");}
+
+int main(int argc, char *argv[])
+{
+ int cont;
+ printf("ÉÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ»\n");
+    printf("º      Princess I love you        º\n");
+    printf("º           Club Hacker           º\n");
+    printf("º   http://clubhacker.66ghz.com   º\n");
+    printf("º           2009-2010             º\n");
+    printf("º            D4NB4R               º\n");
+    printf("ÈÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ¼\n");
+  if (argc<=1)
+    printf("Modo de uso  %s hash\n", argv[0]);
+  for (cont= 1;cont< argc;cont++)
+    d4nb4r(argv[cont]);
+ 
+  system("PAUSE");
+   printf("ÉÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ»\n");
+    printf("º                                 º\n");
+    printf("º      Pandora's Box Team         º\n");
+    printf("º   Cracker hecho por D4NB4R      º\n");
+    printf("º           2009-2010             º\n");
+    printf("º    D4NB4R--Princess I love you  º\n");
+    printf("ÈÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍÍ¼\n");
+  system("PAUSE");
+  return 0;
+
+} 

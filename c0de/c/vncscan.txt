@@ -1,0 +1,369 @@
+#include <arpa/inet.h>
+//comment this and include -lcrypt on unix. linux is fine as is.
+#include <crypt.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <netdb.h>
+#include <netinet/in.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h> a
+#include <stdarg.h>
+#include <sys/socket.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <sys/ioctl.h>
+#include <time.h>
+#include <unistd.h>
+#include <net/if.h>
+
+#define LOGFILE vnchosts.log
+#define FORKLIMIT 100
+void usage(char *program)
+{
+printf("-+ realvnc 4.1.0-4.1.1 scanner +-\n");
+printf("-+ ripped from sshscan/d7 +-\n");
+printf("-+ usage: %s <a or b class> +-\n", program);
+}
+
+/* Nigger up the portscanner ! */
+
+#define SOCKETS 850 /* Im sure you know what this does... */
+
+#define TIMEOUT 2 /* Blah */
+#define S_NONE 0
+#define S_CONNECTING 1
+
+struct conn_t {
+int s;
+char status;
+time_t a;
+struct sockaddr_in addr;
+};
+struct conn_t connlist[SOCKETS];
+
+void init_sockets(void);
+void check_sockets(void);
+void fatal(char *);
+/* End pscan */
+
+struct our_format {
+char *ip;
+};
+
+struct our_format pscan_list[6500];
+/* Enough portscan shit for now, we move on ;) */
+
+int totalowned=0, totalvuln=0;
+int type=-1, shell=0, pnum=0, vnum=0, numforks=0, tot=0;
+int brute=-1, failure=1;
+char *he;
+
+/* Lets jew up some basic banner scan shit to mingle wid tha portscan */
+int startbanner(char *target)
+{
+int cur;
+char vbuf[1024];
+FILE *f;
+
+printf("-+ banner scanning %s +-\n", target);
+
+for (cur=0; cur < pnum; cur++)
+{
+if (!fork())
+{
+bscan(pscan_list[cur].ip);
+free(pscan_list[cur].ip);
+exit(0);
+}
+else
+{
+numforks++;
+if (numforks > FORKLIMIT)
+for (numforks; numforks > FORKLIMIT; numforks--)
+wait(NULL);
+}
+}
+/* Done there, lost? Hope not ... We move on */
+
+/* Give yer box a breather for 20 seconds */
+printf("-+ dusting off sockets +-\n");
+
+sleep(20);
+
+printf("-+ did we find any boxen? +-\n");
+
+/* Lets open our temp file and look for goodies =P */
+if ((f=fopen(".temp", "r")) == NULL)
+{
+fprintf(stderr, "-+ SHIT!!!!! No hosts found on %s +-\n", target);
+return -1;
+}
+
+while (!feof(f))
+{
+memset(&vbuf, 0, sizeof(vbuf));
+fgets((char *) &vbuf, sizeof(vbuf), f);
+
+if (vbuf[strlen(vbuf) - 1] == '\n')
+vbuf[strlen(vbuf) - 1] = '\0';
+if (strlen(vbuf) > 1)
+{
+fflush(stdout);
+totalvuln++;
+smurfy(vbuf);
+}
+}
+fclose(f);
+unlink(".temp");
+printf("\n-+ results logged in vnchosts.log +-\n");
+totalowned=0;
+totalvuln=0;
+}
+/* Close temp file , wipe it, give nigger user results and log em */
+
+int main(int argc, char *argv[])
+{
+
+int nump=0, b;
+char ip[17], salt[3], *parse, *type, *inpass;
+
+if (argc < 2) /* Lets teach the dumbass how to run us */
+{
+usage(argv[0]);
+exit(1);
+}
+
+parse=argv[1];
+
+for (parse; *parse != '\0'; *parse++)
+if (*parse == '.')
+nump++;
+if (nump > 1)
+usage(argv[0]);
+
+
+if (nump == 0) /* Fo da a class niggah scan */
+{
+for (b=0; b<=254; b++)
+{
+memset(&ip, 0, sizeof(ip));
+sprintf(ip, "%s.%d", argv[1], b);
+
+pnum=0;
+pscan(ip);
+startbanner(ip);
+}
+}
+
+if (nump == 1) /* Fo da b class niggah scan */
+{
+pscan(argv[1]);
+startbanner(argv[1]);
+}
+}
+
+int smurfy(char *iptoroot) /* Report any bsd's and make em all shiny */
+{
+he = iptoroot;
+printf("-+ %s is running vnc 4.1.0-4.1.1 +-\n", he);
+}
+
+
+/* Lets finish our portscan shit here */
+int pscan(char *class)
+{
+int done, i, cip, bb, ret, k, ns;
+time_t scantime;
+char ip[20];
+
+done = 0; cip = 1; bb = 0;
+init_sockets();
+
+scantime = time(0);
+
+printf("-+ portscanning %s +-\n", class);
+
+while(!done) {
+for (i = 0; i < SOCKETS; i++) {
+if (cip == 255) {
+if ((bb == 255)) {
+ns = 0;
+for (k = 0; k < SOCKETS; k++) {
+if (connlist[k].status > S_NONE) {
+ns++;
+break;
+}
+}
+
+if (ns == 0)
+done = 1;
+
+break;
+}
+else {
+cip = 0;
+bb++;
+}
+}
+
+if (connlist[i].status == S_NONE) {
+connlist[i].s = socket(AF_INET, SOCK_STREAM, 0);
+if (connlist[i].s == -1)
+printf("unable to allocate socket.\n");
+else {
+ret = fcntl(connlist[i].s, F_SETFL, O_NONBLOCK);
+if (ret == -1) {
+printf("unable to set O_NONBLOCK\n");
+close(connlist[i].s);
+}
+else {
+memset((char *)ip, 0, 20);
+sprintf(ip, "%s.%d.%d", class, bb, cip); /* Make user class
+arg into feasible addy */
+connlist[i].addr.sin_addr.s_addr = inet_addr(ip);
+if (connlist[i].addr.sin_addr.s_addr == -1)
+fatal("Invalid IP.");
+connlist[i].addr.sin_family = AF_INET;
+connlist[i].addr.sin_port = htons(5900);
+connlist[i].a = time(0);
+connlist[i].status = S_CONNECTING;
+cip++;
+}
+}
+}
+}
+
+check_sockets();
+}
+}
+
+void init_sockets(void)
+{
+int i;
+
+for (i = 0; i < SOCKETS; i++) {
+connlist[i].status = S_NONE;
+memset((struct sockaddr_in *)&connlist[i].addr, 0, sizeof(struct
+sockaddr_in));
+}
+}
+
+/* Check our little sockets make sure deyz ok */
+void check_sockets(void)
+{
+int i, ret;
+
+for (i = 0; i < SOCKETS; i++) {
+if ((connlist[i].a < (time(0) - TIMEOUT)) &&
+(connlist[i].status == S_CONNECTING)) {
+close(connlist[i].s);
+connlist[i].status = S_NONE;
+}
+
+else if (connlist[i].status == S_CONNECTING) {
+ret = connect(connlist[i].s,
+(struct sockaddr *)&connlist[i].addr,
+sizeof(struct sockaddr_in));
+if (ret == -1) {
+if (errno == EISCONN) {
+pscan_list[pnum].ip=(char *)malloc(17);
+strcpy(pscan_list[pnum].ip,
+inet_ntoa(connlist[i].addr.sin_addr));
+pnum++;
+
+close(connlist[i].s);
+connlist[i].status = S_NONE;
+}
+
+if ((errno != EALREADY) && (errno != EINPROGRESS)) {
+close(connlist[i].s);
+connlist[i].status = S_NONE;
+}
+}
+else {
+pscan_list[pnum].ip=(char *)malloc(17);
+strcpy(pscan_list[pnum].ip,
+inet_ntoa(connlist[i].addr.sin_addr));
+pnum++;
+
+close(connlist[i].s);
+connlist[i].status = S_NONE;
+}
+}
+}
+}
+
+/* OOooohhh bad stuff */
+void fatal(char *err)
+{
+int i;
+printf("Error: %s\n", err);
+for (i = 0; i < SOCKETS; i++) {
+if (connlist[i].status >= S_CONNECTING)
+close(connlist[i].s);
+}
+}
+/* Pscan shit all done there */
+
+/* Create our main banner scanner and logging functions */
+int bscan(char *host)
+{
+struct sockaddr_in sin;
+int sock, len;
+u_char buf[4000];
+
+FILE *nigger;
+
+sock = socket(AF_INET, SOCK_STREAM, 0);
+if (!sock)
+{
+fprintf(stderr, "unable to get a socket\n");
+return;
+}
+sin.sin_family = AF_INET;
+sin.sin_port = htons(5900);
+sin.sin_addr.s_addr = inet_addr(host);
+alarm(10);
+if (connect(sock, (struct sockaddr*)&sin, sizeof(sin)) == 0) {
+while (1)
+{
+memset(buf, 0, sizeof(buf));
+if ((len = read (sock, buf, 1)) <= 0)
+break;
+if (*buf == (unsigned int) 255)
+{
+read(sock, (buf + 1), 2);
+if (*(buf + 1) == (unsigned int) 253 && !(u_char) * (buf + 2));
+else if ((u_char) * (buf + 1) == (unsigned int) 253)
+{
+*(buf + 1) = 252;
+write (sock, buf, 3);
+}
+}
+else
+{
+if (*buf != 0)
+{
+bzero (buf, sizeof (buf));
+read (sock, buf, sizeof (buf));
+usleep(20000);
+if (strstr(buf, "003.008"))
+{
+nigger=fopen(".temp", "a");
+fprintf(nigger, "%s\n", host);
+fclose(nigger);
+system("cp .temp vnchosts.log");
+alarm(0);
+return 1;
+}
+}
+}
+}
+}
+alarm(0);
+close(sock);
+return;
+}

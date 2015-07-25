@@ -1,0 +1,44 @@
+###################################
+#cracker md5 (perl)
+###################################
+
+#!/usr/bin/perl
+print "\n\t*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*\n"; 
+print "\t*    Md5 Cracker                      *\n";
+print "\t*    www.dz-security.net              *\n";
+print "\t*    dzh4cker[at]gmail[dot]com        *\n";  
+print "\t-          Coded By sub-zero          -\n"; 
+print "\t*                Ex:md5.pl md5_hash   *\n"; 
+print "\t*-*-*-*-*-*-*-*-**-*-*-*-*-*-*-*-**-*-*\n"; 
+
+use LWP::UserAgent;
+
+use HTTP::Request::Common;
+
+
+my $md5 = shift;
+
+
+if (!$md5 | (length($md5) != 32)) {
+
+   die "not found or this is not md5\n";
+
+}
+else {
+
+$lwp = LWP::UserAgent->new;
+
+$lwa = $lwp->get('http://md5.rednoize.com/?p&s=md5&q='.$md5);
+
+$hash = $lwa->content;
+
+
+if ($hash or die "Not Found.\n") {
+
+   print "cracked: $hash\n";
+
+}
+
+}
+
+# dz-security [ 25-01-2009 ]

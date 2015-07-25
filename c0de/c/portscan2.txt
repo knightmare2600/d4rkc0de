@@ -1,0 +1,123 @@
+#include <stdio.h>
+#include <unistd.h>      // Defines implementation characteristics identified by POSIX standard.
+#include <sys/types.h>      // data types
+#include <sys/socket.h>      // Internet Protocol family
+#include <netdb.h>       // definitions for network database operations
+#include <netinet/in.h>    // Internet Protocol family
+#include <time.h>      // standard time functions
+
+#define START_PORT 1
+#define END_PORT 100  // define constants
+
+/*
+Structures used, included for informational/testing purposes only
+
+struct sockaddr_in
+   short int          sin_family   // Address family
+   unsigned short int sin_port   // Port number
+   struct in_addr     sin_addr     // Internet address
+   unsigned char      sin_zero[8]    // Same size as struct sockaddr
+
+struct hostent
+   char     *h_name          // name of the host
+   char     **h_aliases      // A pointer to an array of pointers to alternative host names
+        int      h_addrtype       // Address type being returned
+   int      h_length         // The length of address in bytes
+   char     **h_addr_list    // network addresses for the host, terminated by a null pointer
+   
+   
+
+struct servent
+         char    *s_name;        // official service name
+         char    **s_aliases;    // alias list
+         int     s_port;         // port number
+         char    *s_proto;       // protocol to use
+*/
+ 
+
+int main(int argc, char **argv) {
+     
+    // declare data types   
+    int socket_fd, port, start_port, end_port, open_ports, closed;
+    time_t time1, time2;
+    struct hostent *host;
+    struct sockaddr_in target;
+    struct servent* sp;
+    float diff;
+   
+    // initiate variables
+    open_ports = 0; closed = 0;
+   
+    // check for command line arguements
+    if (argc<2) exit(printf("usage: %s <hostname>\n", argv[0]));
+
+    // get hostname or exit with error
+    host = gethostbyname(argv[1]);
+    if (!host) exit(printf("Error looking up hostname.\n"));
+
+    // specify address family
+    target.sin_family = AF_INET;
+   
+    target.sin_addr.s_addr = *(long *)(host->h_addr);
+   
+    // get intitial clock time
+    time1 = time(NULL);
+
+    printf("scanning ports %d - %d on %s (%s)\n\n",START_PORT, END_PORT, inet_ntoa(*((struct in_addr *)host->h_addr)), host->h_name);
+
+    printf("port \t state \t service\n");
+   
+    // loop through all ports specified
+    for (port=START_PORT; port <= END_PORT; port++) {
+
+       // convert ip to network based order
+       target.sin_port = htons(port);
+   
+          // here we create the socket that returns a file desriptor
+   // AF_INET = address family
+   // SOCK_STREAM - basic TCP socket reliable, two-way, connection-based byte streams.
+   // 0 - set protocol type
+        socket_fd =socket(AF_INET,SOCK_STREAM,0);
+        if (socket_fd < 0) exit(printf("Error creating socket.\n"));
+
+   // check port is open
+        if (!connect(socket_fd,(struct sockaddr *)&target, sizeof(target))) {
+           
+       // increment no of open ports
+       open_ports++;
+      
+       // getservbyport tries to convert port to service name. checks /etc/services by default
+       sp = getservbyport(htons(port),"tcp");
+      
+       // output
+       printf("%i/tcp \t open \t %s\n", port,sp->s_name);
+   }
+   
+   // if port closed, increment closed count
+   else closed++;
+      
+   // clean up / close socket
+        if (close(socket_fd)) exit(printf("error closing socket.\n"));
+   
+    } // end for loop
+   
+    // get final time
+    time2 = time(NULL);
+       
+    // calculate time difference
+    diff = difftime(time2,time1);
+   
+    // check if there are no open ports
+    if(open_ports < 1) printf("No open ports found");   
+   
+    // (int)diff may return 0 if scanning localhost - yes its so fast ;)
+    printf("\nScan completed in %d seconds, %d ports open, %d closed\n", (int)diff, open_ports, closed);
+   
+    return 0;
+}
+
+/*
+ This is a simple port scanner written in c, it will basically do the same thing as nmap -sT <host>
+ which is the default TCP connect scan. I do not recommend using it as it is quite slow, its purpose is
+ to show you some basic socket usage in c.
+*/

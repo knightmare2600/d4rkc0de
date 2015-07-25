@@ -1,0 +1,300 @@
+/****
+
+ Hollow Chocolate Bunnies From hell
+ ----------------------------------           
+            presenting
+
+ refspoof.c - A HTTP referer spoofer
+
+ written by softxor
+
+ Refspoof is acting like a proxy server and is able to spoof
+ your HTTP referer and user-agent. This comes in handy to
+ bypass certain authentication mechanisms or user-agent limitations
+ for some download managers. Port shouldn't be world accessable,
+ might not be very secure. Start with ./refspoof -h to get help.
+
+ compile with: gcc -o refspoof refspoof.c
+
+ Contact:
+ [+] Web:  http://bunnies.phpnet.us/
+ [+] Mail: insertnamehere@ NOSPAM gmx.de
+ [+] Irc:  irc.milw0rm.com #hcbfh
+
+ NOTE: Hollow chocolate bunnies from hell, the new
+ upcoming security group of your trust, is still searching
+ for new members. Join us in irc at irc.milw0rm.com #hcbfh
+ and msg softxor or apply by email. Membership comes with
+ free 0day midget porn.
+ 
+****/
+
+#include <getopt.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <netdb.h>
+
+//how many pending connections?
+#define BACKLOG 50
+
+#define VERSION "1.0"
+
+int verbose = 0;
+int listen_port = 8080;
+char *referer = "www.google.de";
+char *user_agent = "Mozilla/5.0 (Windows; U; Windows NT 5.1; de; rv:1.8) Gecko/20051111 Firefox/1.5";
+
+void usage(char *cmd)
+{
+	fprintf(stderr, "Usage: %s <options>\n"
+			"Options:\n"
+			"-r <url>\tsets the HTTP referer (without http:// in front)\n"
+			"-u <agent>\tsets the User-agent\n"
+			"-v\t\tshows version\n"
+			"-V\t\tsets verbose mode\n"
+			"-p <port>\tsets listening port\n"
+			"-h\t\tshows this help\n"
+			"Example: %s -r http://foo.net -u Mozilla1.0 -p 3029\n",cmd, cmd);
+}
+
+
+void send_error_page(int sockfd, char *message)
+{
+	char error_header[] = 	"HTTP/1.1 200 OK\n"
+				"Date: Mon, 23 May 2005 22:38:34 GMT\n"
+				"Content-Length: 39\n"
+				"Server: refspoof\n"
+				"Connection: close\n"
+				"Content-Type: text/html; charset=UTF-8\n\n";
+
+	char error_message[1024];
+	sprintf(error_message, "%s<html><body>%s</body></html>\n", error_header, message);
+
+	write(sockfd, error_message, strlen(error_message));
+}
+
+
+void connect_target(int sockfd_in, char *get_request, char *domain)
+{
+	char recvbuffer[90000];
+	int sockfd;
+
+	struct sockaddr_in srv;
+	struct hostent *host;
+	int x;
+
+	if (strstr(domain, "about") != NULL) {
+		send_error_page(sockfd_in, "refspoof " VERSION " <br>\nby softxor<br>\nhttp://softxor.ifastnet.net<br>\n");
+		_exit(1);
+	}
+
+	domain[strlen(domain) - 1] = '\0';
+
+	if((host = gethostbyname(domain)) == NULL) {
+		send_error_page(sockfd_in, "Unable to find host. Maybe misspelled?");
+		fprintf(stderr, "ERROR: Unknown host %s\n", domain);
+		_exit(1);
+	}
+
+	srv.sin_family = AF_INET;
+	srv.sin_port = htons(80);
+	srv.sin_addr = *(struct in_addr*) host->h_addr;
+
+	if((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		fprintf(stderr, "ERROR: Cannot start socket()!\n");
+		exit(1);
+	}
+
+
+	if(connect(sockfd,(struct sockaddr*)&srv, sizeof(srv)) < 0) {
+		fprintf(stderr, "ERROR: Could not connect to %s!\n", domain);
+		send_error_page(sockfd_in, "Unable to connect to host.");
+		close(sockfd);
+		_exit(1);
+	}	
+	
+
+	if(write(sockfd, get_request, strlen(get_request)) < 0) {
+		fprintf(stderr, "ERROR: Not able to get remote data.\n");
+		send_error_page(sockfd_in, "Not able to get remote data.");
+		_exit(1);
+
+	}
+
+
+	bzero(&recvbuffer, sizeof(recvbuffer));
+	while (x = read(sockfd, recvbuffer, sizeof(recvbuffer))) {;
+		if (verbose)
+			printf("RECIEVING DATA: %s\n\n", recvbuffer); fflush(stdout);
+
+		if (write(sockfd_in, recvbuffer, x) < 0) {
+			fprintf(stderr, "ERROR: Not able to pipe datastream to client.\n");
+			_exit(1);
+		}
+    
+		bzero(&recvbuffer, sizeof(recvbuffer));
+	}
+
+	close(sockfd);
+
+}
+
+
+void relay_connection(int sockfd_in)
+{
+
+	char recvbuffer[1024];
+	char *tmp;	
+	int i;
+	char get_path[128];
+	char get_domain[128];
+	char get_request[1024];
+
+	
+	if (recv(sockfd_in, recvbuffer, sizeof(recvbuffer), 0) < 0)
+		_exit(1);
+
+	if (strlen(recvbuffer) < 15) {
+		send_error_page(sockfd_in, "Malformed GET request.");
+		fprintf(stderr, "ERROR: Malformed GET request (%s%s)", get_domain, get_path);
+		_exit(1);
+	}
+
+	tmp = strchr(recvbuffer + 12, '/');
+	
+	for (i = 0; tmp[i] != ' '; ++i) {
+		if (i >= 127) {
+			tmp[128] = '\0';
+			send_error_page(sockfd_in, "Too long path defined.");
+			fprintf(stderr, "ERROR: Too long path in GET REQUEST (%s)\n", tmp);
+			_exit(1);
+		}
+		get_path[i] = tmp[i];
+	}
+	get_path[i] = '\0';
+	
+	if (verbose) {
+		printf("PATH %s\n",get_path);
+		fflush(stdout);
+	}
+
+	tmp = strstr(recvbuffer, "Host:");
+	tmp += 6;
+	
+	for (i = 0; tmp[i] != '\n'; ++i) {
+		if (i >= 127) {
+			tmp[128] = '\0';
+			send_error_page(sockfd_in, "Too long path defined.");
+			fprintf(stderr, "ERROR: Too long path in GET REQUEST (%s)\n", tmp);
+			_exit(1);
+		}
+		get_domain[i] = tmp[i];
+	}
+	get_domain[i] = '\0';
+	
+	if (verbose) {
+		printf("DOMAIN %s\n",get_domain);
+		fflush(stdout);
+	}
+
+	sprintf(get_request, "GET %s HTTP/1.0\nHost: %s\nReferer: http://%s\nUser-Agent: %s\n\n", get_path, get_domain, referer, user_agent);
+	
+	connect_target(sockfd_in, get_request, get_domain);
+}
+
+
+int main(int argc, char **argv)
+{
+	
+
+	int sockfd_listen, sockfd_n;
+	struct sockaddr_in my_addr;
+	int yes = 1;
+	struct sockaddr_in their_addr;
+	socklen_t sin_size;
+	int c;
+	extern char *optarg;
+
+	
+	while((c = getopt(argc, argv, "u:r:vVp:hH")) != -1) {
+		switch(c) {
+			case 'u':
+				user_agent = malloc(strlen(optarg) + 1);
+				strcpy(user_agent, optarg);
+				break;
+			case 'r':
+				referer = malloc(strlen(optarg) + 1);
+				strcpy(referer, optarg);
+				break;
+			case 'v':
+				printf("refspoof version " VERSION " by softxor\n");
+				exit(0);
+			case 'V':
+				verbose = 1;
+				break;
+			case 'p':
+				listen_port = atoi(optarg);
+				break;
+			case 'h':
+			case 'H':
+			default:
+				usage(argv[0]);
+				exit(0);
+				break;
+		}
+	}
+	
+	
+	printf("Starting proxy server on port %i.\n", listen_port);
+	printf("Using 'http://%s' as referer\n", referer);
+	printf("User agent is '%s'\n", user_agent);
+	fflush(stdout);
+	
+
+	sockfd_listen = socket(AF_INET, SOCK_STREAM, 0);
+	setsockopt(sockfd_listen, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int));
+
+	
+	my_addr.sin_family = AF_INET;
+	my_addr.sin_port = htons(listen_port);
+	my_addr.sin_addr.s_addr = INADDR_ANY;
+	memset(&(my_addr.sin_zero), '\0', 8);
+
+
+	bind(sockfd_listen, (struct sockaddr *)&my_addr, sizeof(struct sockaddr));
+	listen(sockfd_listen, BACKLOG);
+
+
+	while(1) {
+		sin_size = sizeof(struct sockaddr_in);
+
+		if ((sockfd_n = accept(sockfd_listen, (struct sockaddr *)&their_addr, &sin_size)) == -1) {
+			fprintf(stderr, "ERROR: Unable to accept connections.\n");
+			continue;
+		}
+
+		fprintf(stdout, "SERVER: got connection from %s\n",inet_ntoa(their_addr.sin_addr));
+
+		if (!fork()) {
+			close(sockfd_listen);
+			relay_connection(sockfd_n);
+			close(sockfd_n);
+			_exit(EXIT_SUCCESS);
+		}
+
+		close(sockfd_n);
+	}
+
+  
+	exit(EXIT_SUCCESS);
+}
+

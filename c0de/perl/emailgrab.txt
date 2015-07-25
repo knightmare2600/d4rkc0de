@@ -1,0 +1,83 @@
+#####################################################################
+# yellowpag3r.pl - simple email grabber                             #
+#   [[[  by pr0misc (pr0misc@gmail.com) ]]]                         #
+#####################################################################
+#                                                                   #
+# - version 0.5: (july.07)                                          #
+#   ============                                                    #
+#                                                                   #
+#   simple email grabber from a webpage (needs libwww-perl)         #
+#                                                                   #
+# usage: perl yellowpag3r.pl <webpage> <file> <output>              #
+#                                                                   # 
+#  ex: (http://www.uspto.gov/main/contacts.htm)                     #
+#                                                                   #
+# perl yellowpag3r.05.pl www.uspto.gov /main/contacts.htm mails.txt #
+#                                                                   #
+#####################################################################
+
+#/usr/local/bin/perl
+
+$input_address = $ARGV[0];
+$output_file = $ARGV[2];
+$web_file = $ARGV[1];
+
+print "[[ yellowpag3r 0.1 . by pr0misc ]]\n";
+
+unless ($input_address) {
+ die "__ usage: yellowpag3r.pl <webpage> <file> <output_file>\n";
+}
+
+unless ($web_file) {
+ die "__ usage: yellowpag3r.pl <webpage> <file> <output_file>\n";
+}
+
+unless ($output_file) {
+ die "__ usage: yellowpag3r.pl <webpage> <file> <output_file>\n";
+}
+
+ use Net::HTTP;
+ my $s = Net::HTTP->new(Host => $input_address) || die $@;
+ $s->write_request(GET => $web_file, 'User-Agent' => "Mozilla/5.0");
+ my($code, $mess, %h) = $s->read_response_headers;
+
+ print "yP: getting $web_file from $input_address...\n";
+
+ open(OUTPUT, ">temp");
+
+ while (1) {
+    my $buf;
+    my $n = $s->read_entity_body($buf, 1024);
+    die "__ p4nic: read failed: $!" unless defined $n;
+    last unless $n;
+    print OUTPUT $buf;
+ }
+
+ close(OUTPUT);
+
+ print "yP: gattering e-mails...\n";
+
+open (INPUT, "temp") or die " cannot open the input file ($input_file)...\n";
+open (OUTPUT, ">>$output_file") or die "__ p4nic: cannot open the output file ($output_file), check your permissions...n";
+
+$email_count = 0;
+
+while ($line = <INPUT>) {
+
+  @cenas = split(/</, $line);
+  foreach $item (@cenas)
+ {
+   	if($item =~ /mailto:/ ) {
+	$email_count++;
+	$email = substr($item, index($item, ":")+1, rindex($item, "\"")-index($item, ":")-1);
+	print OUTPUT "$email\n";
+	}
+ }
+
+ }
+
+close (INPUT);
+close (OUTPUT);
+
+print "yP: wrote $email_count mail adresses to [$output_file]....\n";
+

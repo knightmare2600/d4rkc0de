@@ -1,0 +1,26 @@
+#include <windows.h>
+
+/* By K1u
+k0h.org
+Disclaimer: I am not responsible for any damages this program my create.
+I am not responsible for how you use this program.
+*/
+
+int main(void){
+   
+    FreeConsole(); /* Hidden console */
+   
+    /* Get the screen sizes */
+    int sw = GetSystemMetrics(SM_CXSCREEN);
+    int sh = GetSystemMetrics(SM_CYSCREEN);
+   
+    for( ;; ){
+        srand(GetTickCount()); /* Seed random generator */
+        SetCursorPos((rand() % sw) + 1, (rand() % sh) + 1);
+       
+        /* SetCursorPos function moves the cursor to the specified screen coordinates
+       
+        How to stop - Hit Ctrl-Alt-Del together which will open the task manager then using
+        the arrow keys scroll until program name found then hit the Delete key then enter. */
+    }
+}

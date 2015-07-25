@@ -1,0 +1,10 @@
+ use strict;
+use warnings;
+use Digest::MD5::Reverse qw(reverse_md5);
+
+my @md5 = qw(e6d52b73077bc8564bbe80bace7a74c4 d97c026f9c2dbedbe7a4ceb77504d60b 0e46a5bfeb9e6c5dd4fcc5f912654ffa a0f4d33b95ea8fe720ad28a878faadbf);
+
+foreach my $md5 (@md5)
+{   
+   print "$md5 : ".reverse_md5($md5)."\n";
+}

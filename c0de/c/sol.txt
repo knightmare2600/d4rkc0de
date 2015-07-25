@@ -1,0 +1,86 @@
+// Solitaire Cipher algorithm: Bruce Schneier -> http://schneier.com/solitaire.html //
+// Implementation by: B-Con (Brad Conte)                                            //
+//////////////////////////////////////////////////////////////////////////////////////
+
+#include <stdio.h>
+#include <string.h>
+#define CARDS 54
+#define JOKER_A 53
+#define JOKER_B 54
+
+char find_move_joker(char deck[], char joker) {
+   char idx=0,temp,joker_index,new_index;
+   while (deck[idx] != joker)
+      joker_index = ++idx;
+   temp = deck[joker_index];
+   new_index = (joker_index + 1) % CARDS;
+   if (!new_index)
+      new_index++;
+   deck[joker_index] = deck[new_index];
+   deck[new_index] = temp;
+   return(new_index);
+}   
+
+void three_way_split(char deck[], char hi, char low) {
+   char temp[CARDS];
+   memcpy(temp,&deck[low+1],CARDS-1-low);
+   memcpy(&temp[CARDS-1-low],&deck[hi],low-hi+1);
+   memcpy(&temp[CARDS-1-hi+1],deck,hi);
+   memcpy(deck,temp,CARDS);
+}
+
+void count_cut(char deck[], char count) {
+   char temp[CARDS];
+   deck[count] == JOKER_B ? (count = JOKER_A) : (count = deck[CARDS-1]);
+   memcpy(temp,&deck[count],CARDS-1-count);
+   memcpy(&temp[CARDS-1-count],deck,count);
+
+   memcpy(deck,temp,CARDS-1);
+}
+
+void init_deck(char deck[], char key[]) {
+   unsigned char idx,joker_a,joker_b,len=strlen(key);
+   for (idx=0; idx < len; idx++)
+      key[idx] >= 'a' && key[idx] <= 'z' ? (key[idx] -= 'a' - 26 - 1) : (key[idx] -= 'A' - 1);
+   for (idx=0; idx < CARDS; idx++)
+      deck[idx] = idx + 1;
+   for (idx=0; idx < len; idx++) {
+      joker_a = find_move_joker(deck,JOKER_A);
+      joker_b = find_move_joker(deck,JOKER_B);
+      joker_b = find_move_joker(deck,JOKER_B);
+      joker_a < joker_b ? three_way_split(deck,joker_a,joker_b) : three_way_split(deck,joker_b,joker_a);
+      count_cut(deck,deck[CARDS-1]);
+      count_cut(deck,key[idx]);
+   }   
+}
+
+void gen_keystream(char deck[], char keystream[], int len) {
+   char temp[CARDS],joker_a,joker_b,new_key;
+   int idx;
+   for (idx=0; idx < len; idx++) {
+      joker_a = find_move_joker(deck,JOKER_A);
+      joker_b = find_move_joker(deck,JOKER_B);
+      joker_b = find_move_joker(deck,JOKER_B);
+      joker_a < joker_b ? three_way_split(deck,joker_a,joker_b) : three_way_split(deck,joker_b,joker_a);
+      count_cut(deck,deck[CARDS-1]);
+      new_key = deck[deck[0]];
+      if (new_key == JOKER_A || new_key == JOKER_B)
+         idx--;
+      else
+         (new_key > 26) ? (keystream[idx] = new_key + ('a' - 26 - 1)) : (keystream[idx] = new_key + ('A' - 1));
+   }   
+} 
+
+int main() {
+   char deck[CARDS],deck_init_key[256],key_len[8],keystream[2048]={0};
+   printf("Key: ");
+   gets(deck_init_key);
+   init_deck(deck,deck_init_key);
+   printf("Length of keystream: ");
+   gets(key_len);
+   gen_keystream(deck,keystream,atoi(key_len));
+   printf("Keystream: ");
+   puts(keystream);
+   getchar();
+   return 0;
+} 

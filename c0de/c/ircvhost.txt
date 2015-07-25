@@ -1,0 +1,154 @@
+/*
+ * IRC VHostBot
+ * Version: 1.0
+ * Website: http://Apaxteam.org
+ *
+ * Copyright (C) 2004 Andrew Holbrook
+ *
+ * This program is free software; you can redistribute it and/or
+ * modify it under the terms of the GNU General Public License
+ * as published by the Free Software Foundation; either version 2
+ * of the License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+ *
+*/
+
+#include <stdio.h>
+#include <sys/types.h>
+#include <netdb.h>
+#include <string.h>
+int numtok (const char *src, const char delim)
+{
+ int i = 0;
+ int f = 1;
+ while (*src)
+   if (*src++ == delim)
+   {
+     if (f == 1)
+     {
+       i++;
+       f = 0;
+     }
+   }
+   else
+     f = 1;
+ return i + f;
+}
+
+char* gettok (const char *src, int n, const char *delim)
+{
+ if (n < numtok(src, *delim))
+ {
+   char b[1024];
+   char *p;
+   int i;
+   memset(b, 0, sizeof(b));
+   memcpy(b, src, strlen(src));
+   p = strtok(b, delim);
+   for (i = 1; i != (n + 1); i++)
+     p = strtok(NULL, delim);
+   return p;
+ }
+ else
+   return "null";
+}
+
+int main(int argc, char **argv)
+{
+ struct sockaddr_in serv;
+ struct hostent *h;
+ int sock, nb;
+
+ char *msg = "NICK VHostBot\n\rUSER VHostBot \"Apaxteam.org\" \"irc.Apaxteam.org\" :Apaxteam Virutal Host Bot\n\r\n\r";
+ char tbuf[2];
+ char buf[1024];
+ char *p = buf;
+
+ if (argc < 2)
+   printf("Usage: %s <Address>\n", *argv);
+ else
+ {
+   printf("Lookup %s >>> ", *(argv+1));
+   if ((h = gethostbyname(*(argv+1))) == NULL)
+     printf("Failed\n");
+   else {
+     printf("%s\nCreating Socket >>> ", inet_ntoa(*((struct in_addr *) h->h_addr)));
+     if ((sock = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+       printf("Failed\n");
+     else {
+       printf("Complete\nConnecting >>> ");
+       serv.sin_family = AF_INET;
+       serv.sin_port = htons(6667);
+       serv.sin_addr = *((struct in_addr *) h->h_addr);
+       bzero(&(serv.sin_zero),8);
+       if (connect(sock, (struct sockaddr *)&serv, sizeof(struct sockaddr)) ==-1)
+         printf("Failed\n");
+       else
+       {
+         printf("Complete\nSend `%s` >>> ", msg);
+         if ((nb = send(sock, msg, strlen(msg) + 1, 0)) == -1)
+           printf("Failed\n");
+         else
+         {
+           printf("%d bytes sent, listening...\n\n----\n", nb);
+           memset(tbuf, 0, sizeof(tbuf));
+           memset(buf, 0, sizeof(buf));
+           while ((nb = recv(sock, tbuf, 1, 0)) > 0)
+           {
+             if (strncmp(tbuf, "\r", 1) == 0)
+             {
+               printf("%s\n", buf);
+               if (strcmp(gettok(buf, 0, " "), "PING") == 0)
+               {
+                 printf("\nGot PING...\n");
+                 char m[1024] = "PONG ";
+                 strcat(m, gettok(buf, 1, " "));
+                 strcat(m, "\n\r");
+                 send(sock, m, strlen(m), 0);
+               }
+               if (strcmp(gettok(buf, 1, " "), "376") == 0)
+               {
+                 char m[1024] = "\n\rOPER Omitted Omitted \n\rJOIN #VHost\n\r";
+                 printf("Login.. now.\n");
+                 nb = send(sock, m, strlen(m), 0);
+                 printf("Sent %d bytes\n", nb);
+               }
+               if (strcmp(gettok(buf, 3, " "), ":!VHost") == 0)
+               {
+                 char m[1024] = "CHGHOST ";
+                 strcat(m, (gettok(buf, 0, "!") + 1));
+                 strcat(m, " ");
+                 strcat(m, gettok(buf, 4, " "));
+                 strcat(m, "\n\rPRIVMSG #VHost :Set host for ");
+                 strcat(m, (gettok(buf, 0, "!") + 1));
+                 strcat(m, " to \"");
+                 strcat(m, gettok(buf, 4, " "));
+                 strcat(m, "\".\n\r");
+                 printf("\nReply to Test (%s)... ", m);
+                 nb = send(sock, m, strlen(m), 0);
+                 printf("Sent %d bytes\n", nb);
+               }
+               memset(buf, 0, sizeof(buf));
+               p = buf;
+             }
+             else if (strncmp(tbuf, "\n", 1) != 0)
+               *p++ = *tbuf;
+             memset(tbuf, 0, sizeof(tbuf));
+           }
+         }
+         printf("Closing Socket\n");
+         close(sock);
+       }
+     }
+   }
+ }
+ return 0;
+}

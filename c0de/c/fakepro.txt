@@ -1,0 +1,15 @@
+Author:  itni 
+
+Example in C/linux to create a _fake_ process name for an app your running. example uses "syslogd"
+
+int main(argc, argv)
+int argc;
+char **argv;
+{
+char *p;
+for (p = argv[0]; *p; p++)
+*p = 0;
+strcpy(argv[0], "syslogd");
+(void) getchar ();
+return(0);
+}

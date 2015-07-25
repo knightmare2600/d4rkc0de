@@ -1,0 +1,33 @@
+#!/usr/bin/perl
+
+use LWP;
+use HTTP::Request::Common;
+use HTTP::Cookies;
+ 
+$userid   =   '';
+$pass   =   '';
+ 
+$ua = LWP::UserAgent->new;
+$ua->cookie_jar(HTTP::Cookies->new(file=>'lwp-cookies',autosave=>1));
+
+$req=$ua->request(GET
+'http://cgi3.ebay.com/aw-cgi/eBayISAPI.dll?SignIn');
+
+$req=$ua->request(POST 'http://cgi3.ebay.com/aw-cgi/eBayISAPI.dll',
+   [
+   'MfcISAPICommand'   =>   'SignInWelcome',
+   'siteid'         =>   0,
+   'co_partnerId'      =>   2,
+   'UsingSSL'         =>   0,
+   'ru'            =>   '',
+   'pp'            =>    '',
+   'pa1'            =>   '',
+   'pa2'            =>   '',
+   'pa3'            =>   '',
+   'i1'            =>   -1,
+   'pageType'         =>   559,
+   'userid'         =>   $userid,
+   'pass'            =>   $pass,
+   ]);
+
+print $req->content; 

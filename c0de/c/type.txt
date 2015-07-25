@@ -1,0 +1,124 @@
+#include <sgtty.h>
+#include <sys/file.h>
+#include <stdio.h>
+#include <sys/param.h>
+#include <strings.h>
+#include <fcntl.h>
+
+/*
+ * type - make the system think that a command was entered on
+ * another user's terminal.
+ *
+ * type [-n] <terminal> <command>
+ *
+ *	<terminal> is the line that the command should be entered on.
+ *		examples: "/dev/ttyj4" ; "ttyj4" ; "j4"
+ *
+ *	<command> is the command that should be entered on that terminal.
+ *		examples: "logout" ; "jobs > /dev/console"
+ *
+ * a newline will be appended to <command> unless type is given a "-n"
+ * option.
+ *
+ * type can only be used on the terminal you are on, unless you are the
+ * superuser, in which case you can send commands to any terminal.
+ */
+
+static int fd;		/* file descriptor for terminal line */
+extern int wakeup();	/* routine to wakeup if open of terminal line hangs */
+
+main(argc, argv, environ)
+int argc;
+char *argv[], *environ[];
+{
+	int flag_n = 0;		/* do not append newline to <command> */
+
+	if ( argc <= 1 ) {
+		usage();
+	}
+
+	if ( argv[1][0] == '-' ) {
+		switch ( argv[1][1] ) {
+			case 'n' :
+				flag_n++;
+				break;
+			case '-' :
+				break;
+			default:
+				usage();
+				break;
+		}
+		argc--, argv++;
+	}
+		
+	if ( argc < 3 ) {
+		usage();
+	}
+
+	if ( index( argv[1], '/' ) == NULL ) {
+		char terminal[MAXPATHLEN+1];
+
+		/*
+		 * since a full pathname was not given, assume the
+		 * file is in the "/dev" directory, and if only 2
+		 * characters were given, assume that means a "tty".
+		 */
+		strcpy( terminal, "/dev/" );
+		if (strlen(argv[1]) == 2)
+			strcat( terminal, "tty" );
+		argv[1] = strcat( terminal, argv[1] );
+	}
+
+	/*
+	 * O_NDELAY does not work (?), so set a timer to
+	 * wake up if the open hangs.
+	 */
+	
+	signal( SIGALRM, wakeup );
+	alarm( 30 );
+
+	if ( (fd = open(argv[1], O_WRONLY|O_NDELAY, 0)) < 0 ) {
+		perror( "open" );
+		exit( 2 );
+	} else {
+		char *cp = argv[2];
+
+		alarm( 0 );
+
+		while ( *cp != '\0' ) {
+			send( *cp );
+			cp++;
+		}
+
+		if ( ! flag_n ) send( '\n' );
+	}
+}
+
+usage()
+{
+	fprintf( stderr, "usage: type [-n] <terminal> <command>\n" );
+	exit( 1 );
+}
+
+send( c )
+char c;
+{
+	register int status;
+
+	status = ioctl( fd, TIOCSTI, &c );
+
+	if ( status != 0 ) {
+		perror( "ioctl" );
+		exit( 3 );
+	}
+
+	return status;
+}
+
+wakeup()
+{
+	fprintf( stderr, "open hung\n" );
+	exit( 4 );
+}
+
+

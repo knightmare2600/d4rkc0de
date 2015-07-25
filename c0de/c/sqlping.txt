@@ -1,0 +1,200 @@
+/* $Id: sqlping.c,v 1.1 2001/03/06 02:40:48 fygrave Exp $ */
+/*
+** fygrave@tigerteam.net
+** http://www.relaygroup.com
+**
+** Unix port of m$ sql ping tool from http://www.sqlsecurity.com (reversed)
+**
+**
+**
+*/
+
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <sys/select.h>
+#include <netinet/in.h> 
+#include <arpa/inet.h>
+#include <errno.h>
+#include <signal.h>
+#include <netdb.h>
+
+
+#define DEF_TIMEOUT 10
+#define SQL_PORT    1434
+
+
+int ssock;
+
+int usage(char *myname) {
+    printf("Usage: %s ip_address [timeout] [num of packets]\n",myname);
+    exit(1);
+}
+
+void sig_alarm(int sig) {
+    close(ssock);
+    printf("\nNo responce received.\n");
+    exit(1);
+}
+
+int main(int argc,char **argv) {
+
+int   pcount;
+int   npack;
+struct servent *sp;
+struct sockaddr_in host;
+struct hostent *hostaddr;
+struct linger ling;
+int rsize,hsize,i,timeout;
+fd_set rfd,wfd;
+struct timeval  waitsock; 
+unsigned char received=0;
+char rpack[]="\x02";
+unsigned char buf[1000];
+int junkct=0;
+
+    /* we need hostname. at least.. */
+    if (argc<2) {
+        usage(argv[0]);
+        exit(1);
+    }
+
+    /* and maybe timeout */
+
+    timeout =   DEF_TIMEOUT;
+    npack   =   1;
+
+    switch (argc) {
+        case 4:
+                npack = atoi(argv[3]);
+        case 3: 
+                timeout = atoi(argv[2]);
+                break;
+        case 2: 
+                break;
+        default: 
+                printf("too much garbage\n");
+                usage(argv[0]);
+    }
+
+    if (timeout <=0) {
+        fprintf(stderr, "Bogus timeout period [%s]\n",argv[3]);
+        usage(argv[0]);
+    }
+
+    if (signal(SIGALRM,sig_alarm)==SIG_ERR) {
+        perror("signal");
+        exit(1);
+    }
+    alarm(timeout);
+
+    memset(&host, 0, sizeof(host));
+    host.sin_family = AF_INET;
+    host.sin_port = 0;
+    if (( hostaddr = gethostbyname(argv[1])) == NULL) {
+        herror("can't resolve remote hostname");
+        exit(1);
+     }
+
+    /* here we open socket, which we will use to send packets */
+
+    if ((ssock=socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+        perror("socket");
+        exit(1);
+    }
+
+    if ((bind(ssock, (struct sockaddr *)&host, sizeof(host))) < 0 ) { 
+        perror("bind");
+        close(ssock);
+        exit(1);
+    }
+    ling.l_onoff = 0;          /* dont linger */
+    if(setsockopt(ssock, SOL_SOCKET, 
+        SO_LINGER, (void *)&ling, sizeof(ling))==-1) {
+        perror("setsockopt error:");
+        close(ssock);
+        exit(1);
+    }
+ 
+    host.sin_port = htons(SQL_PORT);
+    bcopy(hostaddr->h_addr,&host.sin_addr,hostaddr->h_length);
+
+    printf("Sending %i packet(s) to %s [%s]\n(%i sec. timeout).", npack, argv[1],
+        inet_ntoa(host.sin_addr),timeout);
+
+
+    waitsock.tv_sec=0;
+    waitsock.tv_usec=0;
+
+
+    /* send packets while not receive any or interrupted */
+    for(;;) {
+
+        FD_ZERO(&rfd);
+        FD_ZERO(&wfd);
+        FD_SET(ssock,&rfd);
+        FD_SET(ssock,&wfd);
+    
+
+        if (select(ssock+1,&rfd,&wfd,(fd_set *)0,&waitsock) == -1) {
+             if (errno==EINTR)
+                 continue;
+            else {
+                perror("select");
+                close(ssock);
+                exit(1);
+            }
+        }    
+    
+        /* if we can write */
+        if (FD_ISSET(ssock,&wfd) && npack) {
+            if ((sendto(ssock,rpack,sizeof(rpack),
+                        0,(struct sockaddr *)&host,
+                        sizeof(host)))
+                 != sizeof(rpack)) {
+                    perror("sendto");
+                    if (errno == ENOBUFS ) {
+                                sleep(1);
+                                continue;
+                    }
+                    else
+                       exit(1);
+             }
+             printf(".");
+             npack--;
+             fflush(stdout);
+        }
+    /* if something to read ... */
+        if (FD_ISSET(ssock,&rfd))
+         {
+             if( ( rsize = recvfrom(ssock,buf,sizeof(buf),0,
+                     (struct sockaddr *)&host,&hsize)) <=0) continue;
+            printf("\nResponse:\n");
+            for(i=3; i<rsize; i++) {
+                if (buf[i] == ';') 
+                    if (junkct) {
+                        printf("\n");
+                        junkct=0;
+                    } else {
+                        if (buf[i-1] != ';')
+                            printf("\t\t=\t");
+                        junkct=1;
+                    }
+                  else
+                      printf("%c", buf[i]);  
+
+                    
+            }
+            received++;/* ok.. we got at least single packet */             
+    
+         }
+         if (received) break;
+    }
+    close(ssock);
+    printf("\n");
+return 0;
+}

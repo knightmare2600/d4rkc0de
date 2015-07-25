@@ -1,0 +1,31 @@
+char* md5(char *data, char *hash) {
+   HCRYPTPROV c_prov;
+   HCRYPTHASH c_hash;
+   BYTE raw_hash[64];
+   DWORD len = sizeof(raw_hash);
+   unsigned int i;
+   
+   if(CryptAcquireContext(&c_prov, NULL, NULL, PROV_RSA_FULL, CRYPT_VERIFYCONTEXT | CRYPT_SILENT) &&
+      CryptCreateHash(c_prov, CALG_MD5, 0, 0, &c_hash) &&
+      CryptHashData(c_hash, data, strlen(data), 0) &&
+      CryptGetHashParam(c_hash, HP_HASHVAL, raw_hash, &len, 0) &&
+      ((len * 2) + 1 <= 33)) {
+      for(i=0;i<len;i++) {
+         wsprintf(&hash[i * 2], TEXT("%02.2x"), raw_hash[i]);
+      }       
+   } else {
+      return NULL;       
+   }
+               
+   hash[33] = '\0';
+   return hash;
+}
+
+int main(void)
+{
+   char hash[33];
+   
+   printf("%s\r\n", md5("string", hash));
+
+   return 0;
+}

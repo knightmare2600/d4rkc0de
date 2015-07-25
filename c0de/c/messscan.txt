@@ -1,0 +1,520 @@
+
+/*
+ms03-043scanner.c
+
+linux scanner for messenger service vulnerability (MS03-043)
+
+By: Crowley @ kiwi-hacker.net
+
+Tested against: w2k sp2/3/4, xp sp1
+
+I know the code's a bit messy but it does what I wanted it to.
+
+--= WWW.KIWI-HACKER.NET =--
+
+ ~~~~ Big hello to the guys at wolfgaming.net ~~~~
+
+
+
+Based on work by the below, all kudos to them;
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Doke Scott, doke at udel.edu, 10 Sep 2003
+        and their work based on work by: buildtheb0x presents : msgr/rpc scanner by: kid and farp
+
+VeNoMouS
+        venom@gen-x.co.nz and his work based on Hanabishi Recca - recca@mail.ru
+
+doscan by Florian Weimer
+        http://www.enyo.de/fw/software/doscan/
+
+CDE 1.1: Remote Procedure Call - The Open Group
+        http://www.opengroup.org/onlinepubs/9629399/toc.htm
+
+packet sniffs on IIS scanmsgr.exe
+        http://www.iss.net/support/product_utilities/ms03-043/
+
+
+
+
+
+Results in a packet like this returned;
+
+760.611604  x.x.x.69 -> x.x.x.254 DCERPC Fault: seq_num: 1189303165: status: Unknown (0x000006f7)
+
+0000  00 08 c7 85 ca d8 00 00 0e fd 05 31 08 00 45 00   ...........1..E.
+0010  00 70 00 49 00 00 80 11 d6 b4 xx xx xx 45 xx xx   .p.I.........E..
+0020  xx fe 04 02 aa f9 00 5c d5 5e 04 03 00 00 10 00   .......\.^......
+0030  00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00   ................
+0040  00 00 f8 91 7b 5a 00 ff d0 11 a9 b2 00 c0 4f b6   ....{Z........O.
+0050  e6 fc 7d 53 e3 46 6b 69 77 69 2d 68 61 63 6b 65   ..}S.Fkiwi-hacke
+0060  72 21 d6 94 a3 3f 01 00 00 00 7d 53 e3 46 00 00   r!...?....}S.F..
+0070  ff ff 57 00 04 00 00 00 00 00 f7 06 00 00         ..W...........
+
+f7 06 00 00 => 0x000006f7  shows that its not patched
+
+
+*/
+
+#define d_msgr_scan_timeout 5  // max seconds for individual msgr scan
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <signal.h>
+#include <errno.h>
+#include<time.h>
+
+#define null NULL
+
+// for sun spro cc wierdness?  seg faults without this
+#define my_inet_ntoa(ip) inet_ntoa( *( (struct in_addr *) &ip ) )
+
+#define RPC_REQUEST 0x00
+
+typedef struct UUID
+ {   unsigned long Data1;
+     unsigned short  Data2;
+     unsigned short  Data3;
+     unsigned short  Data4;             // added a short to make up the UUID in the xxxxxxxx-xxxx-xxxx
+-xxxx-xxxxxx format
+     unsigned char  Data5[6];
+ } uuid_t;
+
+
+//  Here's the connectionless rpc pdu header.  (taken from DaveK'sallchin.cpp) cheers matey
+typedef struct dc_rpc_cl_pkt_hdr {
+    unsigned char rpc_vers; // = 4; /* RPC protocol major version (4 LSB only)*/
+    unsigned char ptype;            /* Packet type (5 LSB only) */
+    unsigned char flags1;           /* Packet flags */
+    unsigned char flags2;           /* Packet flags */
+    char drep[3];                   /* Data representation format label */
+    unsigned char serial_hi;        /* High char of serial number */
+    uuid_t object;                  /* Object identifier */
+    uuid_t if_id;                   /* Interface identifier */
+    uuid_t act_id;                  /* Activity identifier */
+    unsigned long server_boot;      /* Server boot time */
+    unsigned long if_vers;          /* Interface version */
+    unsigned long seqnum;           /* Sequence number */
+    unsigned short opnum;           /* Operation number */
+    unsigned short ihint;           /* Interface hint */
+    unsigned short ahint;           /* Activity hint */
+    unsigned short len;             /* Length of packet body */
+    unsigned short fragnum;         /* Fragment number */
+    unsigned char auth_proto;       /* Authentication protocol identifier*/
+    unsigned char serial_lo;        /* Low char of serial number */
+} dc_rpc_cl_pkt_hdr_t;
+
+typedef struct dce_param {
+        unsigned long size1;            // things like from name etc.
+        unsigned long undef;            // always 0x00000000 ?
+        unsigned long size2;            // same as param_size1
+        unsigned char buffer[];
+} dce_param_t;
+
+static char *program_name;
+static int verbose = 0;
+int msgr_scan_timeout = d_msgr_scan_timeout;
+volatile int timed_out = 0;
+volatile int msgrsockfd = 0;
+
+extern char *optarg;
+extern int optind, opterr, optopt;
+
+#define DEST_PORT 135
+#define SOURCE_PORT 43769
+
+static char sourcename[] = "kh-03-11-03\x00";
+static char destname[] =   "ms03-043scanner\x00";
+
+void
+print_hex( unsigned char *data, int len ) {
+//
+// pretty print some buffer in readable hex and ascii
+//
+    int i, j;
+    char alphastr[ 17 ];
+
+    for ( i = 0, j = 0; i < len; i++, j++ ) {
+             if ( j == 0 ) {
+                 alphastr[ j ] = isprint( data[i] ) ? data[i] : '.';
+                 printf( "%04x  %02x", i, data[ i ] & 0xff );
+                 }
+             else if ( j == 15 ) {
+                 alphastr[ j ] = isprint( data[i] ) ? data[i] : '.';
+                 alphastr[ j + 1 ] = 0;
+                 printf( " %02x   %s\n", data[ i ] & 0xff, alphastr );
+                 j = -1;
+                 }
+             else {
+                 alphastr[ j ] = isprint( data[i] ) ? data[i] : '.';
+                 printf( " %02x", data[ i ] & 0xff );
+                 }
+             }
+    if ( j )  {
+             alphastr[ j + 1 ] = 0;
+             for ( ; j < 16; j++ )
+                 printf( "   " );
+             printf( "   %s\n", alphastr );
+             }
+    }
+
+
+void
+timeout_handler( int info ) {
+    //fprintf( stderr, "timed out\n" );
+    if ( msgrsockfd )
+             close( msgrsockfd );   // have to close it here to abort the connect
+    timed_out = 1;
+    }
+
+
+// send a packet, and get response
+// return length of received data, or -1 on error
+int
+exchange_packets( int pktnum, uint32_t ip, int fd, struct sockaddr_in*
+destaddr, unsigned char *req,
+             int reqlen, unsigned char *resp, int resplen ) {
+    int len;
+
+    if ( verbose > 1 )
+             printf( "Sending packet %d\n", pktnum );
+
+    if(sendto(msgrsockfd, req, reqlen, 0, (struct sockaddr *)destaddr ,sizeof(struct sockaddr)) < 0) {
+             close( msgrsockfd );
+             alarm( 0 );
+             if ( timed_out )
+                 printf( "timed out while sending packet %d to %s\n",
+                         pktnum, my_inet_ntoa( ip ) );
+             else
+                 fprintf( stderr, "error sending packet %d to %s\n",
+                         pktnum, my_inet_ntoa( ip ) );
+             return -1;
+             }
+
+    if ( ( len = recv( msgrsockfd, resp, resplen, 0 ) ) < 0 ) {
+             close( msgrsockfd );
+             alarm( 0 );
+             if ( timed_out )
+                 //printf( "timed out while receiving packet %d from %s\n",
+                 //        pktnum, my_inet_ntoa( ip ) );
+            return -2;
+             else
+                 fprintf( stderr, "error receiving packet %d from %s\n",
+                         pktnum, my_inet_ntoa( ip ) );
+             return -1;
+             }
+    return len;
+    }
+
+
+int
+msgr_scan( uint32_t ip ) {
+    struct sockaddr_in dest_addr;   /* hold dest addy */
+    unsigned char resp1[1600]; // just over single pkt size on ethernet
+    int len1;
+    int ret_code = 0;
+    int i;
+
+    if ( verbose > 1 )
+             printf( "scanning %s\n", my_inet_ntoa( ip ) );
+
+    timed_out = 0;
+    signal( SIGALRM, timeout_handler );
+    alarm( msgr_scan_timeout );
+
+    msgrsockfd = 0;
+    if((msgrsockfd = socket(PF_INET, SOCK_DGRAM, IPPROTO_UDP)) < 0) {  // now we are using UDP
+             alarm( 0 );
+             if ( timed_out ) {
+                 if ( verbose )
+                         printf( "%s timed out while getting socket\n",
+                             my_inet_ntoa( ip ) );
+                 }
+             else
+                 fprintf( stderr, "error getting socket: %s\n", strerror( errno ) );
+        return 255;
+        }
+
+    // setup UDP listening port
+    struct sockaddr_in my_addr;
+
+    // set content of struct saddr to zero to be safe
+    memset(&my_addr, 0, sizeof(struct sockaddr_in));
+
+    my_addr.sin_family = PF_INET;
+    my_addr.sin_port = htons( SOURCE_PORT );  // listen here
+    my_addr.sin_addr.s_addr = htonl(INADDR_ANY); // bind socket to any interface
+
+    int status=bind(msgrsockfd, (struct sockaddr *)&my_addr, sizeof(struct sockaddr_in) );
+    if (status) {
+        fprintf(stderr,"Can't bind socket\n");
+        exit(1);
+    };
+
+    bzero( &dest_addr, sizeof( struct sockaddr_in ) );
+    dest_addr.sin_family = AF_INET;
+    dest_addr.sin_port = htons(DEST_PORT);
+    dest_addr.sin_addr.s_addr = ip;
+
+
+    if ( verbose > 1 ) printf("Connecting to %s\n", my_inet_ntoa( ip ) );
+
+        // make up a packet sequence number
+        srand(time(NULL));
+        unsigned long sequence_number = rand();
+
+        unsigned char *messenger;
+
+        // get some memory for the pkt
+        messenger = (char *) malloc(1521);
+        if (!messenger) {
+                         fprintf(stderr, "cant malloc mem for pkt buffer\n");
+                         exit(0);
+        }
+
+        // copy our struct over the buffer
+        struct dc_rpc_cl_pkt_hdr *rpc_connless_pkt = (struct dc_rpc_cl_pkt_hdr *) messenger;
+/*
+ * Why do it this way? well at least you know what's going on, and doesn't it look better
+ * than some hex string.  Plus it's easier to change the fields here than in a hex string.
+ *
+ */
+        rpc_connless_pkt->rpc_vers = 4;
+        rpc_connless_pkt->ptype = RPC_REQUEST;
+        rpc_connless_pkt->flags1 = 0x28;
+        rpc_connless_pkt->flags2 = 0;
+        memcpy (rpc_connless_pkt->drep, "\x10\x00\x00",3);
+        rpc_connless_pkt->serial_hi = 0;
+
+        rpc_connless_pkt->object.Data1 = 0;
+        rpc_connless_pkt->object.Data2 = 0;
+        rpc_connless_pkt->object.Data3 = 0;
+        rpc_connless_pkt->object.Data4 = 0;
+        memcpy (rpc_connless_pkt->object.Data5, "\x00\x00\x00\x00\x00\x00",6);
+
+        rpc_connless_pkt->if_id.Data1 = 0x5a7b91f8;
+        rpc_connless_pkt->if_id.Data2 = 0xff00;
+        rpc_connless_pkt->if_id.Data3 = 0x11d0;
+        rpc_connless_pkt->if_id.Data4 = 0xb2a9;
+        memcpy (rpc_connless_pkt->if_id.Data5, "\x00\xc0\x4f\xb6\xe6\xfc",6);
+
+                // change this UUID each time or we timeout sometimes
+        rpc_connless_pkt->act_id.Data1 = sequence_number;
+        rpc_connless_pkt->act_id.Data2 = 0x696b;
+        rpc_connless_pkt->act_id.Data3 = 0x6977;
+        rpc_connless_pkt->act_id.Data4 = 0x682d;
+        memcpy (rpc_connless_pkt->act_id.Data5, "\x61\x63\x6b\x65\x72\x21",6);
+
+
+        rpc_connless_pkt->server_boot = 0;
+        rpc_connless_pkt->if_vers = 1;
+        rpc_connless_pkt->seqnum = sequence_number;
+        rpc_connless_pkt->opnum = 0;
+        rpc_connless_pkt->ihint = 0xffff;
+        rpc_connless_pkt->ahint = 0xffff;
+        //rpc_connless_pkt->len = 0xFF;   // done later
+        rpc_connless_pkt->fragnum = 0;
+        rpc_connless_pkt->auth_proto = 0;
+        rpc_connless_pkt->serial_lo = 0;
+
+        /*
+         * This is the REAL request to the messenger service, I cant find any reference to it on the w
+eb
+         * of hos these 3 parameters work together to show that the machine hasn't been patched.
+         * This is just from how the packets look in tethereal when I ran various scanners.
+         */
+
+        // copy our params into the buffer
+        struct dce_param *psender_name = (struct dce_param *) (messenger + sizeof(struct dc_rpc_cl_pkt
+_hdr));
+
+        psender_name->size1 = sizeof(sourcename);
+        psender_name->undef = 0;
+        psender_name->size2 = sizeof(sourcename);
+        memcpy (psender_name->buffer, sourcename ,15);
+
+        struct dce_param *pmsgr = (struct dce_param *) (messenger
+                + sizeof(struct dc_rpc_cl_pkt_hdr)
+                + sizeof(struct dce_param)
+                + sizeof(sourcename));
+
+        pmsgr->size1 = 1;
+        pmsgr->undef = 0;
+        pmsgr->size2 = 1;
+        memcpy (pmsgr->buffer, "\x00\x00\x00\x00\x00" ,4);
+
+        struct dce_param *pdest_name = (struct dce_param *) (messenger
+                + sizeof(struct dc_rpc_cl_pkt_hdr)
+                + sizeof(struct dce_param)
+                + sizeof(sourcename)
+                + sizeof(struct dce_param)
+                + 4);  // unsigned long = 0x0
+
+        pdest_name->size1 = sizeof(destname);
+        pdest_name->undef = 0;
+        pdest_name->size2 = sizeof(destname);
+        memcpy (pdest_name->buffer, destname ,sizeof(destname));
+
+        unsigned int dce_param_pkt_len = sizeof(struct dce_param)
+                                                                        + sizeof(sourcename)
+                                                                        + sizeof(struct dce_param)
+                                                                        + 4
+                                                                        + sizeof(struct dce_param)
+                                                                        + sizeof(destname);
+
+
+        // how big is the pkt we need to send.
+        unsigned int pkt_len = sizeof(dc_rpc_cl_pkt_hdr_t) + dce_param_pkt_len;
+
+        // how big is the rpc data, NOT the whole packet.
+        rpc_connless_pkt->len = dce_param_pkt_len -1 ;
+
+   /*
+        *
+        * SEND IT
+        *
+        */
+        len1 = exchange_packets( 1, ip, msgrsockfd, &dest_addr, messenger,pkt_len,resp1, sizeof( resp1
+ ) );
+
+    if ( len1 == -1 ) return 255;
+
+        if ( len1 == -2 ) {
+                if (verbose) printf("%s Timeout or not vunerable\n", my_inet_ntoa( ip ));
+                        return 255;
+                };
+
+        // we've finished with that pkt, throw it away
+        free(messenger);
+
+        // do something with the dce response
+        unsigned long dce_ret_code = *((unsigned long *)&resp1[len1 - 4]);
+
+        switch (dce_ret_code) {
+                case 0x1c010003:
+                        //"The server does not export the requested interface"  patched?
+                        printf("%s is patched.\n", my_inet_ntoa( ip ),dce_ret_code);
+                        ret_code=0;
+                        break;
+                case 0x000006f7:
+                        // Ah ha, hack me now
+                        printf("%s Vunerable to MS03-043 exploit.\n", my_inet_ntoa( ip ));
+                        ret_code=3;
+                        break;
+                default:
+                        // unknown so print packet
+                        printf("UNKNOWN response from %s\n", my_inet_ntoa( ip ));
+                        print_hex(resp1,len1);
+                        ret_code=255;
+                        break;
+        };
+
+        // tidy up
+        shutdown(msgrsockfd,2);  // stop using socket
+        close(msgrsockfd); // release it
+
+    return ret_code;
+    }
+
+
+
+
+
+void
+usage( int rc ) {
+    fprintf( stderr, "Usage: %s [-vqh] [ -t timeout ] <ip address>\n"
+             "       %s [-vqh] [ -t timeout ] <ip address>/<cidr-bits>\n"
+             "    -v    increase verbosity\n"
+             "    -q    quiet, no output, just exit status\n"
+             "    -t n  set scan timeout to n seconds, default %d\n"
+             "    -h    this help\n"
+             "    when scanning one ip, exits with:\n"
+             "        0 not vulnerable\n"
+             "        1 does not accept DCE RPC protocol (connection refused)\n"
+             "        2 no response (filtering msgr port, or not there)\n"
+             "        3 vulnerable to msgr 1 and msgr2\n"
+             "        4 vulnerable to msgr 2 (but patched for msgr1)\n"
+             "        255 can't tell for some other reason\n"
+             "    when scanning an ip range, exits with:\n"
+             "        0 nothing was vulnerable\n"
+             "        4 one or more were vunerable\n",
+             program_name, program_name, d_msgr_scan_timeout );
+    exit( rc );
+    }
+
+
+
+
+
+int
+main( int argc, char **argv )  {
+    int a, b, c, d, bits;
+    unsigned int mask, low, high, ip, netip;
+    int rc = 0, r;
+
+    program_name = argv[0];
+
+    verbose = 0;  // turn on basic prints in scan function
+    msgr_scan_timeout = d_msgr_scan_timeout;
+
+    while ( ( c = getopt( argc, argv, "vqt:h" ) ) >= 0 ) {
+             switch ( c ) {
+                 case 'v':
+                         verbose++;
+                         break;
+                 case 'q':
+                         verbose = 0;
+                         break;
+                 case 't':
+                         msgr_scan_timeout = atoi( optarg );
+                         break;
+                 case 'h':
+                         usage( 0 );
+                         break;
+                 default:
+                         usage( -1 );
+                         break;
+                 }
+             }
+
+    if ( optind >= argc || ! argv[ optind ] )
+             usage( -1 );
+
+    rc = sscanf( argv[ optind ], "%d.%d.%d.%d/%d", &a, &b, &c, &d, &bits );
+    if ( rc == 5 )  {
+             // scan range
+             if ( bits < 0 || 32 < bits )
+                 usage( -1 );
+             rc = 0;
+             mask = 0xffffffff << ( 32 - bits );
+             low = ( a << 24 | b << 16 | c << 8 | d ) & mask;
+             high = low | ~ mask;
+             for ( ip = low + 1; ip < high; ip++ ) {
+                 netip = htonl( ip );
+                 // could 'fork' these off for a faster scan but I havent the time ;-)
+                 r = msgr_scan( netip );
+                 if ( r == 3 || r == 4 )
+                         rc = 4;
+                 }
+             }
+    else if ( rc == 4 ) {
+             // scan 1 ip
+             inet_pton( AF_INET, argv[ optind ], (struct in_addr *) &netip
+);
+             rc = msgr_scan( netip );
+             }
+    else
+             usage( -1 );
+
+    return rc;
+    }
+
+
+

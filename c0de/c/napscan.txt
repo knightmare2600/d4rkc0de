@@ -1,0 +1,117 @@
+/* napscan.c - quick portscanner written by napster. */
+
+#include <stdio.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/types.h>
+#include <netdb.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+
+
+char *ipaddy;
+int portlow, porthigh;
+
+unsigned int resolved_host;
+
+/* prototypes... */
+
+void reseed(void);
+void usage(char *progname);
+unsigned int resolve(char *host);
+
+void usage(char *progname)
+{
+        system("clear");
+        printf("napscan v1.0 by napster.\n");
+        printf ("usage: %s <address> <portlow> <porthigh> \n",progname); exit(1); 
+}
+
+main(int argc, char *argv[])
+{
+    
+        struct sockaddr_in sin;
+        int sockdesc, x;
+
+        if (argc<4) usage(argv[0]);
+  
+        ipaddy    = argv[1];
+        portlow   = atoi(argv[2]);
+        porthigh  = atoi(argv[3]);
+
+        resolved_host = resolve(ipaddy);
+
+        if (porthigh > 65535) 
+        {
+                printf("Uh, dood... highest possible high port is 65535.. \n");
+                exit(0);
+        }
+        if (portlow < 0)
+        {
+                printf("Uh, dood... negative ports? get some help... \n");
+                exit(0);
+        }
+        system("clear");
+        printf("                       napscan.c by napster.\n");
+        printf("                             [1.28.97]\n\n");
+        printf("Portscanning: %s.\n", ipaddy);
+        printf("Portlow: %d\n", portlow);
+        printf("Porthigh: %d\n\n", porthigh);
+        printf("Ports open:");
+        
+        reseed();
+
+        for (x=portlow;x<=porthigh;x++)
+        {
+        
+                fflush(stdout);
+
+                sockdesc = socket(AF_INET, SOCK_STREAM, 0);
+
+                if (sockdesc < 0) {
+                        perror("socket");
+                        exit(-1);
+                }
+  
+                sin.sin_family = AF_INET;
+                sin.sin_port = htons(x);
+                sin.sin_addr.s_addr = resolved_host;
+                if (connect(sockdesc, (struct sockaddr *)&sin, sizeof(sin)) == 0) printf(" %d", x); 
+                fflush(stdout); 
+                close(sockdesc);
+        }
+        printf("\n");
+        exit(0);
+}
+
+
+void reseed(void) 
+{
+        srand(time(NULL));
+}
+
+
+unsigned int resolve(char *host)
+{
+  /* resolve routine written by Aut0psy. */
+
+        struct hostent *he;
+        struct sockaddr_in tmp;
+
+        /* Lookup host. */
+        he = gethostbyname(host);
+
+        if (he)
+        {
+                /* Copy host into a temporary endpoint. */
+                memcpy((caddr_t)&tmp.sin_addr.s_addr, he->h_addr, he->h_length);        
+        } else {
+                perror("resolving");
+                exit(-1);
+        }
+
+        /* Return address in network byte order. */
+        return(tmp.sin_addr.s_addr);
+}
+

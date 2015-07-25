@@ -1,0 +1,57 @@
+import java.io.*;
+import javax.crypto.*;
+import javax.crypto.spec.*;
+
+
+
+public class DesLib {
+   private DesLib() {}
+
+   public static final int ver = 1;
+
+   public static byte[] genKey() {
+      byte[] bytes = null;
+      try {
+         KeyGenerator keyGen = KeyGenerator.getInstance("DES");
+         SecretKey key = keyGen.generateKey();
+         bytes = key.getEncoded(); // get the bytes of the key
+      } catch (Exception e) {
+         System.err.println(e); }
+      return bytes;
+   }
+
+
+   public static SecretKey makeKey(byte[] key) {
+      return new SecretKeySpec(key, "DES");
+   }
+
+
+   public static SealedObject encrypt(SecretKey sk, Serializable s) {
+      SealedObject so = null;
+      try {
+         // Prepare the encrypter
+         Cipher enc = Cipher.getInstance("DES");
+         enc.init(Cipher.ENCRYPT_MODE, sk);
+         // Seal (encrypt) the object
+         so = new SealedObject(s, enc);
+      } catch (Exception e) {
+         System.err.println(e); }
+      return so;
+   }
+
+
+   public static Object decrypt(SecretKey sk, SealedObject so) {
+      Object o = null;
+      try {
+         // Get the algorithm used to seal the object
+         String algoName = so.getAlgorithm(); // DES
+         // Prepare the decrypter
+         Cipher dec = Cipher.getInstance("DES");
+         dec.init(Cipher.DECRYPT_MODE, sk);
+         // Unseal (decrypt) the class
+         o = so.getObject(dec);
+      } catch (Exception e) {
+         System.err.println(e); }
+      return o;
+   }
+} 

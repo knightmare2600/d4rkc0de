@@ -1,0 +1,26 @@
+/*
+Finds mouse coor-X-Y
+
+LogicKills
+
+*/
+
+
+#include <windows.h>
+#include <stdio.h>
+int main()
+{ 
+    int x,y = 0;
+    while(1){
+        Sleep(10);
+        POINT cursorPos;
+        GetCursorPos(&cursorPos);
+        x = cursorPos.x;
+        y = cursorPos.y;
+        system("cls");
+        printf("X:%d\n",x);
+        printf("Y:%d",y);
+        }
+                
+        return 0;
+}

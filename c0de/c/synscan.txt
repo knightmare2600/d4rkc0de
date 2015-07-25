@@ -1,0 +1,308 @@
+/*
+   a harmless synportopen
+
+   credits:
+   -racerx90: Unfinnished synportopen, his carnivore sniffer (not sure who the original author of carnivore is).
+   -steelcap: Synflooder code which is broken btw and I think these tcp headers as well (mostly).
+   -Edrin@gmx.net: I learned how to do the tcp checksum from skydance3.6 because the other one didn't work.
+   -msdn: Gotta learn somehow right?
+   -Ago: I think ResolveAddress() is his or he used it first at least.
+   -mixter: http://mixter.void.ru/rawip.html
+   -anyone else: I don't think I left anyone out but seriously... you'll get over it.
+
+   notes:
+   -Compiled with msvc8 so don't bitch to me if you don't know what to do with it
+*/
+#include <winsock2.h>
+#include <windows.h>
+#include <stdio.h>
+
+bool PORTOPEN;
+
+// Standard TCP flags
+#define URG 0x20
+#define ACK 0x10
+#define PSH 0x08
+#define RST 0x04
+#define SYN 0x02
+#define FIN 0x01
+#define IP_HDRINCL 2
+#define SIO_RCVALL _WSAIOW(IOC_VENDOR,1)
+
+typedef struct tcphdr
+{
+   unsigned short sport;         // Source port
+   unsigned short dport;         // Destination port
+   unsigned int   seq;            // Sequence number
+   unsigned int   ack_seq;         // Acknowledgement number
+   unsigned char  lenres;         // Length return size
+   unsigned char  flags;         // Flags and header length
+   unsigned short window;         // Window size
+   unsigned short checksum;      // Packet Checksum
+   unsigned short urg_ptr;         // Urgent Pointer
+} TCPHEADER;
+
+typedef struct ip
+{
+   unsigned char  verlen;         // IP version & length
+   unsigned char  tos;            // Type of service
+   unsigned short total_len;      // Total length of the packet
+   unsigned short ident;         // Unique identifier
+   unsigned short frag_and_flags;   // Flags
+   unsigned char  ttl;            // Time to live
+   unsigned char  proto;         // Protocol (TCP, UDP etc)
+   unsigned short checksum;      // IP checksum
+   unsigned int   sourceIP;      // Source IP
+   unsigned int   destIP;         // Destination IP
+} IPHEADER;
+
+typedef struct pshdr
+{
+   unsigned int   saddr;         // Source address
+   unsigned int   daddr;         // Destination address
+   unsigned char  zero;         // Placeholder
+   unsigned char  proto;         // Protocol
+   unsigned short length;         // TCP length
+} PSDHEADER;
+
+typedef struct recvhdr
+{
+   struct tcphdr tcp;
+   unsigned char junk_data[65535];
+} RECVHEADER;
+
+typedef struct chksum
+{
+   PSDHEADER psdh;
+   char buffer[28];
+} TCPCHECK;
+
+unsigned long ResolveAddress(const char *szHost)
+{
+   unsigned long IP = inet_addr(szHost);
+   if (IP == INADDR_NONE)
+   {
+      hostent *pHE = gethostbyname(szHost);
+      if (pHE == 0)
+         return INADDR_NONE;
+
+      IP = *((unsigned long *)pHE->h_addr_list[0]);      
+   }
+   return IP;
+}
+
+USHORT checksum(USHORT *buffer, int size)
+{
+   unsigned long cksum=0;
+
+   while(size >1)
+   {
+      cksum+=*buffer++;
+      size -=sizeof(USHORT);
+   }
+ 
+   if(size )
+   {
+      cksum += *(UCHAR*)buffer;
+   }
+
+   cksum = (cksum >> 16) + (cksum & 0xffff);
+   cksum += (cksum >>16);
+
+   return (USHORT)(~cksum);
+}
+
+in_addr &to_in_addr(unsigned long lHost)
+{
+   static in_addr ina;
+   ina.s_addr=lHost;
+   return ina;
+}
+
+DWORD WINAPI CheckReply(LPVOID param)
+{
+   char rawdata[65535], *Packet;
+   int i, iRecvd = 0;
+   DWORD dwRet, dwMode = 1;
+
+   IPHEADER *ip;
+   TCPHEADER *tcp;
+   IN_ADDR ia;
+
+   SOCKET sniffsock;
+   SOCKADDR_IN ssin;
+   memset(&ssin, 0, sizeof(ssin));
+   ssin.sin_family         = AF_INET;
+   ssin.sin_port         = htons(0);
+//   ssin.sin_addr.s_addr   = INADDR_ANY;
+   ssin.sin_addr.s_addr   = ResolveAddress("192.168.0.102");
+
+   if ((sniffsock = socket(AF_INET, SOCK_RAW, IPPROTO_IP)) == INVALID_SOCKET)
+   {
+      printf("[-] checkreply() Error: socket() failed, returned: <%d>.\n", WSAGetLastError());
+      return 0;
+   }
+
+   if (bind(sniffsock, (LPSOCKADDR)&ssin, sizeof(ssin)) == SOCKET_ERROR)
+   {
+      printf("[-] checkreply() Error: bind() failed, returned: <%d>.\n", WSAGetLastError());
+      closesocket(sniffsock);
+      return 0;
+   }
+
+   if (WSAIoctl(sniffsock, SIO_RCVALL, &dwMode, sizeof(dwMode), NULL, 0, &dwRet, NULL, NULL) == SOCKET_ERROR)
+   {
+      printf("[-] checkreply() Error: WSAIoctl() failed, returned: <%d>.\n", WSAGetLastError());
+      closesocket(sniffsock);
+      return 0;
+   }
+
+   while(1)
+   {
+      memset(rawdata, 0, sizeof(rawdata));
+      Packet = (char *)rawdata;
+
+      iRecvd = recv(sniffsock, Packet, sizeof(rawdata), 0);
+
+      if (iRecvd > 0)
+      {
+         ip = (IPHEADER *)Packet;
+         if (ip->proto == IPPROTO_TCP)
+         {
+            Packet += sizeof(*ip);
+            tcp = (TCPHEADER *)Packet;
+
+            int srcport, destport = 0;
+            char szSrcHost[2048], szDestHost[2048];
+            srcport = ntohs(tcp->sport);
+            destport = ntohs(tcp->dport);
+
+            if ((destport == 1985) && (tcp->flags == 0x12)) // SYN, ACK
+            {
+               PORTOPEN = true;
+               /*sprintf_s(szSrcHost, "%s", inet_ntoa(to_in_addr(ip->sourceIP)));
+               sprintf_s(szDestHost, "%s", inet_ntoa(to_in_addr(ip->destIP)));
+               printf("[*] checkreply() packet from: %s:%i to %s:%i\n", szSrcHost, srcport, szDestHost, destport);*/
+               break;
+            }
+         }
+      }
+   } // end loop
+   closesocket(sniffsock);
+   return 0;
+}
+
+bool SendSyn(unsigned long TargetIP, unsigned short TargetPort)
+{   
+   IPHEADER iph;
+   TCPHEADER tcph;
+   TCPCHECK chks;
+
+   char szSendBuf[60] = { 0 };
+   PORTOPEN = false;
+
+   SOCKET sock;
+   if ((sock = WSASocket(AF_INET, SOCK_RAW, IPPROTO_RAW, NULL, 0, WSA_FLAG_OVERLAPPED)) == INVALID_SOCKET)
+   {
+      printf( "[-] Can't create RAW socket.\n" );
+      return FALSE;
+   }
+
+   BOOL flag = true;
+   if (setsockopt(sock, IPPROTO_IP, IP_HDRINCL, (char *)&flag, sizeof(flag)) == SOCKET_ERROR)
+   {
+      printf( "[-] Can't set IP_HDRINCL.\n" );
+      closesocket(sock);
+      return FALSE;
+   }
+
+   SOCKADDR_IN ssin;
+   memset(&ssin, 0, sizeof(ssin));
+   ssin.sin_family         = AF_INET;
+   ssin.sin_port         = 0;
+   ssin.sin_addr.s_addr   = TargetIP;
+   int ssin_len         = sizeof(ssin);
+//////////////////////////////////////////
+   iph.verlen            = (4<<4 | sizeof(iph)/sizeof(unsigned long));
+   iph.total_len         = htons(sizeof(iph)+sizeof(tcph));
+   iph.ident            = htons((unsigned short)((rand() << 16) | rand()));
+   iph.frag_and_flags      = htons(0x4000); // Don't fragment
+   iph.ttl               = 128;
+   iph.proto            = IPPROTO_TCP;
+   iph.checksum         = 0;
+   iph.destIP            = TargetIP;
+   iph.sourceIP         = ResolveAddress("192.168.0.102");
+
+   tcph.dport            = htons(TargetPort);
+   tcph.ack_seq         = 0;
+   tcph.lenres            = (sizeof(tcph)/4<<4|0);
+   tcph.flags            = 2; // SYN
+   tcph.window            = htons(16384);
+   tcph.urg_ptr         = 0;
+   tcph.checksum         = 0;
+   tcph.sport            = htons(1985);
+   tcph.seq            = htons((unsigned short)((rand() << 16) | rand()));
+
+   chks.psdh.daddr         = iph.destIP;
+   chks.psdh.zero         = 0;
+   chks.psdh.proto         = IPPROTO_TCP;
+   chks.psdh.length      = htons(sizeof(tcph));
+   chks.psdh.saddr         = iph.sourceIP;
+
+   memcpy( chks.buffer, &tcph, sizeof(tcph) );
+   tcph.checksum         = checksum( (USHORT*)&chks, sizeof(tcph) + 8 );
+   // who'da thunk that old synflood code was broken?
+
+   memcpy(szSendBuf, &iph, sizeof(iph));
+   memcpy(szSendBuf + sizeof(iph), (char*)&(tcph), sizeof(tcph));
+   memset(szSendBuf + sizeof(iph) + sizeof(tcph), 0, 4);
+   memcpy(szSendBuf, &iph, sizeof(iph));
+//////////////////////////////////////////
+
+   DWORD dwID;
+   CreateThread(NULL, 0, &CheckReply, NULL, 0, &dwID);
+
+   int rect = 0;
+   rect = sendto( sock, szSendBuf, sizeof(iph) + sizeof(tcph), 0, (LPSOCKADDR)&ssin, ssin_len );
+   if (rect == SOCKET_ERROR)
+   {
+      printf( "[-] sendto() error: <%d>.\n", WSAGetLastError() );
+      closesocket(sock);
+      return FALSE;
+   }
+
+   Sleep(100); // this is apparently necessary
+
+   while (TRUE)
+   {
+      if (PORTOPEN == true)
+      {
+         printf("[+] port is open.\n");
+         return TRUE;
+      }
+      else
+      {
+         printf("[-] port is probably closed.\n");
+         break;
+      }
+   }
+
+   closesocket(sock);
+   return FALSE;
+}
+
+void main(int argc, char *argv[])
+{
+   srand(GetTickCount());
+   WSADATA blah;
+   if (WSAStartup(MAKEWORD(2,2), &blah) != 0)
+   {
+      printf("[-] Failed to start winsock!\n");
+      return;
+   }
+
+   if (argc == 3)
+      SendSyn( ResolveAddress(argv[1]), atoi(argv[2]) );
+
+   WSACleanup(); // eh, why not
+}

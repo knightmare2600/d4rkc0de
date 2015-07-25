@@ -1,0 +1,142 @@
+/*
+ * [crip.c - written by PoWeR_PoRK of netric (http://www.netric.org)]
+ *
+ * Another utility to use for shellcode creation. Works a bit like
+ * cdump but instead of converting to c-declaration this rips the
+ * declaration from a c-source and converts it back to binary.
+ * This might be handy for re-encoding or reverse enginering 
+ * third party shellcode.
+ *
+ */
+
+
+#include <stdio.h>
+#include <math.h>
+#define CH_OK                 -1
+#define CH_BAD                 1
+#define STR_NOT_FOUND          0xFFFFFFFF
+#define CHAR_FSLASH            0x2F           // "\"
+#define CHAR_BSLASH            0x5C
+#define CHAR_STAR              0x2A
+#define CHAR_SO                0x22
+
+void * getstdin(unsigned long * cc);
+unsigned char h2c(char * hchars);
+unsigned int findstring(char * buffer, char * key, int start);
+
+int main(int argc, char **argv[])
+{
+  unsigned long stdinsize;
+  unsigned int cbuf=0, c=0, c2=0, oldc=0, tmpfstr=0;
+  char hexb[2];
+
+  char usage[]=
+    "Usage: crip [<char[] identifier>]\n"
+    "pipe driven utility for ripping a c declaration of a char array\n"
+    "in hex notation, converting it to binary and write it back to stdout.\n"
+    "\n"
+    "<char[] identifier>    The name of the identifier associated with\n"
+    "                       the char array that has to be ripped.\n"
+    "\n"
+    "Example: cat exploit.c | crip shellcode[] | swipher -c 00 | cdump\n"
+    "This will rip shellcode[] from exploit, pipe the binary from it to\n"
+    "swipher and this will remove any 0-bytes in the shellcode before\n"
+    "feeding it to cdump making it into a c-declaration once again.\n"
+    "\n"
+    "[crip was written by PoWeR_PoRK of netric]\n"
+    " contact: powerpork@zonnet.nl || powerpork@netric.org\n"
+    " site:    http://www.netric.org\n";
+
+  if(strlen((char *)&argv[1])==0){
+    printf("%s", &usage);
+    exit(0);
+  }
+
+  (void *)cbuf = getstdin(&stdinsize);
+  ((char*)cbuf)[stdinsize]=0;
+  tmpfstr=findstring(((char*)cbuf), (char*)argv[1], 0);
+  
+  if(tmpfstr==STR_NOT_FOUND){
+    printf("error: name of buffer not found\n");
+    exit(0);
+  }
+
+  tmpfstr=findstring(((char*)cbuf), "\"", tmpfstr);
+  tmpfstr++;
+  c2=findstring((char*)cbuf, ";", tmpfstr);
+
+  for(c=tmpfstr;c<c2;c++){
+    switch(((char*)cbuf)[c])
+    {
+      case CHAR_FSLASH:
+	if(((char*)cbuf)[c+1]==CHAR_FSLASH){
+	  while(((char*)cbuf)[c]!=0xA){c++;}
+	}else if(((char*)cbuf)[c+1]==CHAR_STAR){
+	  while(!(   ( ((char*)cbuf)[c] == CHAR_STAR ) && ( ((char*)cbuf)[c+1] == CHAR_FSLASH )  )){c++;}
+	  c++;
+	}
+      break;
+	
+      case CHAR_SO:
+	c++;
+	while(((char*)cbuf)[c]!=CHAR_SO){c++;}
+      break;
+
+      case CHAR_BSLASH:
+	hexb[0]=((char*)cbuf)[c+2];
+	hexb[1]=((char*)cbuf)[c+3];
+	printf("%c", h2c((char*)&hexb));
+	c=c+3;
+      break;
+    }
+  }
+  tmpfstr=findstring(((char*)cbuf), "\"", tmpfstr);  
+  return 0;
+}
+
+void * getstdin(unsigned long * cc)
+{
+  int pbuf=0, fs=0;
+  *cc = 0;
+
+  (void *)pbuf = malloc(2048);
+
+  while(feof(stdin)==0){
+    fs = fread((void *)(pbuf+*cc), 1, 1024, stdin);
+    (void *)(pbuf) = realloc(pbuf, (*cc+2048));
+    *cc = *cc+fs;
+  }
+
+  return (void *)pbuf;
+}
+
+unsigned char h2c(char * hchars)
+{
+  unsigned char conv=0;
+  int c=0;
+  for(c=0;c<2;c++){
+    if      (47<hchars[1-c] && hchars[1-c]<58){
+      conv = conv + ((hchars[1-c]-48)*(pow(16,c)));
+    }else if(96<hchars[1-c] && hchars[1-c]<103){
+      conv = conv + ((hchars[1-c]-87)*(pow(16,c)));
+    }else if(64<hchars[1-c] && hchars[1-c]<71){
+      conv = conv + ((hchars[1-c]-55)*(pow(16,c)));
+    }else{
+      return 0;
+    }
+  }
+  return conv;
+}
+
+unsigned int findstring(char * buffer, char * key, int start)
+{
+  int indexcounter=0;
+
+  for(indexcounter=start;(indexcounter)<(strlen(buffer));indexcounter++){
+    if(strncmp((((char*)buffer)+indexcounter), key, strlen(key))==0){
+      return indexcounter;
+    }
+  }
+  
+  return STR_NOT_FOUND;
+}

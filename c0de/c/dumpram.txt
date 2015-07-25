@@ -1,0 +1,88 @@
+/* A simple tool that allows you to dump all the physical memory (RAM) */
+/* For more visit: http://vx.netlux.org/wargamevx */
+/* greetz: undernet @ #eof-project,#virus and to non3x for the testing */
+
+/* Tested on:
+   2.6.20-1.2320.fc5smp i686 athlon
+   2.6.22-gentoo-r5 i686 AMD Turion(tm) 64 X2 Mobile Technology TL-50 */
+   
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+
+void Printable(char *str,int size)
+{
+	int lm = 0;
+	while(lm < size)
+	{
+		if(isprint(str[lm]))
+			printf("%c",str[lm]);
+
+		lm++;
+	}
+}
+
+main(int argc,char *argv[])
+{
+	int fd,only_print;
+	unsigned char *buf = NULL;
+	unsigned int addr,page_size = sysconf(_SC_PAGESIZE),tot_mem = page_size*sysconf(_SC_PHYS_PAGES);
+
+	if(argv[1] == NULL)
+	{
+		printf("DumpRam v0.1 by [WarGame/DoomRiderz]\n");
+		printf("Usage: %s [option]\n",argv[0]);
+		printf("option can be:\n");	
+		printf("-p = only printable chars\n");
+		printf("-e = every byte\n");
+		exit(EXIT_FAILURE);
+	}
+
+	if(getuid() != 0)
+	{
+		printf("You must be root\n");
+		exit(EXIT_FAILURE);
+	}
+	
+	if(strcmp(argv[1],"-p") == 0)
+		only_print = 1;
+	else if(strcmp(argv[1],"-e") == 0)
+		only_print = 0;
+	else
+	{
+		printf("Invalid option\n");
+		exit(EXIT_FAILURE);
+	}
+	
+	fd = open("/dev/mem",O_RDONLY);
+
+	if(fd < 0)
+	{
+		perror("/dev/mem");
+		exit(EXIT_FAILURE);
+	}
+
+	printf("\n\n\n\t** RAM size in Kb: %d\n",tot_mem/1024);
+	printf("\t** Size of a page in bytes: %d\n\n\n\n\n",page_size);
+
+	if((buf = malloc(page_size)) == NULL)
+	{
+		perror("malloc()");
+		exit(EXIT_FAILURE);
+	}
+
+	while(read(fd,buf,page_size) != -1)
+	{
+		if(only_print)
+			Printable(buf,page_size);
+		else
+			write(0,buf,page_size);
+	}
+
+	close(fd);
+	free(buf);
+}

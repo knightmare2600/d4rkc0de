@@ -1,0 +1,366 @@
+#!usr/bin/perl 
+
+##
+#     Coded By KuNdUz
+#   Md5 Crack Monster v1.1
+#######################
+#   www.tydal.nu
+#   milw0rm.com
+#   gdataonline.com
+#   ice.breaker.free.fr
+#   passcracking.com
+#   md5.hashcracking.com
+#   md5decryption.com
+#   www.hashchecker.com
+#   victorov.su
+#   md5crack.it-helpnet.de
+#   www.md5decrypter.com
+#   blacklight.gotdns.org
+#   www.hashchecker.com
+#   md5.ip-domain.com.cn
+#   www.bigtrapeze.com
+#   opencrack.hashkiller.com
+#   md5live.com
+#   www.md5hood.com
+#   www.astalavista.net
+#######################
+#   Ex. Option 1
+#
+#   Pick one of ~# 1
+#   Enter Md5 Hash ~# 28c15e68173b7bf815ccbfd0513d2663
+#   ***************
+#   Ex. Option 2
+#
+#   Pick one of ~# 2
+#   Enter Md5 File ~# md5_hash.txt
+#   ***************
+#
+#   Ex. For md5_hash.txt
+#
+#   28c15e68173b7bf815ccbfd0513d2663
+#   21232f297a57a5a743894a0e4a801fc3
+#   8ff32489f92f33416694be8fdc2d4c22
+#   ...
+#   ...
+##
+
+use LWP::UserAgent; 
+use HTTP::Request::Common; 
+
+system('cls');
+system('title Md5 Crack Monster v1.1 - Coded By KuNdUz');
+
+print "\n\t***********************************\n"; 
+print "\t*      Md5 Crack Monster v1.1     *\n"; 
+print "\t*         Coded By KuNdUz         *\n"; 
+print "\t-   Options:                      -\n"; 
+print "\t*          1 - md5 hash           *\n"; 
+print "\t*          2 - md5.txt            *\n"; 
+print "\t***********************************\n"; 
+
+
+print "\nPick One Of ~# ";
+$pick=<STDIN>;
+chop($pick);
+
+if($pick == "1"){
+MD5FAIL:
+print "\nEnter Md5 Hash ~# ";
+$hash=<STDIN>;
+chop($hash);
+
+###############md5 hash crack###############
+
+if (length($hash)==32)
+{  
+print "\n\t*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*\n"; 
+print "\t*                 Md5 Crack Monster v1.1                  *\n";  
+print "\t*                    Coded By KuNdUz                      *\n"; 
+print "\t*__ $hash Searching 19 sites __*\n"; 
+print  "\t*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*-*\n\n";
+&next;
+} else { 
+print "\nThis is not a md5 hash!\n\n$hash \n\nTry Again!\n\n"; 
+goto MD5FAIL;
+} 
+}
+
+###############md5 hash file crack###############
+
+if($pick == "2"){
+
+print "\nEnter Md5 File ~# ";
+$file=<STDIN>;
+chop($file);
+
+open(RES,"<","$file"); 
+@lol = <RES>; 
+close(RES);
+
+foreach $hash(@lol){
+print "       \nSearching Md5 Hash  $hash\n\n";
+&next;
+}
+}
+
+sub next { 
+
+$url = "http://www.tydal.nu/php/sakerhet/md5.php?q=$hash";
+$lwp = LWP::UserAgent->new(); 
+$lwp -> agent("Mozilla/5.0 (Windows; U; Windows NT 5.1; en; rv:1.9.0.4) Gecko/2008102920 Firefox/3.0.4");
+$connect = $lwp -> get($url); 
+
+print "1 www.tydal.nu                 ----  "; 
+if ($connect -> content =~ /(.*)<\/b><\/h5>/)
+{ 
+if ($connect -> content =~ /Ingen/)
+{ 
+print "Result : Hash not found!\n"; 
+} else { 
+print "Result : $1\n"; 
+} 
+} else { 
+print "Result : Hash not found!\n"; 
+} 
+
+$url = "http://milw0rm.com/cracker/search.php"; 
+$lwp = LWP::UserAgent->new(); 
+$lwp -> agent("Mozilla/5.0 (Windows; U; Windows NT 5.1; en; rv:1.9.0.4) Gecko/2008102920 Firefox/3.0.4");
+$request = $lwp->post($url, ["hash" => $hash, "Submit" => "Submit"]);
+
+print "2 www.milw0rm.com              ----  "; 
+if ($request->content =~ /<\/TD><TD align=\"middle\" nowrap=\"nowrap\" width=90>(.*)<\/TD><TD align=\"middle\" nowrap=\"nowrap\" width=90>cracked<\/TD><\/TR>/)
+{ 
+print "Result : $1\n"; 
+} else { 
+print "Result : Hash not found!\n"; 
+} 
+
+$url = "http://gdataonline.com/qkhash.php?mode=txt&hash=$hash"; 
+$lwp = LWP::UserAgent->new(); 
+$lwp -> agent("Mozilla/5.0 (Windows; U; Windows NT 5.1; en; rv:1.9.0.4) Gecko/2008102920 Firefox/3.0.4"); 
+$connect = $lwp -> get($url);
+
+print "3 gdataonline.com              ----  "; 
+if ($connect -> content =~ /<\/td><td width=\"35%\"><b>(.*)<\/b><\/td><\/tr>/)
+{ 
+print "Result : $1\n"; 
+} else { 
+print "Result : Hash not found!\n"; 
+} 
+
+$url = "http://ice.breaker.free.fr/md5.php?hash=$hash"; 
+$lwp = LWP::UserAgent->new(); 
+$lwp -> agent("Mozilla/5.0 (Windows; U; Windows NT 5.1; en; rv:1.9.0.4) Gecko/2008102920 Firefox/3.0.4"); 
+$connect = $lwp->get($url); 
+
+print "4 ice.breaker.free.fr          ----  "; 
+if ($connect -> content =~ /: <b><br><br> - (.*)<br><br><br><a href=http:\/\/ice.breaker.free.fr\/#hash>/)
+{ 
+print "Result : $1\n"; 
+} else { 
+print "Result : Hash not found!\n"; 
+} 
+
+$url = "http://passcracking.com/"; 
+$lwp = LWP::UserAgent->new(); 
+$lwp -> agent("Mozilla/5.0 (Windows; U; Windows NT 5.1; en; rv:1.9.0.4) Gecko/2008102920 Firefox/3.0.4"); 
+$request = $lwp ->post($url, ["datafromuser" => $hash, "submit" => "DoIT"]); 
+
+print "5 passcracking.com             ----  "; 
+if ($request->content =~ /<\/td><td>md5 Database<\/td><td>$hash<\/td><td bgcolor=#FF0000>(.*)<\/td><td>/)
+{ 
+print "Result : $1\n"; 
+} else { 
+print "Result : Hash not found!\n"; 
+} 
+
+$url = "http://md5.hashcracking.com/search.php?md5=$hash"; 
+$lwp = LWP::UserAgent->new(); 
+$lwp->agent("Mozilla/5.0 (Windows; U; Windows NT 5.1; en; rv:1.9.0.4) Gecko/2008102920 Firefox/3.0.4");
+$connect = $lwp -> get($url);
+ 
+print "6 md5.hashcracking.com         ----  "; 
+if ($connect->content =~ /Cleartext of $hash is (.*)/)
+{ 
+print "Result : $1\n"; 
+} else { 
+print "Result : Hash not found!\n"; 
+} 
+
+$url = "http://md5decryption.com"; 
+$lwp = LWP::UserAgent->new(); 
+$lwp -> agent("Mozilla/5.0 (Windows; U; Windows NT 5.1; en; rv:1.9.0.4) Gecko/2008102920 Firefox/3.0.4");
+$request = $lwp->post($url, ["hash" => $hash, "submit" => "Decrypt It!"]); 
+  
+print "7 www.md5decryption.com        ----  "; 
+if ($request->content =~ /<h2>Results<\/h2><b>Md5 Hash:<\/b> $hash<br\/><b class='red'>Normal Text: <\/b>(.*)<br\/>/)
+{ 
+print "Result : $1\n"; 
+} else { 
+print "Result : Hash not found!\n"; 
+} 
+
+$url = "http://www.hashchecker.com/index.php?_sls=search_hash"; 
+$lwp = LWP::UserAgent->new(); 
+$lwp -> agent("Mozilla/5.0 (Windows; U; Windows NT 5.1; en; rv:1.9.0.4) Gecko/2008102920 Firefox/3.0.4");
+$request = $lwp -> post($url, ["search_field" => $hash, "Submit" => "search"]); 
+ 
+print "8 www.hashchecker.com          ----  "; 
+if ($request -> content =~ /<td><li>Your md5 hash is :<br><li>$hash is <b>(.*)<\/b> used charl/)
+{ 
+print "Result : $1\n"; 
+} else { 
+print "Result : Hash not found!\n"; 
+} 
+
+$url = "http://victorov.su/md5/?md5e=&md5d=$hash"; 
+$lwp = LWP::UserAgent->new(); 
+$lwp->agent("Mozilla/5.0 (Windows; U; Windows NT 5.1; en; rv:1.9.0.4) Gecko/2008102920 Firefox/3.0.4"); 
+$connect = $lwp -> get($url);
+ 
+print "9 victorov.su                  ----  "; 
+if ($connect -> content =~ /MD5 נאסרטפנמגאם: <b>(.*)<\/b><br><form action=\"\">/)
+{ 
+print "Result : $1\n"; 
+} else { 
+print "Result : Hash not found!\n"; 
+} 
+
+$url = "http://md5crack.it-helpnet.de/index.php?op=search"; 
+$lwp = LWP::UserAgent->new(); 
+$lwp->agent("Mozilla/5.0 (Windows; U; Windows NT 5.1; en; rv:1.9.0.4) Gecko/2008102920 Firefox/3.0.4");
+$request = $lwp->post($url, ["md5" => $hash, "submit" => "Search now"]); 
+
+print "10 md5crack.it-helpnet.de      ----  "; 
+if ($request->content =~ /<\/td><td>$hash<\/td><td>(.*)<\/td>/)
+{ 
+if (length($1)==23) { 
+print "Result : Hash not found!\n"; 
+} else { 
+print "Result : $1\n"; 
+} 
+} else { 
+print "Result : Hash not found!\n"; 
+} 
+
+$url = "http://www.md5decrypter.com/"; 
+$lwp = LWP::UserAgent->new(); 
+$lwp->agent("Mozilla/5.0 (Windows; U; Windows NT 5.1; en; rv:1.9.0.4) Gecko/2008102920 Firefox/3.0.4"); 
+$request = $lwp->post($url, ["hash" => $hash, "submit" => "Decrypt!"]); 
+
+print "11 www.md5decrypter.com        ----  "; 
+if ($request->content =~ /<h2>Results<\/h2><b>Md5 Hash:<\/b> $hash<br\/><b class='red'>Normal Text: <\/b>(.*)/)
+{ 
+if (length($1)==23) { 
+print "Result : Hash not found!\n"; 
+} else { 
+print "Result : $1\n"; 
+} 
+} else { 
+print "Result : Hash not found!\n"; 
+} 
+
+$url = "http://blacklight.gotdns.org/cracker/crack.php"; 
+$lwp = LWP::UserAgent->new(); 
+$lwp->agent("Mozilla/5.0 (Windows; U; Windows NT 5.1; en; rv:1.9.0.4) Gecko/2008102920 Firefox/3.0.4");
+$request = $lwp->post($url, ["hash" => $hash, "algos" => "MD5", "crack" => "Crack"]); 
+
+print "12 blacklight.gotdns.org       ----  "; 
+if ($request->content =~ /$hash -> <b>(.*)<\/b><br><br>/)
+{ 
+print "Result : $1\n"; 
+} else { 
+print "Result : Hash not found!\n"; 
+} 
+
+$url = "http://www.hashchecker.com/index.php?_sls=search_hash"; 
+$lwp = LWP::UserAgent->new(); 
+$lwp->agent("Mozilla/5.0 (Windows; U; Windows NT 5.1; en; rv:1.9.0.4) Gecko/2008102920 Firefox/3.0.4");
+$request = $lwp->post($url, ["search_field" => $hash, "Submit" => "search"]); 
+
+print "13 www.hashchecker.com         ----  "; 
+if ($request->content =~ /<td><li>Your md5 hash is :<br><li>$hash is <b>(.*)<\/b> used charlist/)
+{ 
+print "Result : $1\n"; 
+} else { 
+print "Result : Hash not found!\n"; 
+}
+
+$url = "http://md5.ip-domain.com.cn/"; 
+$lwp = LWP::UserAgent->new(); 
+$lwp->agent("Mozilla/5.0 (Windows; U; Windows NT 5.1; en; rv:1.9.0.4) Gecko/2008102920 Firefox/3.0.4");
+$request = $lwp->post($url, ["text" => $hash, "submit" => "submit"]); 
+
+print "14 md5.ip-domain.com.cn        ----  "; 
+if ($request->content =~ /<strong>result:<\/strong><font color=red>(.+)<\/font>&nbsp;/){ 
+print "Result : $1\n"; 
+} else {
+print "Result : Hash not found!\n"; 
+}
+
+$url = "http://www.bigtrapeze.com/md5/"; 
+$lwp = LWP::UserAgent->new(); 
+$lwp->agent("Mozilla/5.0 (Windows; U; Windows NT 5.1; en; rv:1.9.0.4) Gecko/2008102920 Firefox/3.0.4");
+$request = $lwp->post($url, ["query" => $hash, "submit" => " Crack "]); 
+ 
+print "15 www.bigtrapeze.com          ----  "; 
+if ($request->content =~ /The hash <strong>$hash<\/strong> has been deciphered to: <strong>(.+)<\/strong>/)
+{ 
+print "Result : $1\n"; 
+} else { 
+print "Result : Hash not found!\n"; 
+}
+
+$url = "http://opencrack.hashkiller.com/"; 
+$lwp = LWP::UserAgent->new(); 
+$lwp->agent("Mozilla/5.0 (Windows; U; Windows NT 5.1; en; rv:1.9.0.4) Gecko/2008102920 Firefox/3.0.4");
+$request = $lwp->post($url, ["oc_check_md5" => $hash, "submit" => "Search MD5"]); 
+
+print "16 opencrack.hashkiller.com    ----  "; 
+if ($request->content =~ /<\/div><div class="result">$hash:(.+)<br\/>/)
+{ 
+print "Result : $1\n"; 
+} else { 
+print "Result : Hash not found!\n"; 
+}
+
+$url = "http://md5live.com/index.php?format=md5&search=$hash"; 
+$lwp = LWP::UserAgent->new(); 
+$lwp->agent("Mozilla/5.0 (Windows; U; Windows NT 5.1; en; rv:1.9.0.4) Gecko/2008102920 Firefox/3.0.4"); 
+$connect = $lwp -> get($url);
+ 
+print "17 md5live.com                 ----  "; 
+if ($connect -> content =~ /(.+)<br \/>/){
+print "Result : $1\n"; 
+}
+
+$url = "http://www.md5hood.com/"; 
+$lwp = LWP::UserAgent->new(); 
+$lwp->agent("Mozilla/5.0 (Windows; U; Windows NT 5.1; en; rv:1.9.0.4) Gecko/2008102920 Firefox/3.0.4");
+$request = $lwp->post($url, ["md5" => $hash, "submit" => "Search"]); 
+
+print "18 www.md5hood.com             ----  "; 
+if ($request->content =~ /				<div class="result_found">(.+)<\/div>/){ 
+print "Result : $1\n"; 
+} else { 
+print "Result : Hash not found!\n"; 
+}
+
+$url = "https://www.astalavista.net/?cmd=rainbowtables"; 
+$lwp = LWP::UserAgent->new(); 
+$lwp->agent("Mozilla/5.0 (Windows; U; Windows NT 5.1; en; rv:1.9.0.4) Gecko/2008102920 Firefox/3.0.4");
+$request = $lwp->post($url, ["query_hash" => $hash, "submit" => "Search", "hash_algorithm_query" => "MD5"]); 
+
+print "19 www.astalavista.net         ----  "; 
+if ($request->content =~ /<\/td><\/tr><tr><td><b>Plain-Text:<\/b><\/td><\/tr><tr><td>(.+)/)
+{ 
+print "Result : $1\n"; 
+} else { 
+print "Result : Hash not found!\n"; 
+}
+}
+
+##
+# Coded By KuNdUz
+##

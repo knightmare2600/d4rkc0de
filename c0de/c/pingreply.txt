@@ -1,0 +1,206 @@
+/*
+ping.c
+
+pings a host and gives stats on interupt
+only takes ip addresses
+have to be setuid for raw socket
+drops privs after getting socket
+
+tgo - http://anomalous-security.org
+*/
+
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <signal.h>
+
+#include <sys/socket.h>
+#include <sys/types.h>
+
+#include <netinet/in.h>
+#include <netinet/ip_icmp.h>
+#include <netinet/ip.h>
+
+#define DATALEN 56
+#define PACKETSIZE 1500
+
+int sent  = 0;
+int received = 0;
+
+struct icmp *icmp;
+char packet[PACKETSIZE+1];
+int sock;
+char *host;
+
+
+void die(char *reason){
+   perror(reason);
+   exit(1);
+}
+
+void usage(char *prog){
+   printf("%s <ip address>\n",prog);
+   exit(1);   
+}
+
+/* stolen - everyone does it */
+in_cksum(addr, len)
+u_short *addr;
+int len;
+{
+   register int nleft = len;
+   register u_short *w = addr;
+   register int sum = 0;
+
+   /*
+    *  Our algorithm is simple, using a 32 bit accumulator (sum),
+    *  we add sequential 16 bit words to it, and at the end, fold
+    *  back all the carry bits from the top 16 bits into the lower
+    *  16 bits.
+    */
+   while( nleft > 1 )  {
+      sum += *w++;
+      nleft -= 2;
+   }
+
+   /* mop up an odd byte, if necessary */
+   if( nleft == 1 )
+      sum += *(u_char *)w;
+
+   /*
+    * add back carry outs from top 16 bits to low 16 bits
+    */
+    while (sum>>16)
+        sum = (sum & 0xffff) + (sum >> 16);     /* add hi 16 to low 16 */
+       
+   return ( (~sum) & 0xFFFF);
+}
+
+void send_request(){
+
+   struct sockaddr    where;
+   struct sockaddr_in *whereto;
+   int total = DATALEN + 8;
+   memset(packet,0x00,sizeof(packet));
+
+   whereto = (struct sockaddr_in *)&where;
+
+   whereto->sin_family = AF_INET;
+   whereto->sin_addr.s_addr = inet_addr(host);
+
+   /* fill icmp structure to ping host */
+   icmp = (struct icmp *)packet;
+   icmp->icmp_code = 0;
+   icmp->icmp_type = ICMP_ECHO;
+   icmp->icmp_seq = htons(sent);
+   icmp->icmp_id = htons(0x029a + sent);
+   memset(icmp->icmp_data,0x41,DATALEN);
+   gettimeofday((struct timeval *) icmp->icmp_data,NULL);
+      
+        icmp->icmp_cksum = 0;
+   icmp->icmp_cksum = in_cksum(icmp,total);
+
+   if( sendto(sock,packet,total,0,&where,sizeof(struct sockaddr)) < 0)
+      die("sendto");
+   sent++;
+
+}
+
+void get_response(){
+
+   memset(packet,0x00,sizeof(packet));
+   read(sock,&packet,1500);
+   int type;
+   struct sockaddr_in source;
+
+        struct ip *ip = (struct ip *) (packet);
+   icmp = (struct icmp *)(packet + sizeof(struct ip));
+
+   type = icmp->icmp_type;
+   
+   if (type == ICMP_ECHOREPLY){
+   
+      received++;
+   
+      memcpy(&source.sin_addr, (struct sockaddr_in *)&ip->ip_src , sizeof(source.sin_addr) );
+
+      printf("reply from: %s, id %d, sequence %d, length %d, ttl %d, type %d\n"
+         ,inet_ntoa(source.sin_addr.s_addr)
+         ,htons(icmp->icmp_id)
+         ,htons(icmp->icmp_seq)
+         ,htons(ip->ip_len)
+         ,(short)ip->ip_ttl
+         ,type
+      );
+      
+   }
+   else if ( type != ICMP_ECHO )
+      printf("Error code %d received - check /usr/include/netinet/ip_icmp.h for value\n",type);
+
+
+}
+
+void alarm_called(int signo){
+
+   /* sends ping request then sets alarm to go off one second later ( send another ping ) */
+   send_request();
+   alarm(1);
+}
+
+void print_stats(){
+
+   /* called on SIGINT, print stats and exits */
+
+   if (sent > 0){
+      printf(
+         "\n\n--- Stats for: %s ---\n"
+         "Sent: %d\n"
+         "Received: %d\n"
+         "Percent: %d% returned\n"
+         "---------------------\n"
+         ,inet_ntoa(inet_addr(host))
+         ,sent
+         ,received
+         ,(received/sent)*100
+      );
+   }else
+      printf("no packets sent yet\n");
+      
+   exit(0);
+}
+
+int get_sock(){
+
+   /* set socket and drop privs after getting socket */
+   int sock;
+
+   if((sock = socket(AF_INET,SOCK_RAW,IPPROTO_ICMP)) < 0)
+      die("socket");
+
+   setuid(getuid());
+
+   return sock;
+}
+   
+int main(int argc,char *argv[]){
+
+   if (argc < 2) usage(argv[0]);
+
+   /* set socket and host */
+   sock = get_sock();   
+   host = argv[1];
+
+   /* sigalarm does 1 second interval pings */
+   if ( signal(SIGALRM,alarm_called)  < 0 )
+      die("signal");
+
+   /* on control+c ( interupt ) print stats and exit */
+   if ( signal(SIGINT,print_stats) < 0 )
+      die("signal");
+
+   /* signal alarm for first packet */
+   alarm(1);
+
+   /* keep reading responses */
+   while(1) get_response();
+} 

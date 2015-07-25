@@ -1,0 +1,84 @@
+#include <iostream>
+#include <windows.h>
+
+DWORD WINAPI ENTR();
+DWORD WINAPI M();
+BOOL PutTextToClipboard(LPCTSTR pTxtData);
+void TypeStr(char *lpszString);
+BOOL start = true;
+
+int main()
+{
+    PutTextToClipboard("YOU ARE GOING DOWN DOWN DOWN\nDOWNDOWNDOWN\nYOU ARE SO GOING DOWN\nAND DOWN");
+    Sleep(1000);
+    std::cout << "Open the window of the person you want to nuke and press enter.\n";
+    while(start){
+                 if(GetAsyncKeyState(VK_RETURN) <= -32767)
+                 start = false;
+                 }
+    std::cout << "Nuking him.";
+    TypeStr("You are going to get nuked in 5 seconds.");
+    keybd_event(VK_RETURN,0,0, 0);
+    keybd_event(VK_RETURN,0, KEYEVENTF_KEYUP,0);
+    TypeStr("Program by Kekke.");
+    keybd_event(VK_RETURN,0,0, 0);
+    keybd_event(VK_RETURN,0, KEYEVENTF_KEYUP,0);
+    Sleep(5000);
+    CreateThread(NULL, 0, LPTHREAD_START_ROUTINE(&M), NULL, 0, 0);
+    CreateThread(NULL, 0, LPTHREAD_START_ROUTINE(&M), NULL, 0, 0);
+    CreateThread(NULL, 0, LPTHREAD_START_ROUTINE(&M), NULL, 0, 0);
+    CreateThread(NULL, 0, LPTHREAD_START_ROUTINE(&ENTR), NULL, 0, 0);
+    CreateThread(NULL, 0, LPTHREAD_START_ROUTINE(&ENTR), NULL, 0, 0);
+    Sleep(15000);
+    EmptyClipboard();
+}
+
+       
+DWORD WINAPI M()
+{
+      while(1){
+      keybd_event(VK_CONTROL, 0, 0, 0);
+      keybd_event(VkKeyScan('v'),0xB2,0 , 0);
+      keybd_event(VkKeyScan('v'),0xB2, KEYEVENTF_KEYUP,0);
+      keybd_event(VK_CONTROL, 0, KEYEVENTF_KEYUP, 0);
+      }
+}
+
+DWORD WINAPI ENTR()
+{
+      while(1){
+      keybd_event(VK_RETURN,0,0, 0);
+      keybd_event(VK_RETURN,0, KEYEVENTF_KEYUP,0);
+      }
+}
+
+BOOL PutTextToClipboard(LPCTSTR pTxtData)
+{
+    if (!OpenClipboard(NULL))
+        return FALSE;
+
+    EmptyClipboard();
+
+    HGLOBAL hglbCopy = GlobalAlloc(GMEM_MOVEABLE, lstrlen(pTxtData));
+
+    LPTSTR lptstrCopy = (TCHAR*)GlobalLock(hglbCopy);
+    memcpy(lptstrCopy, pTxtData, lstrlen(pTxtData));
+    GlobalUnlock(hglbCopy);
+
+    SetClipboardData(CF_TEXT, hglbCopy);
+
+    CloseClipboard();
+    return TRUE;
+}
+
+void TypeStr(char *lpszString)
+{
+    char cChar;
+    while((cChar = *lpszString++)){
+        short vk = VkKeyScan(cChar);
+        if((vk >> 8) & 1) keybd_event(VK_LSHIFT, 0, 0, 0);
+        keybd_event((unsigned char)vk, 0, 0, 0);   
+        keybd_event((unsigned char)vk, 0, KEYEVENTF_KEYUP, 0);
+        if((vk >> 8) & 1) keybd_event(VK_LSHIFT, 0, KEYEVENTF_KEYUP, 0);
+    }
+} 

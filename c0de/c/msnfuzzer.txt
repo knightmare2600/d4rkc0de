@@ -1,0 +1,609 @@
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+:)
+
+/*
+C:\>msn_fuzzer test@mail.com testpasswd
+[.] Resolving.....: messenger.hotmail.com = 65.54.239.140
+[.] Connected.....: 207.46.4.25:1863
+[.] HTTPS.........: unauthorized (login/passwd)
+[.] Disconnection..
+
+C:\>msn_fuzzer test@mail.com testpasswd -v
+[.] Resolving.....: messenger.hotmail.com
+[.] Resolving.....: messenger.hotmail.com = 65.54.239.140
+[.] Connecting....: 65.54.239.140:1863
+[.] Connected.....: logging (test@mail.com)
+[.] Connected.....: 207.46.4.33:1863
+[.] Connected.....: logging (test@mail.com)
+[.] Connected.....: challenge string OK
+[.] HTTPS.........: unauthorized (login/passwd)
+[.] Disconnection..
+
+C:\>msn_fuzzer test@mail.com testpasswd -vv
+[.] Resolving.....: messenger.hotmail.com
+[.] Resolving.....: messenger.hotmail.com = 65.54.239.140
+[.] Connecting....: 65.54.239.140:1863
+[.] Connected.....: 65.54.239.140:1863
+[.] Connected.....: logging (test@mail.com)
+[.] Connected.....: buffer #1
+[.] Connected.....: buffer #2
+[.] Connected.....: buffer #3
+[.] Transferred...: 207.46.4.92:1863
+[.] Connected.....: 207.46.4.92:1863
+[.] Connected.....: logging (test@mail.com)
+[.] Connected.....: buffer #1
+[.] Connected.....: buffer #2
+[.] Connected.....: buffer #3
+[.] Connected.....: challenge string OK
+[.] HTTPS.........: subconnection #1 (nexus.passport.com)
+[.] HTTPS.........: retrieving login server
+[.] HTTPS.........: retrieving login server (success)
+[.] HTTPS.........: subconnection #2 (loginnet.passport.com)
+[.] HTTPS.........: retrieving hash ticket
+[.] HTTPS.........: unauthorized (login/passwd)
+[.] Disconnection..
+
+C:\>msn_fuzzer 207.46.4.92 1863 test@mail.com testpasswd -vv
+[.] Connecting....: 207.46.4.92:1863
+[.] Connected.....: 207.46.4.92:1863
+[.] Connected.....: logging (test@mail.com)
+[.] Connected.....: buffer #1
+[.] Connected.....: buffer #2
+[.] Connected.....: buffer #3
+[.] Connected.....: challenge string OK
+[.] HTTPS.........: subconnection #1 (nexus.passport.com)
+[.] HTTPS.........: retrieving login server
+[.] HTTPS.........: retrieving login server (success)
+[.] HTTPS.........: subconnection #2 (loginnet.passport.com)
+[.] HTTPS.........: retrieving hash ticket
+[.] HTTPS.........: unauthorized (login/passwd)
+[.] Disconnection..
+
+etc,etc..
+
+The C code might be used to fuzze some MSN clients, bruteforce, etc,
+etc...
+
+demonstration:
+
+http://class101.org/MSN_fuzzer.zip
+*/
+#include <stdio.h>
+#include <string.h>
+#include <io.h>
+#include <afxext.h>
+#include <afxinet.h>
+#include <winsock2.h>
+#pragma comment(lib, "ws2_32")
+#pragma comment(lib, "mpr")
+#pragma comment(lib, "wininet")
+
+void ver(),usage(),error(),foot(),done(SOCKET s);
+int vb1=0,vb2=0,port,i,j,l00p=0;
+char
+*ar0,*ar1,*ar2,*ar3,*ar4,*ar5,*one,*pwd,*mail,mail_[128],mail__[128],newip[1
+5],newport[5];
+hostent* one_;
+WSADATA wsadata;
+
+int engine1(char *one,int port,char *mail,int argc);
+
+int main(int argc,char *argv[])
+{
+ ver();
+
+ar0=argv[0],ar1=argv[1],ar2=argv[2],ar3=argv[3],ar4=argv[4],ar5=argv[5];
+ if (argc==1){usage();return 0;}
+ if
+((argc==3||argc==4&&(stricmp(ar3,"-v")==0||stricmp(ar3,"-vv")==0))&&strchr(a
+r1,0x40)!=0||
+
+(argc==5||argc==6&&(stricmp(ar5,"-v")==0||stricmp(ar5,"-vv")==0))&&atoi(ar2)
+>0&&atoi(ar2)<=65535&&strlen(ar1)>7&&strchr(ar3,0x40)!=0)
+ {
+  if (argc==4&&stricmp(ar3,"-v")==0||argc==6&&stricmp(ar5,"-v")==0)
+   vb1++;
+  else if
+(argc==4&&stricmp(ar3,"-vv")==0||argc==6&&stricmp(ar5,"-vv")==0)
+   vb2++;
+  printf("\n"); //I feel maniak I know :s
+  if (WSAStartup(MAKEWORD(2,0),&wsadata)!=0){
+   if (vb2!=0)
+    printf("[.] WSA Initialization Error (%d)\n",WSAGetLastError());
+   printf("[.] Aborting..\n");
+   return -1;
+  }
+  if (argc==3||argc==4){
+   one="messenger.hotmail.com";
+   mail=ar1;pwd=ar2;
+  }else{
+   one=ar1;
+   mail=ar3;pwd=ar4;}
+  for (i=0,j=0;mail[i]!=64;i++,j++){memset(mail_+j,mail[i],1);}
+  for (i=i+1,j=0;mail[i]!=0;i++,j++){memset(mail__+j,mail[i],1);}
+  if (one[strlen(one)-1] == '\n')
+   one[strlen(one)-1] = '\0';
+  if (isalpha(one[0]))
+  {
+   if (vb1!=0||vb2!=0)
+    printf("[.] Resolving.....: %s\n",one);
+   one_=gethostbyname(one);
+   if (one_==0)
+   {
+    if (vb2!=0)
+     printf("[.] Resolving.....: ERROR (%d)\n",WSAGetLastError());
+    printf("[.] Aborting..\n");
+    return -1;
+   }else{
+    printf("[.] Resolving.....: %s = %s\n",one,inet_ntoa(*((struct
+in_addr *)one_->h_addr_list[0])));
+   }
+   one=inet_ntoa(*((struct in_addr *)one_->h_addr_list[0]));
+   port=1863;
+   if (vb1!=0||vb2!=0)
+    printf("[.] Connecting....: %s:%d\n",one,port);
+  }
+  else
+  {
+   port=atoi(ar2);
+   if (vb1!=0||vb2!=0)
+    printf("[.] Connecting....: %s:%d\n",one,port);
+  }
+  engine1(one,port,mail,argc);
+ }
+ else {
+  error();return -1;}
+ return 0;
+}
+
+int engine1(char *one,int port,char *mail,int argc)
+{
+ SOCKET s;fd_set mask1,mask2;
+ struct timeval timeout,timeout2;
+ struct sockaddr_in server;
+loop:
+ unsigned long flag=1;
+ server.sin_family=AF_INET;
+ if (l00p!=0)
+ {
+  server.sin_addr.s_addr=inet_addr(newip);
+  server.sin_port=htons(atoi(newport));
+ }
+ else
+ {
+  server.sin_addr.s_addr=inet_addr(one);
+  server.sin_port=htons(port);
+ }
+ s=socket(AF_INET,SOCK_STREAM,0);
+ if (s==-1){
+  if (vb2!=0)
+   printf("[.] Connecting....: ERR|socket
+(%d)\n",WSAGetLastError());done(s);return -1;
+ }
+ if (ioctlsocket(s,FIONBIO,&flag)!=0){
+  if (vb2!=0)
+   printf("[.] Connecting....: ERR|ioctl
+(%d)\n",WSAGetLastError());done(s);return -1;
+ }
+ connect(s,(struct sockaddr *)&server,sizeof(server));
+ FD_ZERO(&mask1);FD_ZERO(&mask2);FD_SET(s,&mask1);FD_SET(s,&mask2);
+
+timeout.tv_sec=5;timeout.tv_usec=0;timeout2.tv_sec=8;timeout2.tv_usec=0;
+ switch(select(s+1,NULL,&mask1,&mask2,&timeout))
+ {
+  case -1: {
+   if (vb2!=0)
+    printf("[.] Connecting....: ERR|select
+(%d)\n",WSAGetLastError());
+   done(s);return -1;
+     }
+  case 0: {
+   if (vb2!=0)
+    printf("[.] Connecting....: ERR|select (Timeout)\n");
+   done(s);return -1;
+    }
+  default:
+   if(FD_ISSET(s,&mask2))
+   {
+    if (vb2!=0)
+     printf("[.] Connecting....: ERR|isset (Refused)\n");
+    done(s);return -1;
+   }
+   else if(FD_ISSET(s,&mask1))
+   {
+    if ((vb1==0&&vb2==0||vb1!=0)&&l00p!=0||vb2!=0)
+     printf("[.] Connected.....:
+%s:%d\n",inet_ntoa(server.sin_addr),ntohs(server.sin_port));
+    char recvbuf[2048];
+    char
+spy2[512],spy3[512],spy4[512],chstring[1024],chstring2[1024],chstring3[1024]
+,chstring4[1024];
+    char spy[]="VER 15 MSNP11 MSNP10 CVR0\r\n";
+    char lpszHeaders[5000];
+    int rc,Https2=0;
+    sprintf(spy2,"CVR 16 0x0409 winnt 5.1 i386 MSNMSGR 7.0.0816
+MSMSGS %s\r\n",mail);
+    sprintf(spy3,"USR 17 TWN I %s\r\n",mail);
+    if (vb1!=0||vb2!=0)
+     printf("[.] Connected.....: logging (%s)\n",mail);
+    void *hOpen,*hCon,*hDo;
+    LPCTSTR lpszServerName;
+    LPCTSTR lpszObjectName;
+    DWORD dwHeadersLength;
+    if (send(s,spy,sizeof(spy)-1,0)==-1){
+     if (vb2!=0)
+      printf("[.] Connected.....: ERR|send1
+(%d)\n",WSAGetLastError());
+     done(s);return -1;
+    }
+    switch(select(s+1,&mask1,NULL,NULL,&timeout2))
+    {
+     case -1: {
+      if (vb2!=0)
+       printf("[.] Connected.....: ERR|select1
+(%d)\n",WSAGetLastError());
+      done(s);return -1;
+        }
+     case 0: {
+      if (vb2!=0)
+       printf("[.] Connected.....: ERR|select1 (nothing
+received)\n");
+      done(s);return -1;
+       }
+     default:
+      rc=recv(s,recvbuf,sizeof(recvbuf),0);
+    }
+    if (rc<1||!strstr(recvbuf,"VER")){
+     if (vb2!=0)
+      printf("[.] Connected.....: ERR|recv1 (wrong data)\n");
+     done(s);return -1;
+    }
+    else
+    {
+     if (vb2!=0)
+      printf("[.] Connected.....: buffer #1\n");
+    }
+    rc=0;memset(recvbuf,0,sizeof(recvbuf));
+    if (send(s,spy2,strlen(spy2),0)==-1){
+     if (vb2!=0)
+      printf("[.] Connected.....: ERR|send2
+(%d)\n",WSAGetLastError());
+     done(s);return -1;
+    }
+    switch(select(s+1,&mask1,NULL,NULL,&timeout2))
+    {
+     case -1: {
+      if (vb2!=0)
+       printf("[.] Connected.....: ERR|select2
+(%d)\n",WSAGetLastError());
+      done(s);return -1;
+        }
+     case 0: {
+      if (vb2!=0)
+       printf("[.] Connected.....: ERR|select2 (nothing
+received)\n");
+      done(s);return -1;
+       }
+     default:
+      rc=recv(s,recvbuf,sizeof(recvbuf),0);
+    }
+    if (rc<1||!strstr(recvbuf,"CVR")){
+     if (vb2!=0)
+      printf("[.] Connected.....: ERR|recv2 (wrong data)\n");
+     done(s);return -1;
+    }
+    else
+    {
+     if (vb2!=0)
+      printf("[.] Connected.....: buffer #2\n");
+    }
+    rc=0;memset(recvbuf,0,sizeof(recvbuf));
+    if (send(s,spy3,strlen(spy3),0)==-1){
+     if (vb2!=0)
+      printf("[.] Connected.....: ERR|send3
+(%d)\n",WSAGetLastError());
+     done(s);return -1;
+    }
+    switch(select(s+1,&mask1,NULL,NULL,&timeout2))
+    {
+     case -1: {
+      if (vb2!=0)
+       printf("[.] Connected.....: ERR|select3
+(%d)\n",WSAGetLastError());
+      done(s);return -1;
+        }
+     case 0: {
+      if (vb2!=0)
+       printf("[.] Connected.....: ERR|select3 (nothing
+received)\n");
+      done(s);return -1;
+       }
+     default:
+      rc=recv(s,recvbuf,sizeof(recvbuf),0);
+    }
+    if (rc<1||!strstr(recvbuf,"USR")&&!strstr(recvbuf,"XFR")){
+     if (vb2!=0)
+      printf("[.] Connected.....: ERR|recv3 (wrong data)\n");
+     done(s);return -1;
+    }
+    else
+    {
+     if (vb2!=0)
+      printf("[.] Connected.....: buffer #3\n");
+    }
+    if (strstr(recvbuf,"XFR"))
+    {
+     for
+(i=10,j=0;recvbuf[i]!=58;i++,j++){memset(newip+j,recvbuf[i],1);}
+     for
+(i=i+1,j=0;recvbuf[i]!=32;i++,j++){memset(newport+j,recvbuf[i],1);}
+     if (newip[strlen(newip)-1] == '\n')
+      newip[strlen(newip)-1] = '\0';
+     if (vb2!=0)
+      printf("[.] Transferred...: %s:%d\n",newip,atoi(newport));
+     l00p++;closesocket(s);goto loop;
+    }
+    else if (strstr(recvbuf,"USR"))
+    {
+     for
+(i=13,j=0;recvbuf[i]!=0;i++,j++){memset(chstring+j,recvbuf[i],1);}
+     if (chstring[strlen(chstring)-1]==18)
+      chstring[strlen(chstring)-1]='\0'; //XP patch, do not touch.
+     if (vb2!=0||vb1!=0)
+      printf("[.] Connected.....: challenge string OK\n");
+https2:
+     DWORD header1l='-1L';
+     LPVOID header1=new char[header1l];
+     if (Https2==0)
+     {
+      lpszServerName="nexus.passport.com";
+      lpszObjectName="/rdr/pprdr.asp";
+      *lpszHeaders=NULL;
+      dwHeadersLength=0;
+      if (vb2!=0){
+       printf("[.] HTTPS.........: subconnection #1
+(%s)\n",lpszServerName);
+       printf("[.] HTTPS.........: retrieving login server\n");
+      }
+     }
+     else
+     {
+      lpszServerName=chstring2;
+      lpszObjectName=chstring3;
+      sprintf(lpszHeaders,"Authorization: Passport1.4
+OrgVerb=GET,OrgURL=http%%3A%%2F%%2Fmessenger%%2Emsn%%2Ecom,sign-in=%s%%40%s,
+pwd=%s,%s",mail_,mail__,pwd,chstring);
+      dwHeadersLength=-1L;
+      if (vb2!=0){
+       printf("[.] HTTPS.........: subconnection #2
+(%s)\n",lpszServerName);
+       printf("[.] HTTPS.........: retrieving hash ticket\n");
+      }
+//      printf("[.] HTTPS.........: lpszHeaders:%s\n",lpszHeaders);
+     }
+     hOpen = InternetOpen("soleet",0,0,0,0);
+     if (hOpen==0)
+     {
+      if (vb2!=0)
+       printf("[.] HTTPS.........: InternetOpen error
+(%d)\n",WSAGetLastError());
+      done(s);return -1;
+     }
+     hCon =
+InternetConnect(hOpen,lpszServerName,INTERNET_DEFAULT_HTTPS_PORT,"","",INTER
+NET_SERVICE_HTTP,0,0);
+     if (hCon==0)
+     {
+      if (vb2!=0)
+       printf("[.] HTTPS.........: InternetConnect error
+(%d)\n",WSAGetLastError());
+      done(s);return -1;
+     }
+     hDo =
+HttpOpenRequest(hCon,"GET",lpszObjectName,"HTTP/1.1","",NULL,INTERNET_FLAG_S
+ECURE,0);
+     if (hDo==0)
+     {
+      if (vb2!=0)
+       printf("[.] HTTPS.........: HttpOpenRequest error
+(%d)\n",WSAGetLastError());
+      done(s);return -1;
+     }
+     if (HttpSendRequest(hDo,(char
+*)lpszHeaders,dwHeadersLength,0,0)==FALSE)
+     {
+      if (vb2!=0)
+       printf("[.] HTTPS.........: HttpSendRequest error
+(%d)\n",WSAGetLastError());
+      done(s);return -1;
+     }
+     if
+(HttpQueryInfo(hDo,HTTP_QUERY_RAW_HEADERS_CRLF,header1,&header1l,NULL)==FALS
+E)
+     {
+      if (vb2!=0)
+       printf("[.] HTTPS.........: HttpQueryInfo error
+(%d)\n",WSAGetLastError());
+      done(s);return -1;
+     }
+/*     if (Https2==0)
+      printf("[.] HTTPS.........: header:%s\n",header1);
+     else
+      printf("[.] HTTPS.........: header:%s\n",header1);
+*/     char *pch = strtok((char *)header1,"\n");
+     while (pch != NULL)
+     {
+      if (strstr(pch,"DALogin=")&&Https2==0)
+      {
+       if (vb2!=0)
+        printf("[.] HTTPS.........: retrieving login server
+(success)\n");
+       for
+(i=43,j=0;pch[i]!=47;i++,j++){memset(chstring2+j,pch[i],1);}
+       for
+(i=i,j=0;pch[i]!=44;i++,j++){memset(chstring3+j,pch[i],1);}
+//       printf("%s   test:%s        \n",lpszServerName,pch);
+//       printf("%s   test:%s        \n",lpszServerName,chstring3);
+//       return 0;
+      }
+      else if (strstr(pch,"Authentication-Info")&&Https2!=0)
+      {
+       if (vb2!=0)
+        printf("[.] HTTPS.........: retrieving hash ticket
+(success)\n");
+       for
+(i=60,j=0;pch[i]!=39;i++,j++){memset(chstring4+j,pch[i],1);}
+//       printf("%s   test:%s        \n",lpszServerName,pch);
+//       return 0;
+      }
+      else if (strstr(pch,"401 Unauthorized"))
+      {
+       printf("[.] HTTPS.........: unauthorized (login/passwd)\n");
+       done(s);return -1;
+      }
+      else if (strstr(pch,"400 Bad"))
+      {
+       printf("[.] HTTPS.........: 400 Bad Request\n");
+       done(s);return -1;
+      }
+      pch = strtok (NULL,"\n");
+     }
+     InternetCloseHandle(hOpen);
+     if (Https2==0){
+      Https2=1;goto https2;}
+     else{
+      if (strlen(chstring4)<=10){
+       printf("[.] HTTPS.........: unknown reply\n");
+       done(s);return -1;
+      }
+      rc=0;memset(recvbuf,0,sizeof(recvbuf));
+      sprintf(spy4,"USR 18 TWN S %s\r\n",chstring4);
+      if (send(s,spy4,strlen(spy4),0)==-1){
+       if (vb2!=0)
+        printf("[.] Connected.....: ERR|send1
+(%d)\n",WSAGetLastError());
+       done(s);return -1;
+      }
+      switch(select(s+1,&mask1,NULL,NULL,&timeout2))
+      {
+       case -1: {
+        if (vb2!=0)
+         printf("[.] Connected.....: ERR|select4
+(%d)\n",WSAGetLastError());
+        done(s);return -1;
+          }
+       case 0: {
+        if (vb2!=0)
+         printf("[.] Connected.....: ERR|select4 (nothing
+received)\n");
+        done(s);return -1;
+         }
+       default:
+        rc=recv(s,recvbuf,sizeof(recvbuf),0);
+      }
+      if (rc<1){
+       if (vb2!=0)
+        printf("[.] Connected.....: ERR|recv4 (wrong
+data:%d)\n",WSAGetLastError());
+       done(s);return -1;
+      }
+      else
+      {
+       if (vb2!=0)
+        printf("[.] Connected.....: buffer #4\n");
+       if (strstr(recvbuf,"USR")&&strstr(recvbuf,"OK"))
+       {
+        printf("[.] Connected.....: login OK\n");
+       }
+       else
+       {
+        printf("[.] Connected.....: unknown status\n");
+       }
+      }
+      InternetCloseHandle(hOpen);
+     }
+    }
+    else
+    {
+     if (strstr(recvbuf,"931"))
+      if (vb2!=0)
+       printf("[.] Connected.....: forbidden\n");
+     else if (strstr(recvbuf,"911"))
+      if (vb2!=0)
+       printf("[.] Connected.....: 911!\n");
+     else if (vb2!=0)
+      printf("[.] Connected.....: unknown reply:%s\n",recvbuf);
+    }
+   }
+ }
+ done(s);return 0;
+}
+
+void ver(){
+ printf("\n
+=============================================[v0.1.public]===\n");
+ printf("        ===================Tiny MSN Client
+Fuzzer====================\n");
+ printf("
+=============================================================\n");
+}
+
+void usage(){
+ printf("                                    USAGE\n");
+ printf("
+=============================================================\n\n");
+ printf("[+]  . MSN_fuzzer login password  [-v|-vv]\n");
+ printf("[+]  . MSN_fuzzer [ip/hostname] port login password
+[-v|-vv]\n\n");
+ foot();
+}
+
+void error(){
+ printf("                                    ERROR\n");
+ printf("
+=============================================================\n\n");
+ printf("[.] Syntax error, check the usage and try again...\n\n");
+ foot();
+}
+
+void foot(){
+ printf("                     visit class101.org for more
+informations\n");
+}
+
+void done(SOCKET s){
+ printf("[.] Disconnection..\n");
+ closesocket(s);
+}
+
+
+****************************************************************
+KEY: 0xA7C69C5F
+PRINT: 694C 3495 BCC4 2F8B D794  6BD4 AF8B 457B A7C6 9C5F
+****************************************************************
+
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.2rc2 (MingW32) - GPGOE 0.4.1
+
+iQIVAwUBQvpx2q+LRXunxpxfAQJEjhAAgfwKYdybTJ+YA99iDqqVfgmunSPNjYmo
+sFJLDmjq1EC/nLpjPilONQSxkzsp9YNYVIihMi7QBdGWt9orZZQP+J2cuCKXdAmM
+yB1roApiCE6ZHmyPTwxq60IzlCks+LoWkAHUQNVCHyPXyI/B83HhddFookk+uX+T
+YTKazutrBpPmexpsFyV+MlTqb7Tgy8PNhQphGp3la34rB1DsmGDRHztU8Qvxxj1R
+PoBKxLZcxvDoAUlS6PjIA3vCwdUwxQDy5uyDBfrLO1iwxB/6Zhc7LFtub9PpkWZw
+rkDeNqrKypYTsG4xobjpUmUXeozkpo1FWfbwcQrLAWj2d8TJaxXLwNAdqShG27eA
+SEIwrsqOkdGQi9BtCJr3gY82Sx4zmqIyzab++GAzbolMzWzbapDbBOdisz5vbMUt
+Frv1MfXgqYC+wqeuM/YDg78eWfUfB4piewK9iu7CtN7RaR/QNtCUrU3cujTtxw/S
+/dXo6sOXDNS+8k0QN13/FM9vsHrn/imXzIo3Y7KzAq42qxic1B1e789HsIdHM4fi
+waKKIhB3zE2nn867VZrDjOcgIrL+a+i3WQMODxRr0aO45i/4IXv1Gux8t/+2Bmxm
+KnEgaB0kRh70fhuIBiPYwtSBzQRS/f5kMACtHowc/ZO8/vhAuHCJiZJ863A7wRSi
+73EIUC5T5fQ=
+=vS4H
+-----END PGP SIGNATURE-----
+
+
+_______________________________________________
+Full-Disclosure - We believe in it.
+Charter: http://lists.grok.org.uk/full-disclosure-charter.html
+Hosted and sponsored by Secunia - http://secunia.com/

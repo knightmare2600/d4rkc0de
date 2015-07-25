@@ -1,0 +1,111 @@
+/*
+Web proxy port scanner beta v1.1
+
+to compile:~$ gcc ppscan.c -o ppscan
+to use: ./ppscan <proxy> <port> <target> <start_port> <stop_port>
+(i.e. ./ppscan lameproxy.com 1234 antionline.com 1 1024 )
+
+If those two lines are to hard for you, you should not be using it..
+
+This code lets you port scan anonymously, by using a proxy server
+to bounce off of. If the proxy server connects to the host port, it
+returns a 200 OK, like if there was a web server there, but then
+disconnects. The logs of the system scanned will show the proxy box and
+not the real person doing the scan.
+
+Coded by Bronc Buster Dec 1998
+Updated Jan 1999
+
+Thanks to: horizon of Rhino9, r4lph of b4b0 and argv for the help 
+           getting this to work(?)
+
+[gH] - aka gLoBaL h3Ll are lame kode kiddies with no skills, they all need
+to die miserable deaths....
+
+*/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <string.h>
+#define MAX 256
+#define SS struct sockaddr
+
+
+int main(int argc, char *argv[])
+{
+int socks, start, stop, i;
+struct hostent *bounce;
+struct sockaddr_in proxey;
+char temp[MAX+1];
+char buffer[MAX+1];
+char connected[]="200"; 
+/* Some proxys return a diffrent string, but this is the
+   generic HTTP 200 OK check */
+
+char conn[]="GET http://";
+/* Depending on the type of proxy you connect to, 
+   this will be different until the RFC is standardized. 
+   It has to be something like GET, or POST or CONNECT 
+   depending on the type of proxy box */
+
+int port;
+char **target;
+target=&argv[3];
+
+printf("\nProxy Port Scanner v1.2");
+printf("\nby Bronc Buster of LoU\n\n");
+
+if(argc<5)
+  exit(printf("Usage: %s <proxey><port><target><start_port><stop_port>\n",argv[0]));
+
+/* get IP of proxy */
+bounce=gethostbyname(argv[1]);
+  if(!bounce) exit(printf("Domain lookup error\n"));
+
+proxey.sin_family=AF_INET;
+proxey.sin_addr.s_addr=*(long *)(bounce->h_addr);
+
+/* set ports to start and stop at */
+start=atoi(argv[4]);
+stop=atoi(argv[5]); 
+
+/* loop to scan our ports */
+for(i=start;i<=stop;i++)
+  {
+/* create socket */
+  proxey.sin_port=htons(atoi(argv[2]));
+  socks=socket(AF_INET,SOCK_STREAM,0);
+    if(socks<0) exit(printf("Socket error\n"));
+  port=i;
+
+/* format the string we want to send - it takes to returns for it
+   to accept it */
+
+sprintf(temp, "%s %s /: %d HTTP/1.0 \n\n",conn,target,port);                          
+
+/* connect, send string and read back reply */
+  if((connect(socks,(struct sockaddr *) &proxey, sizeof(proxey)))<0)
+    exit(printf("Connection error\n"));
+  write(socks,temp,strlen(temp));
+
+  if(read(socks,buffer,sizeof(buffer))<0)
+    exit(printf("Read error"));
+
+  if(strcmp(buffer,connected)<=0)
+    printf("\nPort: %i open",&i);
+
+/* close socket and loop back */
+  close(socks);
+  }
+printf("\nScan finished\n");
+
+return 0;
+}
+
+/* EOF */
+

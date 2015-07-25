@@ -1,0 +1,53 @@
+#Set variable
+IPT=/sbin/iptables
+MAILSER=192.168.1.1
+#Load module
+modprobe ip_conntrack
+modprobe ip_conntrack_ftp
+#clear and flush rule
+$IPT -F
+$IPT -X
+#Set default policy
+$IPT -P INPUT DROP
+$IPT -P FORWARD DROP
+$IPT -P OUTPUT DROP
+#Set input chain
+$IPT -A INPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+$IPT -A INPUT -p tcp --dport 22 -j LOG --log-level 5 --log-prefix "IPTABLES:"
+$IPT -A INPUT -p tcp -d $MAILSER --dport 22 -j ACCEPT
+$IPT -A INPUT -p tcp -d $MAILSER --dport 80 -j ACCEPT
+$IPT -A INPUT -p udp --dport 53 -j ACCEPT
+$IPT -A INPUT -i lo -j ACCEPT
+$IPT -A INPUT -p tcp -d $MAILSER --dport 25 -j ACCEPT
+$IPT -A INPUT -p tcp -d $MAILSER --dport 110 -j ACCEPT
+$IPT -A INPUT -p tcp -d $MAILSER --dport 143 -j ACCEPT
+#Set output chain
+$IPT -A OUTPUT -m state --state ESTABLISHED,RELATED -j ACCEPT
+$IPT -A OUTPUT -p udp --sport 53 -j ACCEPT
+$IPT -A OUTPUT -o lo -j ACCEPT
+$IPT -A OUTPUT -p tcp --sport 25 -j ACCEPT
+$IPT -A OUTPUT -p tcp --sport 110 -j ACCEPT
+$IPT -A OUTPUT -p tcp --sport 143 -j ACCEPT
+#Set forward chain
+$IPT -A POSTROUTING -t nat -s 192.168.0.0/24 -o eth0 -j MASQUERADE
+$IPT -A FORWARD -m state --state ESTABLISHED,RELATED -j ACCEPT
+$IPT -A FORWARD -s 192.168.0.0/24 -j ACCEPT
+#4444/445/69/135/139
+iptables -A FORWARD -p tcp --dport 4444 -j DROP
+iptables -A FORWARD -p udp --dport 4444 -j DROP
+#
+iptables -A FORWARD -p tcp --dport 445 -j DROP
+iptables -A FORWARD -p udp --dport 445 -j DROP
+#
+iptables -A FORWARD -p tcp --dport 69 -j DROP
+iptables -A FORWARD -p udp --dport 69 -j DROP
+#
+iptables -A FORWARD -p tcp --dport 135 -j DROP
+iptables -A FORWARD -p udp --dport 135 -j DROP
+#
+iptables -A FORWARD -p tcp --dport 139 -j DROP
+iptables -A FORWARD -p udp --dport 139 -j DROP
+#
+echo 1 > /proc/sys/net/ipv4/ip_forward
+#echo finish messages
+echo "finish !!!"

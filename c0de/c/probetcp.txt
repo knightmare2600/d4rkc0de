@@ -1,0 +1,161 @@
+/*
+ * probe_tcp_ports
+ */
+
+
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <stdio.h>
+#include <ctype.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+
+#define RETURN_ERR -1
+#define RETURN_FAIL 0
+#define RETURN_SUCCESS 1
+
+int             Debug;
+int             Hack;
+int             Verbose;
+
+main(ArgC, ArgV)
+ int             ArgC;
+ char          **ArgV;
+{
+ int             Index;
+ int             SubIndex;
+
+ for (Index = 1; (Index < ArgC) && (ArgV[Index][0] == '-'); Index++)
+     for (SubIndex = 1; ArgV[Index][SubIndex]; SubIndex++)
+  switch (ArgV[Index][SubIndex])
+  {
+  case 'd':
+   Debug++;
+   break;
+  case 'h':
+   Hack++;
+   break;
+  case 'v':
+   Verbose++;
+   break;
+  default:
+   (void) fprintf(stderr,
+  "Usage: probe_tcp_ports [-dhv] [hostname [hostname ...] ]\n");
+   exit(1);
+  }
+
+ for (; Index < ArgC; Index++)
+  (void) Probe_TCP_Ports(ArgV[Index]);
+ exit(0);
+}
+
+Probe_TCP_Ports(Name)
+ char           *Name;
+{
+ unsigned        Port;
+ char           *Host;
+ struct hostent *HostEntryPointer;
+ struct sockaddr_in SocketInetAddr;
+ struct hostent  TargetHost;
+ struct in_addr  TargetHostAddr;
+ char           *AddressList[1];
+ char            NameBuffer[128];
+
+ extern int      inet_addr();
+ extern char    *rindex();
+
+ if (Name == NULL)
+  return (RETURN_FAIL);
+ Host = Name;
+ if (Host == NULL)
+  return (RETURN_FAIL);
+ HostEntryPointer = gethostbyname(Host);
+ if (HostEntryPointer == NULL)
+  {
+  TargetHostAddr.s_addr = inet_addr(Host);
+  if (TargetHostAddr.s_addr == -1)
+   {
+   (void) printf("unknown host: %s\n", Host);
+   return (RETURN_FAIL);
+   }
+  (void) strcpy(NameBuffer, Host);
+  TargetHost.h_name = NameBuffer;
+  TargetHost.h_addr_list = AddressList, TargetHost.h_addr =
+   (char *) &TargetHostAddr;
+  TargetHost.h_length = sizeof(struct in_addr);
+  TargetHost.h_addrtype = AF_INET;
+  TargetHost.h_aliases = 0;
+  HostEntryPointer = &TargetHost;
+  }
+ SocketInetAddr.sin_family = HostEntryPointer->h_addrtype;
+ bcopy(HostEntryPointer->h_addr, (char *) &SocketInetAddr.sin_addr,
+  HostEntryPointer->h_length);
+
+
+ for (Port = 1; Port < 65536; Port++)
+  (void) Probe_TCP_Port(Port, HostEntryPointer, SocketInetAddr);
+ return (RETURN_SUCCESS);
+}
+
+Probe_TCP_Port(Port, HostEntryPointer, SocketInetAddr)
+ unsigned        Port;
+ struct hostent *HostEntryPointer;
+ struct sockaddr_in SocketInetAddr;
+{
+ char            Buffer[BUFSIZ];
+ int             SocketDescriptor;
+ struct servent *ServiceEntryPointer;
+
+
+ SocketInetAddr.sin_port = Port;
+ SocketDescriptor = socket(AF_INET, SOCK_STREAM, 6);
+ if (SocketDescriptor < 0)
+  {
+  perror("socket");
+  return (RETURN_ERR);
+  }
+ if (Verbose)
+  {
+  (void) printf("Host %s, Port %d ", HostEntryPointer->h_name,
+         Port);
+  if ((ServiceEntryPointer = getservbyport(Port, "tcp")) !=
+      (struct servent *) NULL)
+   (void) printf(" (\"%s\" service) ",
+          ServiceEntryPointer->s_name);
+  (void) printf("connection ... ");
+  (void) fflush(stdout);
+  }
+ if (connect(SocketDescriptor, (char *) &SocketInetAddr,
+      sizeof(SocketInetAddr)) < 0)
+  {
+  if (Verbose)
+   (void) printf("NOT open.\n");
+  if (Debug)
+   perror("connect");
+  }
+ else
+  {
+  if (!Verbose)
+   {
+   (void) printf("Host %s, Port %d ",
+          HostEntryPointer->h_name, Port);
+   if ((ServiceEntryPointer = getservbyport(Port,"tcp")) !=
+       (struct servent *) NULL)
+    (void) printf(" (\"%s\" service) ",
+           ServiceEntryPointer->s_name);
+   (void) printf("connection ... ");
+   (void) fflush(stdout);
+   }
+  (void) printf("open.\n");
+  if (Hack)
+   {
+   (void) sprintf(Buffer, "/usr/ucb/telnet %s %d",
+           HostEntryPointer->h_name, Port);
+   (void) system(Buffer);
+   }
+  }
+
+ (void) close(SocketDescriptor);
+ return (RETURN_SUCCESS);
+}

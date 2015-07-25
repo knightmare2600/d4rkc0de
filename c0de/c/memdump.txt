@@ -1,0 +1,108 @@
+/* Creator: K-sPecial (xzziroz.net) of .aware (awarenetwork.org)
+ * Date: 07/03/2005
+ * Name: memdump.c
+ * Version: 
+ *  07/02/2005 1.00 - memdump.c created
+ *  07/03/2005 1.10 - added some error checking code on the memory reading section, not very necessary, but
+ *   indeed a perk to have. also modified a strange issue where I was reading a byte at a time from ptrace()
+ *   (not sure how that worked out) even though it returns a word.. who knows.. it works the same as it did
+ *   just in a more correct aspect. Thanks to m0x for pointing this out.
+ *
+ * Description: sometimes you can execute a binary, but you don't have read access so you can't
+ *  debug it or run 'strings' on it, etc. This program tricks it's way around such an issue by
+ *  having a child exec the binary, then having the parent ptrace all of it's data/text memory
+ *  region into a file. 
+ *
+ * Compile: gcc -o memview memview.c
+ * Notes: I didn't figure this out, I simply incorporated it into a neat little tool of it's own.
+*/
+ 
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/ptrace.h>
+#include <string.h>
+#include <errno.h>
+#include <ctype.h>
+
+_Bool getresp (char *question);
+
+int main (int argc, char **argv) { 
+	char *line = NULL, file[128];
+	FILE *in, *out;
+	pid_t pid;
+	unsigned int ini, fim;
+	size_t len = 0;
+	int myerrno, word;
+	
+	if (argc < 2) {
+		fprintf(stderr, "-> you failed to specify an argument (a program's memory to dump)\n");
+		exit(1);
+	}
+		
+	if (pid = fork()) { 
+		sleep(1);
+		sprintf(file, "/proc/%d/maps", pid);
+		printf("file: %s\n", file);
+		if ((in = fopen(file, "r")) == NULL) { 
+			myerrno = errno;
+			fprintf(stderr, "-!> error opening file '%s' for writing: %s\n", file, strerror(myerrno));
+			exit(1);
+		}
+		printf("- sigint at any time to abort\n");
+		while (getline(&line, &len, in) != -1) {
+			printf("\nCurrent line from 'maps': %s", line);
+			if (getresp("Parse this memory location? ")) {
+				if (sscanf(line, "%x-%x", &ini, &fim) != 2) {
+					printf("-?> your last request could not be processed! Moving to next line in 'maps'\n");
+					continue;
+				}
+				
+				printf("Enter a output filename: ");
+				fgets(file, 128, stdin);
+				*(file+strlen(file)-1) = 0;
+				
+				if ((out = fopen(file, "w")) == NULL) {
+					myerrno = errno;
+					fprintf(stderr, "-!> error opening file '%s' for writing: %s\n", file, strerror(myerrno));
+					exit(1);
+				}
+				errno = 0;
+				while (ini <= fim) {
+					word = ptrace(PTRACE_PEEKDATA, pid, (void *)ini, (void *)0);
+					if (word == -1 && (errno == EBUSY || errno == EFAULT || errno == EIO || errno == EPERM || errno == ESRCH)) {
+						perror("-?> memory read failed");
+						break;
+					}
+					fwrite(&word, sizeof(word), 1, out);
+					ini += 4;
+				}
+				fclose(out);
+			}
+		}
+		if (line) free (line);
+		fclose(in);
+	}
+	else if (pid == -1)
+		perror("-!> unable to fork");
+	else {
+		ptrace(PTRACE_TRACEME, 0, NULL, NULL);
+		execve(*(argv+1), 0, 0);
+	}
+}
+
+_Bool getresp (char *question) { 
+	size_t len = 0;
+	char *line = NULL;
+	fwrite(question, strlen(question), 1, stdout);
+	getline(&line, &len, stdin);
+	*line = tolower(*line);
+	if (*line == 'y' && line) { free(line); return(1); }
+	if (line) free(line);
+	return(0);
+}
+	
+	
+	

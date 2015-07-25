@@ -1,0 +1,268 @@
+#!/usr/bin/perl                                          
+#,,               ,                          
+#||              ||          _               
+#||  /'\\  _-_, =||= -_-_   < \,  _-_,  _-_, 
+#|| || || ||_.   ||  || \\  /-|| ||_.  ||_.  
+#|| || ||  ~ ||  ||  || || (( ||  ~ ||  ~ || 
+#\\ \\,/  ,-_-   \\, ||-'   \/\\ ,-_-  ,-_-  
+#                    |/                      	                       
+#			Lo$tpass bot
+#			By: Lo$er                                               
+#For http://security-sh3ll.com/                          #
+#shouts to everyone at security-shell, friends           #
+#and everyone who I got ideas, code, and inspiration from#
+#beta verison 0.9 (i guess?) simple? yes                 #
+#I suggest you append to a log file and run in background#
+#ie: perl bot.pl >> botlog.txt &                         #
+##########################################################
+
+use warnings; #comment out if you dont want to see a bunch of extra text in the terminal
+use IO::Socket;
+use LWP::UserAgent;
+use Digest::MD5 qw(md5_hex);
+use Crypt::PasswdMD5 qw(unix_md5_crypt);
+
+
+##################################################
+#                    !CONFIG!                    #
+##################################################
+$Host = "irc.dal.net"; #server
+$Nick = "bot212121"; #nick
+$Login = "bot21221"; #login
+$Pass = "pass"; #nickserv password
+$Realname = "bot3"; #realname
+$Channel = "#crackhouse"; #channel
+$Port = 6667; #port
+$Owner = "[Loser]"; #owner's nick
+$passfile = "passes.txt"; #plaintext wordlist for md5 cracking
+##################################################
+#                   !END CONFIG!                 #
+##################################################
+
+
+$sock = IO::Socket::INET->new(
+	PeerAddr => $Host, 
+	PeerPort => $Port, 
+	Proto => 'tcp' ) or die "could not make connection: $!\n";
+
+while($line = <$sock>){
+	print $line;
+	if($line =~ /(NOTICE AUTH).*(checking ident)/i){
+		print $sock "NICK $Nick\nUSER $Login 0 0 :$Realname\n";
+		last;
+}
+}
+
+while($line = <$sock>){
+	print $line;    
+	#use next line if the server asks for a ping
+	if($line =~ /^PING/){
+		print $sock "PONG :" . (split(/ :/, $line))[1];
+	}
+	if($line =~ /(376|422)/i){
+		print $sock "NICKSERV :identify $Pass\n";
+		last;
+}
+}
+
+sleep 5;
+print $sock "JOIN $Channel\n";
+
+while(defined($input=<$sock>)){
+
+#pm a text file to user on join (commented out by default)
+#if($input=~/^:(.+)\!.+ JOIN\b/){open (WEL,"ascii9.txt") or print "error \n";
+#foreach (<WEL>){
+#sleep 1;print $sock "PRIVMSG $1 :$_";}}
+
+if($input=~/PING(.*)/){print $sock "PONG :$1\n";}
+print "$input\n";
+
+
+
+##################################################
+#                   !COMMANDS!                   #
+##################################################
+
+# ____________
+#|    HELP    | 
+#|____________|
+
+sub help{
+if($input=~/!help/){
+print $sock "PRIVMSG $Channel :15,1 !print <text> \n";
+print $sock "PRIVMSG $Channel :5,1 !owner \n";
+print $sock "PRIVMSG $Channel :15,1 !md5lookup <hash> \n";
+print $sock "PRIVMSG $Channel :5,1 !md5crack <hash> \n";
+print $sock "PRIVMSG $Channel :15,1 !md5encrypt <text> \n";
+print $sock "PRIVMSG $Channel :5,1 !desencrypt <text> \n";
+print $sock "PRIVMSG $Channel :15,1 !help (you're doing it) \n";
+}
+}
+
+&help;
+
+# ____________
+#|  END HELP  | 
+#|____________|
+
+
+# ____________
+#|    PRINT   | 
+#|____________|
+
+sub print{ #for testing
+if($input=~/!print /){print $sock "PRIVMSG $Channel :15,1 $'\n";}
+}
+
+&print;
+
+# ____________
+#|  END PRINT | 
+#|____________|
+
+
+# ____________
+#|    OWNER   | 
+#|____________|
+
+sub owner{
+if($input=~/!owner/){print $sock "PRIVMSG $Channel : 15,1 $Owner is the owner of $Nick\n";}
+}
+
+&owner;
+
+# ____________
+#|  END OWNER | 
+#|____________|
+
+
+# ____________
+#|  MD5LOOKUP | 
+#|____________|
+
+sub md5lookup{
+if($input=~/!md5lookup /){
+$hash = $';
+chomp $hash;
+if(length($hash) < 32)
+	{print $sock "PRIVMSG $Channel :5,1!This is not a MD5 hash!\n";}
+elsif ($hash !~ /\d|[a-f]{32}/g)
+	{print $sock "PRIVMSG $Channel :5,1!This is not a MD5 hash!\n";}
+else {
+$www = new LWP::UserAgent;
+$site = "http://md5.rednoize.com/?q=$hash/*";
+$res = $www -> get($site) ;
+$res -> content() =~ /"result" >(.*)</ ;
+print $sock "PRIVMSG $Channel :15,1 http://md5.rednoize.com:5 $1 \n";
+$site = "http://gdataonline.com/qkhash.php?mode=txt&hash=$hash/*";
+$res = $www -> get($site) ;
+$res -> content() =~ /<b>(.*)</ ;
+print $sock "PRIVMSG $Channel :15,1 http://gdataonline.com:5 $1 \n";
+}
+}
+}
+
+&md5lookup;
+
+# _____________
+#|END MD5LOOKUP| 
+#|_____________|
+
+
+# ____________
+#|  MD5CRACK  | 
+#|____________|
+
+sub md5crack{
+if($input=~/!md5crack /){
+$hash = $';
+chomp $hash;
+
+open(PLAIN,$passfile) || print "Could not open wordlist!\n";
+
+while(<PLAIN>){
+   chomp($_);
+   chomp($md5=md5_hex($_));
+   if($md5 == $hash){
+      print $sock "PRIVMSG $Channel :15,1 cracked successfully: 5 $_ \n";
+      
+   }
+}
+close(PLAIN);
+
+}
+}
+
+&md5crack;
+
+# ____________
+#|END MD5CRACK| 
+#|____________|
+
+
+# ____________
+#| MD5ENCRYPT | 
+#|____________|
+
+sub md5encrypt{
+if($input=~/!md5encrypt /){
+$plain = $';
+$md5 = md5_hex($plain);
+print $sock "PRIVMSG $Channel :15,1 $md5 5 [MD5] \n";
+}
+}
+
+&md5encrypt;
+
+# ________________
+#| END MD5ENCRYPT | 
+#|________________|
+
+# ____________
+#| DESENCRYPT | 
+#|____________|
+
+sub desencrypt{
+if($input=~/!desencrypt /){
+$password = $';
+chomp $password;
+@salt = ( '.', '/', 0 .. 9, 'A' .. 'Z', 'a' .. 'z' );
+
+$des = crypt( $password, gensalt(2) );
+print $sock "PRIVMSG $Channel :15,1 $des 5 [DES] \n";
+
+
+sub gensalt {
+$count = shift;
+
+$salt;
+for (1..$count) {
+$salt .= (@salt)[rand @salt];
+}
+
+return $salt;
+}
+}
+}
+
+&desencrypt;
+
+# ________________
+#| END DESENCRYPT | 
+#|________________|
+
+##################################################
+#                   !END COMMANDS!               #
+##################################################
+
+}
+
+#,,               ,                          
+#||              ||          _               
+#||  /'\\  _-_, =||= -_-_   < \,  _-_,  _-_, 
+#|| || || ||_.   ||  || \\  /-|| ||_.  ||_.  
+#|| || ||  ~ ||  ||  || || (( ||  ~ ||  ~ || 
+#\\ \\,/  ,-_-   \\, ||-'   \/\\ ,-_-  ,-_-  
+#                    |/                      
+#                    '

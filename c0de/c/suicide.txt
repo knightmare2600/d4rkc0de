@@ -1,0 +1,44 @@
+/* suicide.c by [ByteRage]
+ * win32 self deleting executable
+ */
+
+#include <windows.h>
+
+void suicide(unsigned long exitcode) {
+	HMODULE hModule;
+	char szModuleName[MAX_PATH];
+    hModule = GetModuleHandle(0);
+	GetModuleFileName(hModule, szModuleName, sizeof(szModuleName));
+	if (GetVersion() & 0x80000000) {
+		// windows 9x,ME
+		__asm {
+			lea	eax, szModuleName
+			push	exitcode
+			push	0
+			push	eax
+			push	ExitProcess
+			push	hModule
+			push	DeleteFile
+			push	FreeLibrary
+			ret
+		}
+	} else {
+		// windows NT,2K
+		CloseHandle(4);
+		__asm {
+			lea	eax, szModuleName
+			push	exitcode
+			push	0
+			push	eax
+			push	ExitProcess
+			push	hModule
+			push	DeleteFile
+			push	UnmapViewOfFile
+			ret
+		}
+	}
+}
+
+void main(int argc, char ** argv) {
+	suicide(0);
+}

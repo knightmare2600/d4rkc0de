@@ -1,0 +1,38 @@
+
+#include<stdio.h>
+
+char format[] = "%s %s\n";
+char msg[] = "Your Processer is:";
+char pr[13];
+
+int main()
+{
+   
+
+      __asm
+   {
+   
+      xor eax,eax      
+      cpuid
+
+      mov dword ptr [pr],ebx
+      mov dword ptr [pr+4],edx
+      mov dword ptr [pr+8],ecx
+       mov dword ptr [pr+12],0
+
+     mov  eax, offset pr
+     push eax
+     mov  eax, offset msg
+     push eax
+     mov  eax, offset format
+     push eax
+     call printf
+
+
+     pop  ebx
+     pop  ebx
+     pop  ebx
+  }
+
+  return 0;
+} 

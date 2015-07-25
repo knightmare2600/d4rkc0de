@@ -1,0 +1,129 @@
+/***************************************************************************
+ *   MSN Live Explorer v1.0                                                *
+ *                                                                         * 
+ *   Copyright (C) 2007 by evilsocket                                      *
+ *   evilsocket@notsec.com                                                 *
+ *   evilsocket@notsec.com                                                 *
+ *   http://www.notsec.com                                                 *
+ *                                                                         *
+ *   thanks to :                                                           *
+ *                                                                         *
+ *     Indeed to Microsoft for it's crappy security systems ! U.U          *
+ *     Master_18 for beta testing ;)                                       *   
+ *     Massimiliano Montoro for Cain&Abel, it was fun reversing it ! :P    *    
+ *     All Notsec members, luv ya guys .                                   *
+ *                                                                         *
+ *   This program is free software; you can redistribute it and/or modify  *
+ *   it under the terms of the GNU General Public License as published by  *
+ *   the Free Software Foundation; either version 2 of the License, or     *
+ *   (at your option) any later version.                                   *
+ *                                                                         *
+ *   This program is distributed in the hope that it will be useful,       *
+ *   but WITHOUT ANY WARRANTY; without even the implied warranty of        *
+ *   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the         *
+ *   GNU General Public License for more details.                          *
+ *                                                                         *
+ *   You should have received a copy of the GNU General Public License     *
+ *   along with this program; if not, write to the                         *
+ *   Free Software Foundation, Inc.,                                       *
+ *   59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.             *
+ *                                                                         *
+ ***************************************************************************/
+
+#include <windows.h>
+#include <stdio.h>
+
+typedef unsigned int  uint_t;
+typedef unsigned char byte_t;
+
+/* Win32 CREDENTIAL_ATTRIBUTE (wincred.h) */
+typedef struct{
+    char   * Keyword;
+    uint_t   Flags;
+    uint_t   ValueSize;
+    byte_t * Value;
+}
+cred_attribute_t;
+
+/* Win32 CREDENTIAL (wincred.h) */
+typedef struct{
+    uint_t             Flags;
+    uint_t             Type;
+    char       *       TargetName;
+    char       *       Comment;
+    FILETIME           LastWritten;
+    uint_t             CredentialBlobSize;
+    byte_t *           CredentialBlob;
+    uint_t             Persist;
+    uint_t             AttributeCount;
+    cred_attribute_t * Attributes;
+    char *             TargetAlias;
+    char *             UserName;
+} 
+credential_t;
+
+/* Tipi puntatori alle funzioni CredEnumerateA e CredFree di advapi32.dll */
+typedef bool (WINAPI * credenumerate_t )(const char *, uint_t, uint_t *, credential_t ***);
+typedef void (WINAPI * credfree_t      )(void *);
+
+/* Piccolo handler degli errori, nn mi andava di riscrivere 200 volte FreeLibrary XD */
+int free_and_die( HMODULE hMod, const char *msg )
+{
+    printf( "%s", msg );
+    if(hMod){
+        FreeLibrary(hMod);
+    }
+    return -1;
+}
+
+int main(int argc, char *argv[])
+{
+    HMODULE         h_dll           = NULL;
+    credenumerate_t p_credenumerate = NULL;
+    credfree_t      p_credfree      = NULL;
+        
+    credential_t ** v_cred = NULL;
+    
+    uint_t          cred_count = 0, i = 0;
+                    
+                    
+    printf( "\n*---------------------------------------------------*\n" );
+    printf( "*--            MSN Live Explorer v1.0             --*\n" );
+    printf( "*--        Copyright (C) 2007 by evilsocket       --*\n" );
+    printf( "*-- evilsocket@notsec.com - http://www.notsec.com --*\n" );
+    printf( "*---------------------------------------------------*\n\n" );
+
+    /* Carico un istanza a advapi32.dll */
+    if( !(h_dll = LoadLibrary("advapi32.dll")) ){
+        return free_and_die( 0, "@ Error loading advapi32.dll !\n" );
+    }
+    
+    /* Estraggo i puntatori a CredEnumerateA e CredFree */
+    p_credenumerate = (credenumerate_t)GetProcAddress( h_dll, "CredEnumerateA" );
+    p_credfree      = (credfree_t)GetProcAddress( h_dll, "CredFree" );
+
+    if( !p_credenumerate || !p_credfree ){
+        return free_and_die( h_dll, "@ Error loading CredEnumerateA or CredFree from advapi32.dll !\n" );
+    }
+                
+    /* Enumero le credenziali impostando il filtro a 'WindowsLive:name=*' */
+    if( !p_credenumerate( "WindowsLive:name=*", 0, &cred_count, &v_cred ) ){
+        return free_and_die( h_dll, "@ Error during credentials enumeration !\n" ); 
+    }
+    
+    /* Looppo per tutte le credenziali trovate e ne stampo il contenuto che mi interessa (ma va?) */
+    printf( "@ Found %d credential(s) :\n\n", cred_count );
+
+    for( i = 0; i < cred_count; i++ ){            
+         printf( "\tUsername : %s\n",  v_cred[i]->UserName       );
+         printf( "\tPassword : %ws\n", v_cred[i]->CredentialBlob );
+    }
+    
+    /* Libero il vettore delle credenziali */
+    p_credfree(v_cred);
+
+    /* Libero l'istanza a advapi32.dll */
+    FreeLibrary(h_dll);
+
+    return 0;
+}

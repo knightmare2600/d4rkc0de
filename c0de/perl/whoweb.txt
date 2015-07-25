@@ -1,0 +1,32 @@
+#!/usr/bin/perl
+#c0dex by m0x.lk || Fucker Team ||
+#WhoIsWeb
+
+use Net::Whois::Raw qw( whois );
+
+system ("clear");
+system ("cls");
+system ("color f8");
+
+print "\n\n";
+print "[+]WhoWEb Perl\n";
+print "[+]c0dex by m0x.lk\n";
+print "[+]Fucker Team\n";
+print "[+]Insert Host: ";
+$host=<STDIN>;  
+
+  $s = whois("$host");
+
+use Net::Whois::Raw qw( whois $OMIT_MSG $CHECK_FAIL $CACHE_DIR $CACHE_TIME $USE_CNAMES $TIMEOUT ) || die "[+]Imposible Imprimir Datos\n";
+        
+  $OMIT_MSG = 1;
+  $OMIT_MSG = 2;
+  $CHECK_FAIL = 1;
+  $CHECK_FAIL = 2;
+  $CACHE_DIR = "/var/spool/pwhois/";
+  $CACHE_TIME = 24;
+  $USE_CNAMES = 1;
+  $TIMEOUT = 10;
+
+print "[+]Datos:\n";
+print "$s";

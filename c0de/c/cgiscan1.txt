@@ -1,0 +1,592 @@
+/****************************************************************************
+ 
+                           -(-  Neon beta4  -)-
+                           Cgi Security Scanner
+                               (356) Checks
+ 
+ Instead of just making it as a single host scanner, as everyone else does.
+ I added so you can compile it as a iplist too if that is needed =)
+ 
+       Host   Scanner    Compile : gcc Neon_beta4.c -o Neon -Wall      
+       Iplist Scanner    Compile : gcc Neon_beta4.c -o Neon -Wall -DMULTI
+         
+                 
+                   Usage: just run the file damit #!#%&#!      
+
+ Shoutouts to: prizm and all the rest that have helped me out with adding 
+               new flaws to it before this public release.
+      
+
+          NOTE! I dont answer any questions on how to use any of these flaws.
+
+
+                    Buffer0verfl0w Security www.b0f.com
+                   By axess ( axess@mail.com ) May-2000
+
+*****************************************************************************/
+
+
+
+
+
+#include <stdio.h>
+#include <unistd.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <string.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <stdlib.h>
+
+#define CGIFLAWS 357
+#ifdef MULTI
+void cgihost(char *);
+#endif
+struct sockaddr_in server;
+struct hostent *hp;
+char host[1024];
+char host2[1024];
+char out[100];
+char *get[400];
+char bufferhttp[1024];
+char buffer[1024];
+char *temp;
+char *ip_ptr;
+char *cgicheck;
+char msg[] = "200 OK";
+int s,count,antal,number;
+int f1,f2,f3,f4;
+int s1,s2,s3,s4;
+int ip;
+FILE *inf;
+FILE *of;
+
+int main()
+{
+   system("clear");
+   printf("\n\n\n");
+for ( antal = 1 ; antal <= 28 ; antal++ )
+   putchar(' ');
+   printf("-(- Neon beta4 -)-\n");
+for ( antal = 1 ; antal <= 20 ; antal++ )
+   putchar(' ');
+#ifdef MULTI
+   printf(" Multi Host Cgi Security Scanner\n");
+#else
+   printf("Single Host Cgi Security Scanner\n");
+#endif
+
+for ( antal = 1 ; antal <= 30 ; antal++ )
+   putchar(' ');
+   printf("(356) Checks\n\n");
+for ( antal = 1 ; antal <= 24 ; antal++ )
+   putchar(' ');
+#ifdef MULTI
+   printf("List : ");
+   scanf("%s",host);
+
+if((inf = fopen(host, "r")) == NULL)
+{
+   printf("Error: input file does not exist!!!\n");
+   exit(1);
+}
+
+for ( antal = 1 ; antal <= 21 ; antal++ )
+   putchar(' ');
+   printf("Logfile : ");
+   scanf("%s",out);
+
+if((of = fopen(out, "w")) == NULL)
+{
+   printf("Error: Cant write to file!!!\n");
+   exit(1);
+}
+
+fprintf(of,"This file was created by Neon_beta4 by axess\n");
+fprintf(of,"--------------------------------------------\n");
+
+
+while(fscanf(inf, "%s", host) != EOF)
+{
+   cgihost(host);
+}
+   return 0;
+}
+
+void cgihost(char *target)
+{
+#else
+   printf("Host : ");
+   scanf("%s",host);
+    
+if((hp=gethostbyname(host)) == NULL)
+{
+   herror("gethostbyname");
+   exit(1);
+}
+
+for ( antal = 1 ; antal <= 21 ; antal++ )
+   putchar(' ');
+   printf("Logfile : ");
+   scanf("%s",out);
+
+if((of = fopen(out, "w")) == NULL)
+{
+   printf("Error: Cant write to file!!!\n");
+   exit(1);
+}
+#endif
+
+get[1] = "GET /cgi-bin/whois_raw.cgi HTTP/1.0\n\n";
+get[2] = "GET /cgi-bin/phf HTTP/1.0\n\n";
+get[3] = "GET /cgi-bin/ls HTTP/1.0\n\n";
+get[4] = "GET /cgi-bin/.cobalt/siteUserMod/siteUserMod.cgi HTTP/1.0\n\n";
+get[5] = "GET /cgi-bin/.fhp HTTP/1.0\n\n";
+get[6] = "GET /cgi-bin/Count.cgi HTTP/1.0\n\n";
+get[7] = "GET /cgi-bin/test-cgi HTTP/1.0\n\n";
+get[8] = "GET /cgi-bin/nph-test-cgi HTTP/1.0\n\n";
+get[9] = "GET /cgi-bin/php.cgi HTTP/1.0\n\n";
+get[10] = "GET /cgi-bin/php-cgi HTTP/1.0\n\n";
+get[11] = "GET /cgi-bin/handler HTTP/1.0\n\n";
+get[12] = "GET /cgi-bin/handler.cgi HTTP/1.0\n\n";
+get[13] = "GET /cgi-bin/minimal.exe HTTP/1.0\n\n";
+get[14] = "GET /cgi-bin/stats.prg HTTP/1.0\n\n";
+get[15] = "GET /cgi-bin/statsconfig HTTP/1.0\n\n";
+get[16] = "GET /cgi-bin/excite HTTP/1.0\n\n";
+get[17] = "GET /cgi-bin/webgais HTTP/1.0\n\n";
+get[18] = "GET /cgi-bin/websendmail HTTP/1.0\n\n";
+get[19] = "GET /cgi-bin/webdist.cgi HTTP/1.0\n\n";
+get[20] = "GET /cgi-bin/faxsurvey HTTP/1.0\n\n";
+get[21] = "GET /cgi-bin/dig.cgi HTTP/1.0\n\n";
+get[22] = "GET /cgi-bin/getdoc.cgi HTTP/1.0\n\n";
+get[23] = "GET /cgi-bin/webplus HTTP/1.0\n\n";
+get[24] = "GET /cgi-bin/bizdb1-search.cgi HTTP/1.0\n\n";
+get[25] = "GET /cgi-bin/htmlscript HTTP/1.0\n\n";
+get[26] = "GET /cgi-bin/pfdispaly.cgi HTTP/1.0\n\n";
+get[27] = "GET /cgi-bin/perl.exe HTTP/1.0\n\n";
+get[28] = "GET /cgi-bin/ppdscgi.exe HTTP/1.0\n\n";
+get[29] = "GET /cgi-bin/cart.pl HTTP/1.0\n\n";
+get[30] = "GET /cgi-bin/bigconf.cgi HTTP/1.0\n\n";
+get[31] = "GET /cgi-bin/wwwboard.pl HTTP/1.0\n\n";
+get[32] = "GET /cgi-bin/www-sql HTTP/1.0\n\n";
+get[33] = "GET /cgi-bin/htsearch HTTP/1.0\n\n";
+get[34] = "GET /cgi-bin/view-source HTTP/1.0\n\n";
+get[35] = "GET /cgi-bin/campas HTTP/1.0\n\n";
+get[36] = "GET /cgi-bin/aglimpse HTTP/1.0\n\n";
+get[37] = "GET /cgi-bin/get32.exe HTTP/1.0\n\n";
+get[38] = "GET /cgi-bin/man.sh HTTP/1.0\n\n";
+get[39] = "GET /cgi-bin/meta.pl HTTP/1.0\n\n";
+get[40] = "GET /cgi-bin/AT-admin.cgi HTTP/1.0\n\n";
+get[41] = "GET /cgi-bin/filemail.pl HTTP/1.0\n\n";
+get[42] = "GET /cgi-bin/maillist.pl HTTP/1.0\n\n";
+get[43] = "GET /cgi-bin/maillist.cgi HTTP/1.0\n\n";
+get[44] = "GET /cgi-bin/jj HTTP/1.0\n\n";
+get[45] = "GET /cgi-bin/info2www HTTP/1.0\n\n";
+get[46] = "GET /cgi-bin/files.pl HTTP/1.0\n\n";
+get[47] = "GET /cgi-bin/finger HTTP/1.0\n\n";
+get[48] = "GET /cgi-bin/finger?@localhost HTTP/1.0\n\n";
+get[49] = "GET /cgi-bin/bnbform.cgi HTTP/1.0\n\n";
+get[50] = "GET /cgi-bin/survey.cgi HTTP/1.0\n\n";
+get[51] = "GET /cgi-bin/AnyForm2 HTTP/1.0\n\n";
+get[52] = "GET /cgi-bin/textcounter.pl HTTP/1.0\n\n";
+get[53] = "GET /cgi-bin/classifieds.cgi HTTP/1.0\n\n";
+get[54] = "GET /cgi-bin/classified.cgi HTTP/1.0\n\n";
+get[55] = "GET /cgi-bin/environ.cgi HTTP/1.0\n\n";
+get[56] = "GET /cgi-bin/fpexplore.exe HTTP/1.0\n\n";
+get[57] = "GET /cgi-bin/imagemap.exe HTTP/1.0\n\n";
+get[58] = "GET /cgi-bin/cgitest.exe HTTP/1.0\n\n";
+get[59] = "GET /cgi-bin/anyboard.cgi HTTP/1.0\n\n";
+get[60] = "GET /cgi-bin/webbbs.cgi HTTP/1.0\n\n";
+get[61] = "GET /cgi-bin/visadmin.exe HTTP/1.0\n\n";
+get[62] = "GET /cgi-bin/nph-publish HTTP/1.0\n\n";
+get[63] = "GET /cgi-bin/perlshop.cgi HTTP/1.0\n\n";
+get[64] = "GET /cgi-bin/wrap HTTP/1.0\n\n";
+get[65] = "GET /cgi-bin/cgiwrap HTTP/1.0\n\n";
+get[66] = "GET /cgi-bin/cachemgr.cgi HTTP/1.0\n\n";
+get[67] = "GET /cgi-bin/query HTTP/1.0\n\n";
+get[68] = "GET /cgi-bin/rpm_query HTTP/1.0\n\n";
+get[69] = "GET /cgi-bin/ax.cgi HTTP/1.0\n\n";
+get[70] = "GET /cgi-bin/ax-admin.cgi HTTP/1.0\n\n";
+get[71] = "GET /cgi-bin/architext_query.pl HTTP/1.0\n\n";
+get[72] = "GET /cgi-bin/w3-msql/ HTTP/1.0\n\n";
+get[73] = "GET /cgi-bin/add_ftp.cgi HTTP/1.0\n\n";
+get[74] = "GET /cgi-bin/test.bat HTTP/1.0\n\n";
+get[75] = "GET /cgi-bin/input.bat HTTP/1.0\n\n";
+get[76] = "GET /cgi-bin/input2.bat HTTP/1.0\n\n";
+get[77] = "GET /cgi-bin/day5datacopier.cgi HTTP/1.0\n\n";
+get[78] = "GET /cgi-bin/day5datanotifier.cgi HTTP/1.0\n\n";
+get[79] = "GET /cgi-bin/whois.cgi HTTP/1.0\n\n";
+get[80] = "GET /cgi-bin/mlog.phtml HTTP/1.0\n\n";
+get[81] = "GET /cgi-bin/archie HTTP/1.0\n\n";
+get[82] = "GET /cgi-bin/bb-hist.sh HTTP/1.0\n\n";
+get[83] = "GET /cgi-bin/nph-error.pl HTTP/1.0\n\n";
+get[84] = "GET /cgi-bin/post_query HTTP/1.0\n\n";
+get[85] = "GET /cgi-bin/ppdscgi.exe HTTP/1.0\n\n";
+get[86] = "GET /cgi-bin/webmap.cgi HTTP/1.0\n\n";
+get[87] = "GET /cgi-bin/tigvote.cgi HTTP/1.0\n\n";
+get[88] = "GET /cgi-bin/webutils.pl HTTP/1.0\n\n";
+get[89] = "GET /cgi-bin/axs.cgi HTTP/1.0\n\n";
+get[90] = "GET /cgi-bin/responder.cgi HTTP/1.0\n\n";
+get[91] = "GET /cgi-bin/plusmail HTTP/1.0\n\n";
+get[92] = "GET /cgi-bin/passwd.txt HTTP/1.0\n\n";
+get[93] = "GET /cgi-bin/Cgitest.exe HTTP/1.0\n\n";
+get[94] = "GET /cgi-bin/GW5/GWWEB.EXE HTTP/1.0\n\n";
+get[95] = "GET /cgi-bin/webwho.pl HTTP/1.0\n\n";
+get[96] = "GET /cgi-bin/search.cgi HTTP/1.0\n\n";
+get[97] = "GET /cgi-bin/dbmlparser.exe HTTP/1.0\n\n";
+get[98] = "GET /cgi-bin/search/tidfinder.cgi HTTP/1.0\n\n";
+get[99] = "GET /cgi-bin/wa HTTP/1.0\n\n";
+get[100] = "GET /cgi-bin/tablebuild.pl HTTP/1.0\n\n";
+get[101] = "GET /cgi-bin/displayTC.pl HTTP/1.0\n\n";
+get[102] = "GET /cgi-bin/uptime HTTP/1.0\n\n";
+get[103] = "GET /cgi-bin/cvsweb/src/usr.bin/rdist/expand.c HTTP/1.0\n\n";
+get[104] = "GET /cgi-bin/c_download.cgi HTTP/1.0\n\n";
+get[105] = "GET /cgi-bin/download.cgi HTTP/1.0\n\n";
+get[106] = "GET /cgi-bin/program.pl HTTP/1.0\n\n";
+get[107] = "GET /cgi-bin/ntitar.pl HTTP/1.0\n\n";
+get[108] = "GET /cgi-bin/enter.cgi HTTP/1.0\n\n";
+get[109] = "GET /cgi-bin/test.html HTTP/1.0\n\n";
+get[110] = "GET /cgi-bin/test-unix.html HTTP/1.0\n\n";
+get[111] = "GET /cgi-bin/printenv HTTP/1.0\n\n";
+get[112] = "GET /cgi-bin/dasp/fm_shell.asp HTTP/1.0\n\n";
+get[113] = "GET /cgi-bin/cgiback.cgi HTTP/1.0\n\n";
+get[114] = "GET /cgi-bin/unlg1.1 HTTP/1.0\n\n";
+get[115] = "GET /cgi-bin/unlg1.2 HTTP/1.0\n\n";
+get[116] = "GET /cgi-bin/gH.cgi HTTP/1.0\n\n";
+get[117] = "GET /cgi-bin/rwwwshell.pl HTTP/1.0\n\n";
+get[118] = "GET /cgi-bin/php HTTP/1.0\n\n";
+get[119] = "GET /cgi-bin/perl HTTP/1.0\n\n";
+get[120] = "GET /cgi-bin/wwwboard.cgi HTTP/1.0\n\n";
+get[121] = "GET /cgi-bin/guestbook.cgi HTTP/1.0\n\n";
+get[122] = "GET /cgi-bin/guestbook.pl HTTP/1.0\n\n";
+get[123] = "GET /cgi-bin/passwd HTTP/1.0\n\n";
+get[124] = "GET /cgi-bin/passwd.txt HTTP/1.0\n\n";
+get[125] = "GET /cgi-bin/password HTTP/1.0\n\n";
+get[126] = "GET /cgi-bin/password.txt HTTP/1.0\n\n";
+get[127] = "GET /cgi-bin/flexform.cgi HTTP/1.0\n\n";
+get[128] = "GET /cgi-bin/MachineInfo HTTP/1.0\n\n";
+get[129] = "GET /cgi-bin/lwgate HTTP/1.0\n\n";
+get[130] = "GET /cgi-bin/lwgate.cgi HTTP/1.0\n\n";
+get[131] = "GET /cgi-bin/nlog-smb.cgi HTTP/1.0\n\n";
+get[132] = "GET /cgi-bin/icat HTTP/1.0\n\n";
+get[133] = "GET /cgi-bin/tst.bat HTTP/1.0\n\n";
+get[134] = "GET /cgi-bin/infosrch.cgi HTTP/1.0\n\n";
+get[135] = "GET /cgi-bin/webwho.pl HTTP/1.0\n\n";
+get[136] = "GET /cgi-bin/FormHandler.cgi HTTP/1.0\n\n";
+get[137] = "GET /cgi-bin/cgi-lib.pl HTTP/1.0\n\n";
+get[138] = "GET /com1 HTTP/1.0\n\n";
+get[139] = "GET /com2 HTTP/1.0\n\n";
+get[140] = "GET /com3 HTTP/1.0\n\n";
+get[141] = "GET /con HTTP/1.0\n\n";
+get[142] = "GET /_vti_inf.html HTTP/1.0\n\n";
+get[143] = "GET /_vti_pvt/service.pwd HTTP/1.0\n\n";
+get[144] = "GET /_vti_pvt/users.pwd HTTP/1.0\n\n";
+get[145] = "GET /_vti_pvt/authors.pwd HTTP/1.0\n\n";
+get[146] = "GET /_vti_pvt/administrators.pwd HTTP/1.0\n\n";
+get[147] = "GET /_vti_pvt/writeto.cnf HTTP/1.0\n\n";
+get[148] = "GET /_vti_pvt/svcacl.cnf HTTP/1.0\n\n";
+get[149] = "GET /_vti_pvt/services.cnf HTTP/1.0\n\n";
+get[150] = "GET /_vti_pvt/service.stp HTTP/1.0\n\n";
+get[151] = "GET /_vti_pvt/service.cnf HTTP/1.0\n\n";
+get[152] = "GET /_vti_pvt/access.cnf HTTP/1.0\n\n";
+get[153] = "GET /_vti_bin/shtml.dll HTTP/1.0\n\n";
+get[154] = "GET /_vti_bin/shtml.exe HTTP/1.0\n\n";
+get[155] = "GET /_vti_bin/fpcount.exe HTTP/1.0\n\n";
+get[156] = "GET /_vti_bin/_vti_adm/admin.dll HTTP/1.0\n\n";
+get[157] = "GET /_vti_bin/_vti_aut/author.dll HTTP/1.0\n\n";
+get[158] = "GET /_vti_bin/_vti_aut/dvwssr.dll HTTP/1.0\n\n";
+get[159] = "GET /cgi-dos/args.bat HTTP/1.0\n\n";
+get[160] = "GET /cgi-dos/args.cmd HTTP/1.0\n\n";
+get[161] = "GET /cgi-win/uploader.exe HTTP/1.0\n\n";
+get[162] = "GET /cgi-shl/win-c-sample.exe HTTP/1.0\n\n";
+get[163] = "GET /scripts/c32web.exe HTTP/1.0\n\n";
+get[164] = "GET /scripts/cart32.exe HTTP/1.0\n\n";
+get[165] = "GET /scripts/issadmin/bdir.htr HTTP/1.0\n\n";
+get[166] = "GET /scripts/CGImail.exe HTTP/1.0\n\n";
+get[167] = "GET /scripts/tools/newdsn.exe HTTP/1.0\n\n";
+get[168] = "GET /scripts/fpcount.exe HTTP/1.0\n\n";
+get[169] = "GET /scripts/no-such-file.pl HTTP/1.0\n\n";
+get[170] = "GET /scripts/counter.exe HTTP/1.0\n\n";
+get[171] = "GET /scripts/uploadn.asp HTTP/1.0\n\n";
+get[172] = "GET /scripts/uploadx.asp HTTP/1.0\n\n";
+get[173] = "GET /scripts/upload.asp HTTP/1.0\n\n";
+get[174] = "GET /scripts/repost.asp HTTP/1.0\n\n";
+get[175] = "GET /scripts/postinfo.asp HTTP/1.0\n\n";
+get[176] = "GET /scripts/run.exe HTTP/1.0\n\n";
+get[177] = "GET /scripts/convert.bas HTTP/1.0\n\n";
+get[178] = "GET /scripts/iisadmin/ism.dll HTTP/1.0\n\n";
+get[179] = "GET /scripts/tools/getdrvrs.exe HTTP/1.0\n\n";
+get[180] = "GET /scripts/tools/dsnform.exe HTTP/1.0\n\n";
+get[181] = "GET /scripts/samples/search/webhits.exe HTTP/1.0\n\n";
+get[182] = "GET /scripts/../../cmd.exe HTTP/1.0\n\n";
+get[183] = "GET /scripts/webbbs.exe HTTP/1.0\n\n";
+get[184] = "GET /scripts/samples/ctguestb.idc HTTP/1.0\n\n";
+get[185] = "GET /scripts/samples/details.idc HTTP/1.0\n\n";
+get[186] = "GET /scripts/tools/getdrvs.exe HTTP/1.0\n\n";
+get[187] = "GET /scripts/pu3.pl HTTP/1.0\n\n";
+get[188] = "GET /scripts/proxy/w3proxy.dll HTTP/1.0\n\n";
+get[189] = "GET /scripts/cpshost.dll HTTP/1.0\n\n";
+get[190] = "GET /scripts/Fpadmcgi.exe HTTP/1.0\n\n";
+get[191] = "GET /scripts/iisadmin/bdir.htr HTTP/1.0\n\n";
+get[192] = "GET /scripts/iisadmin/samples/ctgestb.htx HTTP/1.0\n\n";
+get[193] = "GET /scripts/iisadmin/samples/ctgestb.idc HTTP/1.0\n\n";
+get[194] = "GET /scripts/iisadmin/samples/details.htx HTTP/1.0\n\n";
+get[195] = "GET /scripts/iisadmin/samples/details.idc HTTP/1.0\n\n";
+get[196] = "GET /scripts/iisadmin/samples/query.htx HTTP/1.0\n\n";
+get[197] = "GET /scripts/iisadmin/samples/query.idc HTTP/1.0\n\n";
+get[198] = "GET /scripts/iisadmin/samples/register.htx HTTP/1.0\n\n";
+get[199] = "GET /scripts/iisadmin/samples/register.idc HTTP/1.0\n\n";
+get[200] = "GET /scripts/iisadmin/samples/sample.htx HTTP/1.0\n\n";
+get[201] = "GET /scripts/iisadmin/samples/sample.idc HTTP/1.0\n\n";
+get[202] = "GET /scripts/iisadmin/samples/sample2.htx HTTP/1.0\n\n";
+get[203] = "GET /scripts/iisadmin/samples/viewbook.htx HTTP/1.0\n\n";
+get[204] = "GET /scripts/iisadmin/samples/viewbook.idc HTTP/1.0\n\n";
+get[205] = "GET /scripts/iisadmin/tools/ct.htx HTTP/1.0\n\n";
+get[206] = "GET /scripts/iisadmin/tools/ctss.idc HTTP/1.0\n\n";
+get[207] = "GET /scripts/iisadmin/tools/dsnform.exe HTTP/1.0\n\n";
+get[208] = "GET /scripts/iisadmin/tools/getdrvrs.exe HTTP/1.0\n\n";
+get[209] = "GET /scripts/iisadmin/tools/mkilog.exe HTTP/1.0\n\n";
+get[210] = "GET /scripts/iisadmin/tools/newdsn.exe HTTP/1.0\n\n";
+get[211] = "GET /WebShop/templates/cc.txt HTTP/1.0\n\n";
+get[212] = "GET /WebShop/logs/cc.txt HTTP/1.0\n\n";
+get[213] = "GET /WebShop/logs/ck.log HTTP/1.0\n\n";
+get[214] = "GET /config/orders.txt HTTP/1.0\n\n";
+get[215] = "GET /config/import.txt HTTP/1.0\n\n";
+get[216] = "GET /config/checks.txt HTTP/1.0\n\n";
+get[217] = "GET /orders/order.log HTTP/1.0\n\n";
+get[218] = "GET /orders/import.txt HTTP/1.0\n\n";
+get[219] = "GET /orders/checks.txt HTTP/1.0\n\n";
+get[220] = "GET /orders/orders.txt HTTP/1.0\n\n";
+get[221] = "GET /Orders/order.log HTTP/1.0\n\n";
+get[222] = "GET /order/order.log HTTP/1.0\n\n";
+get[223] = "GET /cfdocs/expelval/openfile.cfm HTTP/1.0\n\n";
+get[224] = "GET /cfdocs/expelval/exprcalc.cfm HTTP/1.0\n\n";
+get[225] = "GET /cfdocs/expelval/displayopenedfile.cfm HTTP/1.0\n\n";
+get[226] = "GET /cfdocs/expelval/sendmail.cfm HTTP/1.0\n\n";
+get[227] = "GET /cfdocs/cfmlsyntaxcheck.cfm HTTP/1.0\n\n";
+get[228] = "GET /cfdocs/snippets/fileexist.cfm HTTP/1.0\n\n";
+get[229] = "GET /cfdocs/zero.cfm HTTP/1.0\n\n";
+get[230] = "GET /cfdocs/root.cfm HTTP/1.0\n\n";
+get[231] = "GET /cfdocs/expressions.cfm HTTP/1.0\n\n";
+get[232] = "GET /cfdocs/toxic.cfm HTTP/1.0\n\n";
+get[233] = "GET /cfdocs/mole.cfm HTTP/1.0\n\n";
+get[234] = "GET /cfdocs/exampleapp/publish/admin/addcontent.cfm HTTP/1.0\n\n";
+get[235] = "GET /cfdocs/exampleapp/email/getfile.cfm HTTP/1.0\n\n";
+get[236] = "GET /cfdocs/exampleapp/publish/admin/application.cfm HTTP/1.0\n\n";
+get[237] = "GET /cfdocs/exampleapp/email/application.cfm HTTP/1.0\n\n";
+get[238] = "GET /cfdocs/exampleapp/docs/sourcewindow.cfm HTTP/1.0\n\n";
+get[239] = "GET /cfdocs/examples/parks/detail.cfm HTTP/1.0\n\n";
+get[240] = "GET /cfdocs/examples/cvbeans/beaninfo.cfm HTTP/1.0\n\n";
+get[241] = "GET /cfdocs/cfmlsyntaxcheck.cfm HTTP/1.0\n\n";
+get[242] = "GET /cfdocs/snippets/viewexample.cfm HTTP/1.0\n\n";
+get[243] = "GET /cfdocs/snippets/evaluate.cfm HTTP/1.0\n\n";
+get[244] = "GET /cfappman/index.cfm HTTP/1.0\n\n";
+get[245] = "GET /cfusion/cfapps/forums/forums_.mdb HTTP/1.0\n\n";
+get[246] = "GET /cfusion/cfapps/security/realm_.mdb HTTP/1.0\n\n";
+get[247] = "GET /cfusion/cfapps/forums/data/forums.mdb HTTP/1.0\n\n";
+get[248] = "GET /cfusion/cfapps/security/data/realm.mdb HTTP/1.0\n\n";
+get[249] = "GET /cfusion/database/cfexamples.mdb HTTP/1.0\n\n";
+get[250] = "GET /cfusion/database/cfsnippets.mdb HTTP/1.0\n\n";
+get[251] = "GET /cfusion/database/smpolicy.mdb HTTP/1.0\n\n";
+get[252] = "GET /cfusion/database/cypress.mdb HTTP/1.0\n\n";
+get[253] = "GET /_private/registrations.txt HTTP/1.0\n\n";
+get[254] = "GET /_private/registrations.htm HTTP/1.0\n\n";
+get[255] = "GET /_private/register.txt HTTP/1.0\n\n";
+get[256] = "GET /_private/register.htm HTTP/1.0\n\n";
+get[257] = "GET /_private/orders.txt HTTP/1.0\n\n";
+get[258] = "GET /_private/orders.htm HTTP/1.0\n\n";
+get[259] = "GET /_private/form_results.htm HTTP/1.0\n\n";
+get[260] = "GET /_private/form_results.txt HTTP/1.0\n\n";
+get[261] = "GET /admisapi/fpadmin.htm HTTP/1.0\n\n";
+get[262] = "GET /iissamples/exair/howitworks/codebrws.asp HTTP/1.0\n\n";
+get[263] = "GET /iissamples/sdk/asp/docs/codebrws.asp HTTP/1.0\n\n";
+get[264] = "GET /iissamples/iissamples/query.asp HTTP/1.0\n\n";
+get[265] = "GET /iissamples/exair/search/advsearch.asp HTTP/1.0\n\n";
+get[266] = "GET /iisadmpwd/achg.htr HTTP/1.0\n\n";
+get[267] = "GET /iisadmpwd/aexp.htr HTTP/1.0\n\n";
+get[268] = "GET /iisadmpwd/aexp2.htr HTTP/1.0\n\n";
+get[269] = "GET /iisadmpwd/aexp2b.htr HTTP/1.0\n\n";
+get[270] = "GET /iisadmpwd/aexp3.htr HTTP/1.0\n\n";
+get[271] = "GET /iisadmpwd/aexp4.htr HTTP/1.0\n\n";
+get[272] = "GET /iisadmpwd/aexp4b.htr HTTP/1.0\n\n";
+get[273] = "GET /iisadmpwd/anot.htr HTTP/1.0\n\n";
+get[274] = "GET /iisadmpwd/anot3.htr HTTP/1.0\n\n";
+get[275] = "GET /pw/storemgr.pw HTTP/1.0\n\n";
+get[276] = "GET /config/mountain.cfg HTTP/1.0\n\n";
+get[277] = "GET /orders/mountain.cfg HTTP/1.0\n\n";
+get[278] = "GET /quikstore.cfg HTTP/1.0\n\n";
+get[279] = "GET /PDG_Cart/shopper.conf HTTP/1.0\n\n";
+get[280] = "GET /search97.vts HTTP/1.0\n\n";
+get[281] = "GET /carbo.dll HTTP/1.0\n\n";
+get[282] = "GET /msadc/Samples/SELECTOR/showcode.asp HTTP/1.0\n\n";
+get[283] = "GET /adsamples/config/site.csc HTTP/1.0\n\n";
+get[284] = "GET /Admin_files/order.log HTTP/1.0\n\n";
+get[285] = "GET /mall_log_files/order.log HTTP/1.0\n\n";
+get[286] = "GET /PDG_Cart/order.log HTTP/1.0\n\n";
+get[287] = "GET /doc HTTP/1.0\n\n";
+get[288] = "GET /.html/............./config.sys HTTP/1.0\n\n";
+get[289] = "GET /ssi/envout.bat HTTP/1.0\n\n";
+get[290] = "GET /~root HTTP/1.0\n\n";
+get[291] = "GET /server%20logfile HTTP/1.0\n\n";
+get[292] = "GET /....../autoexec.bat HTTP/1.0\n\n";
+get[293] = "GET /perl/files.pl HTTP/1.0\n\n";
+get[294] = "GET /lpt HTTP/1.0\n\n";
+get[295] = "GET /AdvWorks/equipment/catalog_type.asp HTTP/1.0\n\n";
+get[296] = "GET /ASPSamp/AdvWorks/equipment/catalog_type.asp HTTP/1.0\n\n";
+get[297] = "GET /admin.php3 HTTP/1.0\n\n";
+get[298] = "GET /code.php3 HTTP/1.0\n\n";
+get[299] = "GET /bb-dnbd/bb-hist.sh HTTP/1.0\n\n";
+get[300] = "GET /domcfg.nsf HTTP/1.0\n\n";
+get[301] = "GET /today.nsf HTTP/1.0\n\n";
+get[302] = "GET /names.nsf HTTP/1.0\n\n";
+get[303] = "GET /catalog.nsf HTTP/1.0\n\n";
+get[304] = "GET /log.nsf HTTP/1.0\n\n";
+get[305] = "GET /domlog.nsf HTTP/1.0\n\n";
+get[306] = "GET /database.nsf HTTP/1.0\n\n";
+get[307] = "GET /secure/.htaccess HTTP/1.0\n\n";
+get[308] = "GET /secure/.wwwacl HTTP/1.0\n\n";
+get[309] = "GET /WebSTAR HTTP/1.0\n\n";
+get[310] = "GET /msadc/msadcs.dll HTTP/1.0\n\n";
+get[311] = "GET /reviews/newpro.cgi HTTP/1.0\n\n";
+get[312] = "GET /_AuthChangeUrl? HTTP/1.0\n\n";
+get[313] = "GET /........./autoexec.bat HTTP/1.0\n\n";
+get[314] = "GET /.html/............/autoexec.bat HTTP/1.0\n\n";
+get[315] = "GET /......../ HTTP/1.0\n\n";
+get[316] = "GET /eatme.idc HTTP/1.0\n\n";
+get[317] = "GET /eatme.ida HTTP/1.0\n\n";
+get[318] = "GET /eatme.pl HTTP/1.0\n\n";
+get[319] = "GET /eatme.idq HTTP/1.0\n\n";
+get[320] = "GET /eatme.idw HTTP/1.0\n\n";
+get[321] = "GET /default.asp HTTP/1.0\n\n";
+get[322] = "GET /default.asp::$DATA HTTP/1.0\n\n";
+get[323] = "GET /default.asp. HTTP/1.0\n\n";
+get[324] = "GET /samples/ HTTP/1.0\n\n";
+get[325] = "GET /photoads/cgi-bin/env.cgi HTTP/1.0\n\n";
+get[326] = "GET /photoads/cgi-bin/ HTTP/1.0\n\n";
+get[327] = "GET /photoads/ HTTP/1.0\n\n";
+get[328] = "GET /session/admnlogin HTTP/1.0\n\n";
+get[329] = "GET /session/adminlogin?RCpage=/sysadmin/index.stm HTTP/1.0\n\n";
+get[330] = "GET /samples/search/queryhit.htm HTTP/1.0\n\n";
+get[331] = "GET /msadc/msadcs.dll HTTP/1.0\n\n";
+get[332] = "GET /publisher/|publisher HTTP/1.0\n\n";
+get[333] = "GET /PSUser/PSCOErrPage.htm HTTP/1.0\n\n";
+get[334] = "GET ../../boot.ini HTTP/1.0\n\n";
+get[335] = "GET ../.. HTTP/1.0\n\n";
+get[336] = "GET /aux HTTP/1.0\n\n";
+get[337] = "GET /status HTTP/1.0\n\n";
+get[338] = "GET /status.cgi HTTP/1.0\n\n";
+get[339] = "GET /log HTTP/1.0\n\n";
+get[340] = "GET /stats HTTP/1.0\n\n";
+get[341] = "GET /manage/cgi/cgiproc HTTP/1.0\n\n";
+get[342] = "GET /bb-hist.sh HTTP/1.0\n\n";
+get[343] = "GET /DataBase/ HTTP/1.0\n\n";
+get[344] = "GET /scripts/wa.exe HTTP/1.0\n\n";
+get[345] = "GET /cgi-bin/UltraBoard.pl HTTP/1.0\n\n";
+get[346] = "GET /cgi-bin/UltraBoard.cgi HTTP/1.0\n\n";
+get[347] = "GET /piranha/secure/passwd.php3 HTTP/1.0\n\n";
+get[348] = "GET /wwwboard/passwd.txt HTTP/1.0\n\n";
+get[349] = "GET /cgi-bin/sojourn.cgi HTTP/1.0\n\n";
+get[350] = "GET /cgi-bin/ews HTTP/1.0\n\n";
+get[351] = "GET /cgi-bin/dumpenv HTTP/1.0\n\n";
+get[352] = "GET /cgi-bin/dfire.cgi HTTP/1.0\n\n";
+get[353] = "GET /cgi-bin/spin_client.cgi HTTP/1.0\n\n";
+get[354] = "GET /ss HTTP/1.0\n\n";
+get[355] = "GET /cgi-bin/echo.bat HTTP/1.0\n\n";
+get[356] = "GET /cgi-bin/hello.bat HTTP/1.0\n\n";
+
+#ifdef MULTI
+
+   fprintf(of,"\nStarted Scanning %s\n", target);
+
+if((hp=(struct hostent *)gethostbyname(target)) == NULL)
+{
+   return;
+}
+        s = socket(AF_INET, SOCK_STREAM, 0);
+        bzero(&server, sizeof(server));
+        server.sin_family = AF_INET;
+        server.sin_port = htons(80);
+        memcpy((char *)&server.sin_addr, (char *)hp->h_addr,hp->h_length);
+
+if((connect(s, (struct sockaddr *)&server, sizeof(server)))== -1)
+{
+   return;
+}
+        send(s,"HEAD / HTTP/1.0\n\n",17,0);
+        recv(s,bufferhttp,sizeof(bufferhttp),0);
+        fprintf(of,"Version:\n%s",bufferhttp);
+        close(s);
+
+#else 
+
+   s = socket(AF_INET,SOCK_STREAM, 0);
+   bcopy(hp->h_addr, (char *)&server.sin_addr, hp->h_length);
+   server.sin_family = AF_INET;
+   server.sin_port = htons(80);
+
+if((connect(s, (struct sockaddr *)&server, sizeof(server))) == -1)
+{  
+   perror("connect");
+   exit(1);
+}
+   send(s,"HEAD / HTTP/1.0\n\n",17,0);
+   recv(s,bufferhttp,sizeof(bufferhttp),0);
+   fprintf(of,"Scanning:%s\n",host);
+   fprintf(of,"Version:\n%s",bufferhttp);
+
+#endif
+
+fprintf(of,"The following was found on the Server\n");
+
+for(count=1 ; count != CGIFLAWS ; count++ )
+{   
+
+#ifdef MULTI
+
+        s = socket(AF_INET, SOCK_STREAM, 0);
+        bzero(&server, sizeof(server));
+        server.sin_family = AF_INET;
+        server.sin_port = htons(80);
+        memcpy((char *)&server.sin_addr, (char *)hp->h_addr,hp->h_length);
+
+if((connect(s, (struct sockaddr *)&server, sizeof(server))) == -1)
+{
+   return;
+}
+
+#else
+
+
+   s = socket(AF_INET, SOCK_STREAM, 0);    
+   bcopy(hp->h_addr, (char *)&server.sin_addr, hp->h_length);
+   server.sin_family = AF_INET;
+   server.sin_port = htons(80);   
+
+if((connect(s, (struct sockaddr *)&server, sizeof(server))) == -1)
+{
+   perror("connect");
+   exit(1);
+}
+   
+#endif
+
+for(number=0; number<1024; number++)
+{
+   buffer[number] = '\0';
+}
+   send(s,get[count],strlen(get[count]),0);
+   recv(s, buffer, sizeof(buffer),0);                 
+   cgicheck = strstr(buffer,msg);
+
+if(cgicheck != NULL)
+   fprintf(of,"%s \n",get[count]);      
+else  
+   close(s);
+}
+#ifdef MULTI
+return;
+#else
+return 0;
+fclose(of);
+#endif
+}

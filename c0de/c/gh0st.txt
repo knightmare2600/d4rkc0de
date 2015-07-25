@@ -1,0 +1,58 @@
+/* Gh0st by WarGame. A proggy that flashes the leds of the keyboard - http://vx.netlux.org/wargamevx */
+
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <linux/kd.h>
+#include <sys/types.h>
+#include <sys/ioctl.h>
+#include <signal.h>
+
+int fd;
+
+void die(int signum)
+{
+	printf("D3ad\n");
+	ioctl(fd, KDSETLED, 0x0);
+	close(fd);
+	exit(1);
+}
+
+
+int main(int argc,char *argv[])
+{	
+	int act = 0xff,interval;
+
+	if(argv[1] == NULL)
+	{	
+		printf("Gh0st by WarGame\n");
+		printf("Usage: %s <flashing interval in seconds>\n",argv[0]);
+		exit(-1);
+	}
+
+	interval = atoi(argv[1]);
+
+	if ((fd = open("/dev/console", O_NOCTTY)) == -1) 
+	{
+		perror("open");
+		exit(-1);
+	 }
+
+	signal(SIGINT,die);
+	signal(SIGTERM,die);
+	signal(SIGQUIT,die);
+	signal(SIGTSTP,die);
+
+	printf("Gh0st\n");
+	
+	while(1)
+	{
+		if(act == 0xff)
+			act = 0x07;
+		else
+			act = 0xff;
+		
+		ioctl(fd,KDSETLED,act);
+		sleep(interval);
+	}
+}

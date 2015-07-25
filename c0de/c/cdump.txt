@@ -1,0 +1,97 @@
+/*
+ * [cdump 0.1 by PoWeR_PoRK of netric (http://www.netric.org)]
+ *  
+ *  Simple pipe driven utility for creating c-style char decs from binary
+ *  input. Can be of use for embedding shellcode etc in c sourcefiles.
+ *  Do "./shdump -h" for a usage overview.
+ */
+
+#include <stdio.h>
+
+char usage[] =
+ "Usage: ./cdump [-h][-n <var name>][-u][-s <linesize>][-c [-cu]]\n"
+ "Pipe driven utility for coverting binary data to c char declaration.\n"
+ "Example: cat binfile | ./shdump -u -s 20 >> bin.c\n"
+ "This adds the contents of binfile to bin.c in char declaration format\n\n"
+
+ "-h <var name> See this usage overview\n"
+ "-n            Name of the char identifier (maxsize=30, default=foobar)\n"
+ "-u            Set this to uppercase the hex output\n"
+ "-s <linesize> Set the maximum line size per byte input (default=10)\n"
+ "-c            Comment the byte offsets into the output\n"
+ "-cu           Set this to uppercase hex chars in byte offset comment\n";
+
+int main(int argc, char **argv[])
+{
+  int i = -2,oldi, lsize = 10, ucase = 0, npar = 1, cc = 1, cmt = 0, cucase = 0;
+  unsigned long place = 0;
+  char c, vname[31];
+  vname[30] = 0;
+  strncpy(&vname, "foobar", 30);
+  
+  if(argc > 1){
+    if(!strncmp(argv[1], "-h", 2)){ 
+      printf("%s", &usage);
+      exit(0);
+    }
+   
+    while(npar <= 5 && npar <= (argc - 1)){
+      if(!strncmp(argv[npar], "-n", 2)){      
+	strncpy(&vname, argv[npar+1], 30);
+	npar+=2;
+      }else if(!strncmp(argv[npar], "-u", 2)){
+	ucase = 1;
+	npar++;
+      }else if(!strncmp(argv[npar], "-s", 2)){
+	lsize = atoi(argv[npar+1]);
+	npar+=2;
+      }else if(!strncmp(argv[npar], "-c", 2)){
+	cmt = 1;
+	npar++;
+	if(npar <= (argc - 1)){
+	  if(!strncmp(argv[npar], "-cu", 3)){
+	    cucase = 1;
+	    npar++;
+	  }
+	}
+      }else{
+	npar = argc;
+      }
+    }
+
+  }
+
+  if(strchr((char *)&vname, 37) != NULL){
+    printf("Cheeky Bastard! :P (fmt exploitation not allowed)\n");
+    exit(0);
+  }
+
+  oldi = getchar();
+  printf("char %s =\n/* 0000:0000 */ \"", (char *)&vname);
+  while(oldi != EOF )
+    {
+	if( ucase == 0 ){
+	  printf("\\x%.2x", oldi);
+	}else if( ucase == 1 ){
+	  printf("\\x%.2X", oldi);
+	}
+	if(cc >= lsize){
+	  if(cmt == 1){
+	    place += cc;
+	    if(cucase == 1){
+	      printf("\"\n/* %.4X:%.4X */ ", *((unsigned short *)&place + 1), *((unsigned short *)&place));
+	    }else{
+	      printf("\"\n/* %.4x:%.4x */ ", *((unsigned short *)&place + 1), *((unsigned short *)&place));
+	    }
+	  }else{
+	    printf("\"\n");
+	  }
+          printf("\"");
+	  cc = 0;
+	}
+	cc++;
+      oldi = getchar();
+    }
+  printf("\";\n");
+  return 0;
+}

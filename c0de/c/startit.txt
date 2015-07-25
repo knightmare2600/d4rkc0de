@@ -1,0 +1,67 @@
+/* 
+How add your application to startup!
+Author: K1u
+Site: k0h.org & k1u.org
+Disclaimer: I am not responsible for how you use this.
+
+This is purely for educational purposes.
+BTW: If you wish to use this in your application give me a shout.
+*/
+#include <windows.h>
+ 
+int main(void)
+
+{
+    /* Grab filename of process/exe using GetModuleFileName() function. */
+    TCHAR szPath[MAX_PATH];
+
+ 
+    GetModuleFileName(NULL,
+                      szPath,
+                      MAX_PATH);
+
+ 
+    /* Create a New HKEY. */
+    HKEY newValue;
+ 
+    /* Open Registry key. */
+
+    RegOpenKey(HKEY_LOCAL_MACHINE,
+               "Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+
+               &newValue);
+ 
+    /* Note use HKEY_CURRENT_USER\SOFTWARE\Microsoft\Windows\CurrentVersion\Run to add for the
+
+        current user only.
+ 
+        Now give a new value.
+ 
+        Syntax for RegSetValueEx() function is
+        LONG WINAPI RegSetValueEx(
+        __in        HKEY hKey,
+        __in_opt    LPCTSTR lpValueName,
+
+        __reserved  DWORD Reserved,
+        __in        DWORD dwType,
+        __in_opt    const BYTE* lpData,
+        __in        DWORD cbData
+        );
+ 
+        More info at http://msdn2.microsoft.com/en-us/library/ms724923.aspx */
+
+ 
+    RegSetValueEx(newValue,
+                  "Name_Me_Please",
+                  0,
+
+                  REG_SZ,
+                  (LPBYTE)szPath,
+                  sizeof(szPath));
+
+ 
+    /* Close the key. */
+    RegCloseKey(newValue);
+    return 0;
+
+}

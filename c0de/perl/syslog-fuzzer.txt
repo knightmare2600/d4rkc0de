@@ -1,0 +1,202 @@
+#!/usr/bin/perl
+#syslog Fuzzer v0.1 
+#jaime.blasco@aitsec.com
+#www.aitsec.com
+
+use IO::Socket::INET;
+use Getopt::Std;
+use POSIX qw(strftime);
+
+getopt('hp', \ my %opts );
+
+$SIG{INT}=\&exitz;
+print "
+\t  Syslog Fuzzer v0.1 by Jaime Blasco (c) 2008
+\t        www.aitsec.com
+";
+if(!defined($opts{h}) or !defined($opts{p})){
+	print "
+		-h   : Host\n
+		-p   : Port Number
+	";
+exit
+}
+
+$port = $opts{p};
+$host = $opts{h};
+
+@bfo = ('A'x10, 'A'x20, 'A'x40, 'A'x80, 'A'x160, 'A'x320, 'A'x640, 'A'x1280, 'A'x3000, 'A'x5000, 'A'x8000, 'A'x12000, 'A'x15000);
+@fse = ("%s%p%x%d", ".1024d", "%.2049d", "%p%p%p%p", "%x%x%x%x", "%d%d%d%d", "%s%s%s%s", "%99999999999s",
+	    "%08x", "%%20d", "%%20n", "%%20x", "%%20s", "%s%s%s%s%s%s%s%s%s%s", "%p%p%p%p%p%p%p%p%p%p",
+	    "%#0123456x%08x%x%s%p%d%n%o%u%c%h%l%q%j%z%Z%t%i%e%g%f%a%C%S%08x%%", "%s"x150, "%x"x300);
+@int = ("-1", "0", "0x100", "0x1000", "0x3fffffff", "0x7ffffffe", "0x7fffffff", "0x80000000", "0xfffffffe", "0xffffffff", "0x10000", "0x100000");
+
+print "Using host: ".$host."\n";
+print "Using port: ".$port."\n";
+
+$con=new IO::Socket::INET->new(PeerPort=>$port,
+        Proto=>'udp',
+        PeerAddr=>$host);
+
+#http://www.ietf.org/rfc/rfc3164.txt
+#udp SYSLOG PACKET looks like:
+#<Priority>Header Message text
+# Header = Date Hostname PID
+
+$npriority = '<0>';
+$ndate = strftime "%b%e %H:%M:%S", localtime;
+$nhostname = "10.0.0.2";
+$npid = 'fuzzer[10]';
+$nmsg = "Syslog Fuzzer v0.1 by Jaime Blasco (c) 2008";
+
+#fuzzing PRI
+
+#Buffer Overflow
+foreach (@bfo) {
+	$header = $ndate.' '.$nhostname.' '.$npid;
+	$packet = '<'.$_.'>'.$header.': '.$nmsg;
+	$con->send($packet);
+	
+	#print $packet;
+}
+sleep 1;
+
+#Format Strings
+foreach (@fse) {
+	$header = $ndate.' '.$nhostname.' '.$npid;
+	$packet = '<'.$_.'>'.$header.': '.$nmsg;
+	$con->send($packet);
+	#print $packet;
+}
+sleep 1;
+
+#Integer Overflows
+foreach (@int) {
+	$header = $ndate.' '.$nhostname.' '.$npid;
+	$packet = '<'.$_.'>'.$header.': '.$nmsg;
+	$con->send($packet);
+	#print $packet;
+}
+sleep 1;
+
+#fuzzing header
+	
+	#fuzzing Date
+	
+#Buffer Overflow
+foreach (@bfo) {
+	$header = $_.' '.$nhostname.' '.$npid;
+	$packet = $npriority.$header.': '.$nmsg;
+	$con->send($packet);
+	#print $packet;
+}
+sleep 1;
+
+#Format Strings
+foreach (@fse) {
+	$header = $_.' '.$nhostname.' '.$npid;
+	$packet = $npriority.$header.': '.$nmsg;
+	$con->send($packet);
+	#print $packet;
+}
+sleep 1;
+
+#Integer Overflows
+foreach (@int) {
+	$header = $_.' '.$nhostname.' '.$npid;
+	$packet = $npriority.$header.': '.$nmsg;
+	$con->send($packet);
+	#print $packet;
+}
+sleep 1;
+
+	#fuzzing hostname
+
+#Buffer Overflow
+foreach (@bfo) {
+	$header = $ndate.' '.$_.' '.$npid;
+	$packet = $npriority.$header.': '.$nmsg;
+	$con->send($packet);
+	#print $packet;
+}
+sleep 1;
+
+#Format Strings
+foreach (@fse) {
+	$header = $ndate.' '.$_.' '.$npid;
+	$packet = $npriority.$header.': '.$nmsg;
+	$con->send($packet);
+	#print $packet;
+}
+sleep 1;
+
+#Integer Overflows
+foreach (@int) {
+	$header = $ndate.' '.$_.' '.$npid;
+	$packet = $npriority.$header.': '.$nmsg;
+	$con->send($packet);
+	#print $packet;
+}
+sleep 1;
+
+	#fuzzing PID
+	
+#Buffer Overflow
+foreach (@bfo) {
+	$header = $ndate.' '.$nhostname.' '.$_;
+	$packet = $npriority.$header.': '.$nmsg;
+	$con->send($packet);
+	#print $packet;
+}
+sleep 1;
+
+#Format Strings
+foreach (@fse) {
+	$header = $ndate.' '.$nhostname.' '.$_;
+	$packet = $npriority.$header.': '.$nmsg;
+	$con->send($packet);
+	#print $packet;
+}
+sleep 1;
+
+#Integer Overflows
+foreach (@int) {
+	$header = $ndate.' '.$nhostname.' '.$_;
+	$packet = $npriority.$header.': '.$nmsg;
+	$con->send($packet);
+	#print $packet;
+}
+sleep 1;
+
+#fuzzing msg
+
+#Buffer Overflow
+foreach (@bfo) {
+	$header = $ndate.' '.$nhostname.' '.$npid;
+	$packet = $npriority.$header.': '.$_;
+	$con->send($packet);
+	#print $packet;
+}
+sleep 1;
+
+#Format Strings
+foreach (@fse) {
+	$header = $ndate.' '.$nhostname.' '.$npid;
+	$packet = $npriority.$header.': '.$_;
+	$con->send($packet);
+	#print $packet;
+}
+sleep 1;
+
+#Integer Overflows
+foreach (@int) {
+	$header = $ndate.' '.$nhostname.' '.$npid;
+	$packet = $npriority.$header.': '.$_;
+	$con->send($packet);
+	#print $packet;
+}
+
+
+
+
+

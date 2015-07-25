@@ -1,0 +1,144 @@
+#!/usr/local/bin/perl
+=pod
+ Wyrm v2 - The Open Hash Algo
+
+ Skript darf und soll verändert und verteilt werden!
+ Wyrm ist ein Offener Algo zum erstellen von Hashes.
+
+ Fragen? Mail me: perforin@dark-codez.org
+
+ www.vx.perforin.de.vu
+ www.perforins-software.de.vu
+ www.dark-codez.com
+=cut
+
+use bignum;
+
+@NUMBERS_1 = (24,69,17,32,12,76,11,23,14,49,77,81,42,40,19,99,45,33,59,13,95,29,66,95,88,61);
+@NUMBERS_2 = (54,37,85,63,73,51);
+
+($StagesHaF,$StagesBorder) = ('=' x 23,'=' x 7);
+
+
+print <<HEAD;
+ _    _                      
+| |  | |                     
+| |  | |_   _ _ __ _ __ ___  
+| |/\\| | | | | '__| '_ ` _ \\ 
+\\  /\\  / |_| | |  | | | | | |
+ \\/  \\/ \\__, |_|  |_| |_| |_|
+         __/ |               
+        |___/                
+
+  Wyrm - The Open Hash Algo
+
+HEAD
+print "Please enter Password: ";
+chop($input = <STDIN>);
+
+&Stage1;
+
+sub Stage1 {
+for ($input) {
+$input =~ s/A/$NUMBERS_1[0]/ig;
+$input =~ s/B/$NUMBERS_1[1]/ig;
+$input =~ s/C/$NUMBERS_1[2]/ig;
+$input =~ s/D/$NUMBERS_1[3]/ig;
+$input =~ s/E/$NUMBERS_1[4]/ig;
+$input =~ s/F/$NUMBERS_1[5]/ig;
+$input =~ s/G/$NUMBERS_1[6]/ig;
+$input =~ s/H/$NUMBERS_1[7]/ig;
+$input =~ s/I/$NUMBERS_1[8]/ig;
+$input =~ s/J/$NUMBERS_1[9]/ig;
+$input =~ s/K/$NUMBERS_1[10]/ig;
+$input =~ s/L/$NUMBERS_1[11]/ig;
+$input =~ s/M/$NUMBERS_1[12]/ig;
+$input =~ s/N/$NUMBERS_1[13]/ig;
+$input =~ s/O/$NUMBERS_1[14]/ig;
+$input =~ s/P/$NUMBERS_1[15]/ig;
+$input =~ s/Q/$NUMBERS_1[16]/ig;
+$input =~ s/R/$NUMBERS_1[17]/ig;
+$input =~ s/S/$NUMBERS_1[18]/ig;
+$input =~ s/T/$NUMBERS_1[19]/ig;
+$input =~ s/U/$NUMBERS_1[20]/ig;
+$input =~ s/V/$NUMBERS_1[21]/ig;
+$input =~ s/W/$NUMBERS_1[22]/ig;
+$input =~ s/X/$NUMBERS_1[23]/ig;
+$input =~ s/Y/$NUMBERS_1[24]/ig;
+$input =~ s/Z/$NUMBERS_1[25]/ig;
+$input =~ s/\_/$NUMBERS_2[0]/ig;
+$input =~ s/\-/$NUMBERS_2[1]/ig;
+$input =~ s/\[/$NUMBERS_2[2]/ig;
+$input =~ s/\]/$NUMBERS_2[3]/ig;
+$input =~ s/\+/$NUMBERS_2[4]/ig;
+$input =~ s/\:/$NUMBERS_2[5]/ig;
+}
+print <<"STAGE1";
+
+$StagesHaF
+$StagesBorder STAGE 1 $StagesBorder
+$StagesHaF
+
+[+] Input translated!
+
+STAGE1
+}
+
+&Stage2;
+
+sub Stage2 {
+$length = length($input);
+$first = substr($input,0,1);
+$last = substr($input,$#length,$length);
+print <<"STAGE2";
+$StagesHaF
+$StagesBorder STAGE 2 $StagesBorder
+$StagesHaF
+
+[+] TRANSLATED: $input
+[+] LENGTH: $length
+[+] FIRST: $first
+[+] LAST: $last
+
+STAGE2
+}
+
+&Stage3;
+
+sub Stage3 {
+$STEP1 = cos($input * $length);
+$STEP2 = exp($first xor $last);
+$STEP3 = sin($STEP1 + $STEP2);
+$STEP4 = atan2($STEP3,$length);
+$STEP4 =~ tr/\.//d;
+print <<"STAGE3";
+$StagesHaF
+$StagesBorder STAGE 3 $StagesBorder
+$StagesHaF
+
+[+] UR HASH: $STEP4
+
+STAGE3
+}
+
+&Stage4;
+
+sub Stage4 {
+$first = cos($STEP4) ;
+for ($counter = 1; $counter <= 20; $counter++) {
+$second = $counter ** $first;
+push(@uHASH,$second);
+}
+foreach $numeric (@uHASH) {
+$numeric =~ tr/\.\+e//d;
+push(@HASH,$numeric);
+}
+}
+print <<"STAGE4";
+$StagesHaF
+$StagesBorder STAGE 4 $StagesBorder
+$StagesHaF
+
+[+] HASH:
+STAGE4
+print @HASH;

@@ -1,0 +1,99 @@
+/* 
+
+	lscan.c --> listen scanner
+
+	    	by f1ex
+
+	usage: lscan <inputfile> <port number> [outputfile]
+
+
+	props to: duke well this 99% of his c0de...I just did a ripped =)
+*/
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <string.h>
+
+void usage(char *);
+void printheader(void);
+void testhost(char *);
+
+FILE *of;
+
+int main(int argc, char *argv[])
+{
+	FILE *fp;
+	char host[1024];
+	int c;
+	c = 0;
+	printf("\npscan: port scanner for linux by f1ex\n");
+        printf("-------------------------------------\n\n");
+	if(argc < 2){
+		usage(argv[0]);
+		return 0;
+	}
+	if(argc == 3){
+		of = fopen(argv[2], "w");
+		printheader();
+	} else {
+		of = stdout; /* when using fprintf i can refer to stdout or log
+				file without having to do conditions */
+	}
+	if((fp = fopen(argv[1], "r")) == NULL){
+		printf("error: input file does not exist\n");
+		return 0;
+	}
+	printf("scanning...");
+	while(fscanf(fp, "%s", &host) != EOF){
+		testhost(host);
+	}
+	printf("end of scan\n");
+	return 0;
+}
+		
+void usage(char *progname)
+{
+	printf("usage: %s <inputfile> [outputfile]\n", progname);
+	printf("\n\ninputfile: a list of hosts (or ip's) to scan\n");
+	printf("outputfile: optionally record results to a file instead of stdout\n\n\n");
+}
+
+void printheader(void)
+{
+	fprintf(of, "port scan results file\n");
+	fprintf(of, "----------------------\n\n");
+}
+
+void testhost(char *target)
+{
+	struct sockaddr_in server;
+	int sockfd, i;
+	char version[256];
+	struct hostent *hp;
+	printf("%s\n", target);
+	if((hp=(struct hostent *)gethostbyname(target)) == NULL) {
+		fprintf(of, "%s: unknown host\n", target);
+		return;
+	}
+	sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	bzero(&server, sizeof(server));
+	server.sin_family = AF_INET;
+	server.sin_port = htons(31337);
+	memcpy((char *)&server.sin_addr, (char *)hp->h_addr, hp->h_length);
+	if((connect(sockfd, (struct sockaddr *)&server, sizeof(server))) == -1){
+		fprintf(of, "%s: connect error\n", target);
+		return;
+	}
+	else
+	{
+ 	fprintf(of, "%s: open", target);
+	}
+	close(sockfd);
+	return;
+}

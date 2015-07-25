@@ -1,0 +1,97 @@
+#!/usr/bin/perl
+use strict;
+my($wlist,$lmin,$lmax,$dlist,$alow,$ahigh,$x,$maword,$mbword);
+sub usage{
+print "#########################################################\n";
+print "-length <wordlist> <min word length> <max word length> <dump>  \n\t Only have words that are a certain length\n";
+print "-match <wordlist> <word> [can't contain(optional)] <dump> \n\t Only have words that contain a word & don't contain another\n";
+print "-app <wordlist> <low number> <higher number> <dump>	\n\t Goes from a low number to a high number on each word, and appends the number onto the word\n";
+print "-pre <wordlist> <low number> <higher number> <dump>	\n\t Goes from a low number to a high number on each word, and prepends the number onto the word\n";
+print "\nEVERYTHING IS CASE SENSITIVE\n";
+print "#########################################################\n\n";
+exit;
+}
+
+sub xmatch{
+	open("xfile", $wlist) || die "Couldn't open $wlist\n";
+	while(my $line = <xfile>){
+		$line = xchop($line);
+			if($mbword){
+				if(($line =~ m/$maword/) && $line !~ m/$mbword/){
+					print "[M] $line\n";
+					open(LOG,">>$dlist") || die "Couldn't open $dlist\n";
+					print LOG "$line\n";
+					close(LOG);
+				}
+			}
+			else{
+				if($line =~ m/$maword/){
+					print "[M] $line\n";
+					open(LOG,">>$dlist") || die "Couldn't open $dlist\n";
+					print LOG "$line\n";
+					close(LOG);
+				}
+			}
+		}
+	}
+
+sub xpend($){
+	open("xfile", $wlist) || die "Couldn't open $wlist\n";
+	while(my $line = <xfile>){
+		$line = xchop($line);
+		for($x=$alow;$x<=$ahigh;$x++){
+			if($_[0] eq "app"){
+				print "[A] $line$x\n";
+				open(LOG,">>$dlist") || die "Couldn't open $dlist\n";
+				print LOG "$line$x\n";
+				close(LOG);
+			}
+			elsif($_[0] eq "pre"){
+				print "[A] $x$line\n";
+				open(LOG,">>$dlist") || die "Couldn't open $dlist\n";
+				print LOG "$x$line\n";
+				close(LOG);
+			}
+		}
+	}
+}
+
+sub xlength{
+	open("xfile", $wlist) || die "Couldn't open $wlist\n";
+	while(my $line = <xfile>){
+		$line = xchop($line);
+			if((length($line)>$lmin-1) && (length($line)<$lmax+1)){
+			print "[L] Word: $line\n[L] Length: " . length($line) . "\n";
+			open(LOG,">>$dlist") || die "Couldn't open $dlist\n";
+			print LOG "$line\n";
+			close(LOG);
+		}
+	}
+}
+
+sub xchop($){my $xchop = shift;if($^O =~ m/linux/ || $^O =~ m/bsd/ || $^O =~ m/nix/){chop($xchop);}else{chomp($xchop);}return $xchop;}
+
+&usage unless @ARGV;
+$wlist = $ARGV[1];
+if($ARGV[0] eq "-length"){	
+	$lmin = $ARGV[2];
+	$lmax = $ARGV[3];
+	$dlist = $ARGV[4];
+	&xlength;
+}
+elsif($ARGV[0] eq "-match"){
+	$maword = $ARGV[2];
+	$mbword = "";
+	if($ARGV[4]){print $ARGV[4] . "a\n\n";$mbword = $ARGV[3];$dlist = $ARGV[4];}else{$dlist = $ARGV[3];}&xmatch;}
+elsif($ARGV[0] eq "-app"){
+	$alow = $ARGV[2];
+	$ahigh = $ARGV[3];
+	$dlist = $ARGV[4];
+	&xpend("app");
+}
+elsif($ARGV[0] eq "-pre"){
+	$alow = $ARGV[2];
+	$ahigh = $ARGV[3];
+	$dlist = $ARGV[4];
+	&xpend("pre");
+}

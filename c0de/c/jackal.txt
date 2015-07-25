@@ -1,0 +1,466 @@
+/* Jackal - Stealth/FireWall scanner. With the use of halfopen ports
+   and sending SYNC (sometimes additional flags like FIN) one can
+   scan behind a firewall. And it shouldnt let the site feel we're scanning
+   by not doing a 3-way-handshake we hope to avoid any tcp-logging.
+   Credits: Halflife, Jeff (Phiji) Fay, Abdullah Marafie.
+   Alpha Tester: Walter Kopecky.
+   Results:
+   Some firewalls did allow SYN | FIN to pass through. No Site has
+   been able to log the connections though.. during alpha testing.
+   ShadowS shadows@kuwait.net
+   Copyleft (hack it i realy dont care).
+   */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <string.h>
+#include <unistd.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <linux/ip.h>
+#include <linux/tcp.h>
+
+int timeout = 0;
+int counter = 0;
+void usage(char *name)
+{
+  printf("usage:%s [-h target_ip] [-i your_ip] [-t timeout] [-s start-port] [-e end-port] [-f FIN] [-a ACK]\n",name);
+  exit(-1);
+}
+
+void handler(int whateva)
+{
+   alarm(0);
+   timeout = 1;
+}
+/* Checksum Gen */
+
+unsigned short in_cksum(unsigned short *ptr, int nbytes)
+{
+	register long		sum;		/* assumes long == 32 bits */
+	u_short			oddbyte;
+	register u_short	answer;		/* assumes u_short == 16 bits */
+
+	/*
+	 * Our algorithm is simple, using a 32-bit accumulator (sum),
+	 * we add sequential 16-bit words to it, and at the end, fold back
+	 * all the carry bits from the top 16 bits into the lower 16 bits.
+	 */
+
+	sum = 0;
+	while (nbytes > 1)  {
+		sum += *ptr++;
+		nbytes -= 2;
+	}
+
+				/* mop up an odd byte, if necessary */
+	if (nbytes == 1) {
+		oddbyte = 0;		/* make sure top half is zero */
+		*((u_char *) &oddbyte) = *(u_char *)ptr;   /* one byte only */
+		sum += oddbyte;
+	}
+
+	/*
+	 * Add back carry outs from top 16 bits to low 16 bits.
+	 */
+
+	sum  = (sum >> 16) + (sum & 0xffff);	/* add high-16 to low-16 */
+	sum += (sum >> 16);			/* add carry */
+	answer = ~sum;		/* ones-complement, then truncate to 16 bits */
+	return(answer);
+}
+
+/* Generates the tcp header and packet */
+
+struct tcphdr packetgen(int fin,int ack,unsigned int src_addr,unsigned int dst_addr, int port)
+{
+  /* we create both a tcpheader and a ipheader to calculate checksum */
+
+  struct tcphdr packet;
+  
+  struct ipheader
+    {
+      unsigned int source_address;
+      unsigned int dest_address;
+      unsigned char placeholder;
+      unsigned char protocol;
+      unsigned short tcp_length;
+      struct tcphdr tcp;
+   }
+    pseudo_header;
+    
+    
+
+	counter++;
+
+	/* Fill the headers with the options and data */
+
+	packet.source = getpid() + counter;
+	packet.dest = htons(port);
+	packet.seq = getpid() + counter;
+	packet.ack_seq = 0;
+	packet.res1 = 0;
+	packet.doff = 5;
+	packet.res2 = 0;
+	packet.fin = fin;
+	packet.syn = 1;
+	packet.rst = 0;
+	packet.psh = 0;
+	packet.ack = ack;
+	packet.urg = 0;
+	packet.window = htons(512);
+	packet.check = 0;
+	packet.urg_ptr = 0;               
+
+	/* We need this for the checksum */
+
+	pseudo_header.source_address = src_addr;
+	pseudo_header.dest_address = dst_addr;
+	pseudo_header.placeholder = 0;
+	pseudo_header.protocol = IPPROTO_TCP;
+	pseudo_header.tcp_length = htons(20);
+	bcopy(&packet, &pseudo_header.tcp, 20);
+
+	/* Get the checksum and viowlla tcphdr is done :) */
+
+	packet.check = in_cksum((unsigned short *)&pseudo_header, 32);
+
+	return packet;
+}
+
+int scan(struct tcphdr packet,int port,unsigned int dst_addr)
+{
+  struct sockaddr_in remote;
+  int len;
+
+  /* The header we'll receive the info in */
+
+  struct rect
+  {
+      struct iphdr ip;
+      struct tcphdr tcp;
+      unsigned char blah[65535];
+  }
+    recv_tcp;
+    int sockd;
+
+    /* Now we fill the sock struct */
+
+  remote.sin_family = AF_INET;
+  remote.sin_port = htons(port);
+  remote.sin_addr.s_addr = dst_addr;
+
+  len=sizeof(remote);
+
+  signal(SIGALRM, handler);
+
+  sockd = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
+
+  if(sockd < 0)
+    {
+      perror("Socket");
+      exit(1);
+    }
+
+
+  /* Blast the packet into ablivion! */
+
+  sendto(sockd, &packet, 20, 0, (struct sockaddr *)&remote, len);
+
+  timeout = 0;
+  alarm(10);
+  while(1)
+    {
+      /* Now we sit and read */
+
+      read(sockd, (struct recv_tcp *)&recv_tcp, 65535);
+      if(timeout == 1)
+	{
+	  close(sockd);
+	  timeout=0;
+	  return -1;
+	}
+      if(recv_tcp.tcp.dest == (getpid() + counter))
+	{
+         alarm(0);
+         close(sockd);
+
+	 /* It shouldnt be 1 */
+
+         if(recv_tcp.tcp.rst == 1)
+	   return 0;
+         else
+	   return 1;
+	}
+    }
+}
+
+
+main(int argc, char **argv)
+{
+  int c;
+  int start = 0;
+  int end = 0;
+  int fin = 0;
+  int ack = 0;
+  int port = 0;
+  int retval;
+
+  struct tcphdr packet;
+  int host = 0;
+  int target = 0;
+
+  char source[100];
+  char destination[100];
+
+  if(getuid() != 0)
+    {
+      printf("Need root to run this I'm afraid .\n");
+      exit(-2);
+    }
+  if(argc < 2)
+    usage(argv[0]);
+  while ((c = getopt (argc, argv, "s:e:h:i:af")) != EOF) 
+    {
+      switch (c)
+	{
+	  
+	case 's':
+	  start = atoi(optarg);
+	  break;
+	case 'e':
+	  end = atoi(optarg);
+	  break;
+	case 'a':
+	  ack = 1;
+	  break;
+	case 'f':
+	  fin = 1;
+	  break;
+	case 'h':
+	  strcpy(destination,optarg);
+	  target = 1;
+	  break;
+	case 'i':
+	  strcpy(source,optarg);
+	  host = 1;
+	  break;
+	case 't':
+	  timeout = atoi(optarg);
+	  break;
+	default:
+	  usage(argv[0]);
+
+	}
+    }
+  if((host == 0) || (target == 0))
+    usage(argv[0]);
+  if(start == 0)
+    port = start;
+  if(end == 0)
+    end = 1024;
+  for(;port < (end + 1);port++)
+    {
+
+      packet = packetgen(fin,ack,inet_addr(source),inet_addr(destination),port);
+
+      if( (retval = scan(packet,port,inet_addr(source))) ==  1)
+      printf("Port:%i is open.\n",port);
+    }
+  
+  exit(0);
+}
+
+
+
+
+
+
+
+
+
+
+
+==================================================================================
+
+
+
+
+
+
+
+
+
+
+
+/**********************************************************************
+** This is a real simple half opened connection scanner I
+** put together. It scans ports 0 to 1024 for listening
+** processes, and writes to stdout the ports that are 
+** listening.
+**
+** halflife@saturn.net
+**
+** NOTE: You have to define MY_IP as your ip. If you have
+** a dynamic ip, this is gonna bite :-).
+*********************************************************************/
+
+/* define the following as your ip address */
+#define MY_IP		"193.62.1.250"
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <string.h>
+#include <unistd.h>
+#include <netinet/in.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+#include <linux/ip.h>
+#include <linux/tcp.h>
+
+int syn_timeout = 0;
+
+unsigned short in_cksum(unsigned short *, int);
+int scan_port(unsigned short, unsigned int, unsigned int);
+void alarm_handler(int);
+
+void alarm_handler(int s)
+{
+   alarm(0);
+   syn_timeout = 1;
+}
+
+int scan_port(unsigned short port, unsigned int src_addr, unsigned int dst_addr)
+{
+   struct tcphdr send_tcp;
+   struct recv_tcp
+   {
+      struct iphdr ip;
+      struct tcphdr tcp;
+      unsigned char blah[65535];
+   }recv_tcp;
+   struct pseudo_header
+   {
+      unsigned int source_address;
+      unsigned int dest_address;
+      unsigned char placeholder;
+      unsigned char protocol;
+      unsigned short tcp_length;
+      struct tcphdr tcp;
+   }pseudo_header;
+   int tcp_socket;
+   struct sockaddr_in sin;
+   int sinlen;
+   static int blah = 0;
+   
+   blah++;
+   send_tcp.source = getpid() + blah;
+   send_tcp.dest = htons(port);
+   send_tcp.seq = getpid() + blah;
+   send_tcp.ack_seq = 0;
+   send_tcp.res1 = 0;
+   send_tcp.doff = 5;
+   send_tcp.res2 = 0;
+   send_tcp.fin = 0;
+   send_tcp.syn = 1;
+   send_tcp.rst = 0;
+   send_tcp.psh = 0;
+   send_tcp.ack = 0;
+   send_tcp.urg = 0;
+   send_tcp.window = htons(512);
+   send_tcp.check = 0;
+   send_tcp.urg_ptr = 0;               
+   pseudo_header.source_address = src_addr;
+   pseudo_header.dest_address = dst_addr;
+   pseudo_header.placeholder = 0;
+   pseudo_header.protocol = IPPROTO_TCP;
+   pseudo_header.tcp_length = htons(20);
+   bcopy(&send_tcp, &pseudo_header.tcp, 20);
+   send_tcp.check = in_cksum((unsigned short *)&pseudo_header, 32);
+   sin.sin_family = AF_INET;
+   sin.sin_port = htons(port);
+   sin.sin_addr.s_addr = dst_addr;
+   sinlen=sizeof(sin);
+   signal(SIGALRM, alarm_handler);
+   tcp_socket = socket(AF_INET, SOCK_RAW, IPPROTO_TCP);
+   if(tcp_socket < 0)
+   {
+      fprintf(stderr, "couldnt open raw socket\n");
+      exit(1);
+   }
+   sendto(tcp_socket, &send_tcp, 20, 0, (struct sockaddr *)&sin, sinlen);
+   syn_timeout = 0;
+   alarm(10);
+   while(1)
+   {
+      read(tcp_socket, (struct recv_tcp *)&recv_tcp, 65535);
+      if(syn_timeout == 1) {close(tcp_socket);syn_timeout=0;return -1;}
+      if(recv_tcp.tcp.dest == (getpid() + blah))
+      {
+         alarm(0);
+         close(tcp_socket);
+         if(recv_tcp.tcp.rst == 1) return 0;
+         else return 1;
+      }
+   }
+}
+
+unsigned short in_cksum(unsigned short *ptr, int nbytes)
+{
+	register long		sum;		/* assumes long == 32 bits */
+	u_short			oddbyte;
+	register u_short	answer;		/* assumes u_short == 16 bits */
+
+	/*
+	 * Our algorithm is simple, using a 32-bit accumulator (sum),
+	 * we add sequential 16-bit words to it, and at the end, fold back
+	 * all the carry bits from the top 16 bits into the lower 16 bits.
+	 */
+
+	sum = 0;
+	while (nbytes > 1)  {
+		sum += *ptr++;
+		nbytes -= 2;
+	}
+
+				/* mop up an odd byte, if necessary */
+	if (nbytes == 1) {
+		oddbyte = 0;		/* make sure top half is zero */
+		*((u_char *) &oddbyte) = *(u_char *)ptr;   /* one byte only */
+		sum += oddbyte;
+	}
+
+	/*
+	 * Add back carry outs from top 16 bits to low 16 bits.
+	 */
+
+	sum  = (sum >> 16) + (sum & 0xffff);	/* add high-16 to low-16 */
+	sum += (sum >> 16);			/* add carry */
+	answer = ~sum;		/* ones-complement, then truncate to 16 bits */
+	return(answer);
+}
+
+main(int argc, char **argv)
+{   
+   unsigned short i;
+   if(argc < 2)
+   {
+      fprintf(stderr, "%s target_ip\n", argv[0]);
+      exit(0);
+   }
+   if(geteuid() != 0)
+   {
+      fprintf(stderr, "this program requires root\n");
+      exit(0);
+   }
+   printf("Scanning %s\n", argv[1]);
+   for(i=0;i < 1025;i++)
+   {
+      if(scan_port(i, inet_addr(MY_IP), inet_addr(argv[1]))==1)
+         printf("Port %d active\n", i);
+   }
+}
+

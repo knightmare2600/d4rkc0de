@@ -1,0 +1,39 @@
+#!/usr/bin/perl
+#
+#This is a my first Perl script
+#which connects to big.oscar.aol.com
+#and grabs a users online status
+#shout outs to cijfer for helping me learn sockets.
+#
+#written by: seven
+# © 2001-2005 Esoteric Code
+#<ra@sevenz.net>
+#=================================================
+
+use IO::Socket;
+print "Enter AIM Screen name to check: ";
+$aimscreename = <STDIN>;
+chomp($aimscreename);
+
+$Host = "big.oscar.aol.com";
+$Socket = new IO::Socket::INET(
+                               PeerAddr => $Host,
+                               PeerPort => 80,
+                               Proto => 'tcp',
+                              ) || die "Could not connect $!\n";
+print"Connected.\n";
+print"Getting online status--*\n";
+print $Socket "GET /$aimscreename?on_url=online&off_url=offline HTTP/1.0\n";
+print $Socket "Accept: */*\n";
+print $Socket "Accept-Language: en-us\n";
+print $Socket "Accept-Encoding: gzip , deflate\n";
+print $Socket "User-Agent: Mozilla/4.0 (compatible; MSIE 5.01; Windows NT 5.0)\n";
+print $Socket "Host: big.oscar.aol.com\n";
+print $Socket "Connection: Keep-Alive\n\n";
+print "User: $aimscreename is: ";
+
+while($result=<$Socket>)
+{
+    @b = split(/:/, $result);
+    print $b[1]
+}

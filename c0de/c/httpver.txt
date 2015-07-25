@@ -1,0 +1,82 @@
+/* Way to find out version of remote httpd server */
+/* Written by Shok.      --==+*~(Shok)~*+==--     */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <errno.h>
+
+#define ERROR -1 
+#define MAXDATASIZE 300
+
+char buf[MAXDATASIZE];
+char message[] = "HEAD / HTTP/1.0\n\n";
+
+/* Function prototypes */
+char *GetHTTPVer(char *);
+
+
+void main(int argc, char **argv)
+{
+  GetHTTPVer(argv[1]);
+}
+
+char *GetHTTPVer(char *host)
+{
+  char *p;
+  int s;   
+  int i;    
+  int numbytes;
+  struct sockaddr_in sock;
+  struct hostent *he;
+
+
+  if ((he=gethostbyname(host)) == NULL) {
+	herror("gethostbyname");
+	exit(1);
+  }
+
+  if ((s = socket(AF_INET, SOCK_STREAM, 0)) == ERROR) {
+	perror("socket");
+	exit(1);
+  }
+  
+
+  sock.sin_family = AF_INET;
+  sock.sin_port = htons(80);
+  sock.sin_addr =  *((struct in_addr *)he->h_addr);  
+  bzero(&(sock.sin_zero), 8);
+
+  if (connect(s, (struct sockaddr *)&sock, sizeof(struct sockaddr)) == ERROR) 
+  {
+	perror("connect");
+        exit(1);
+  }
+ 
+  if ((send(s, message, strlen(message), 0)) == ERROR) { 
+   	perror("send");
+        close(s);
+	exit(1);
+  }
+
+  for (i=0;i<5;i++) {
+  	if((numbytes=recv(s, buf, MAXDATASIZE, 0)) == ERROR) {
+  		perror("recv");
+                close(s);
+		exit(1);
+  	} 
+  
+         buf[numbytes] = '\0';
+         p=strstr(buf, "Server");
+         printf("%s\n", p);
+         
+  }
+
+  close(s);
+  return buf;
+}
+

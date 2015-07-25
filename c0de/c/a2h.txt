@@ -1,0 +1,50 @@
+#include <stdio.h>
+#include <ctype.h>
+
+
+// This converts a given HEX character to it's DEC value
+unsigned char translate(unsigned char hex)
+{
+   unsigned char t;
+   if (isdigit(hex))
+      t = (hex - '0');
+   else if (isxdigit)
+      (hex >= 'a') ? (t = (hex - 'a' + 10)) : (t = (hex - 'A' + 10));
+   else {
+      printf("**ERROR: Invalid hex string.\n");
+      exit(0);
+   }   
+   return(t);
+}
+
+   
+int main()
+{
+   unsigned char hex[50],str[50],idx,idx2;
+   
+   // Input the hex string, we don't care how
+   gets(hex);
+   
+   // This quick if-else is to get started, acts on the first char depending on
+   // whether or not the length of the string is even or odd
+   if (strlen(hex) % 2) {
+      str[0] = translate(hex[0]);
+      idx = 1;
+   }
+   else {
+      str[0] = translate(hex[0]) << 4;
+      str[0] += translate(hex[1]);
+      idx = 2;
+   }   
+   
+   // Loop through the rest of the chars in the "hex" string converting them
+   for (idx2 = 1; idx < strlen(hex); idx+=2,idx2++) {
+      str[idx2] = translate(hex[idx]) << 4;
+      str[idx2] += translate(hex[idx+1]);
+   }   
+   
+   // We are now done. The char array "str" has the literal translated binary value of the
+   // hex string, and "idx2" contains the length of the array.
+   
+   return 0;
+}

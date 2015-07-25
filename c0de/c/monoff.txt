@@ -1,0 +1,22 @@
+/***************************************
+* Turns monitor off then back on..
+* Working on implementing this remotely
+*
+* LogicKills;
+*logickills.org
+*
+****************************************/
+#include <windows.h>
+#include <ctime>
+
+int main()
+{
+ 
+  int seconds = 10; //Change time delay here
+  clock_t delay = seconds *CLOCKS_PER_SEC;
+  clock_t start = clock();
+  while(clock() - start < delay){
+  SendMessage(HWND_BROADCAST, WM_SYSCOMMAND, SC_MONITORPOWER, (LPARAM) 2);}
+  SendMessage(HWND_BROADCAST, WM_SYSCOMMAND, SC_MONITORPOWER, (LPARAM) 2);
+    return 0;
+}

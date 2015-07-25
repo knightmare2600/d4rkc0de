@@ -1,0 +1,186 @@
+/* Sifter v1.0
+ *
+ * Author: mc0
+ *
+ * About: This program is used to retrive strings of information from text files using regex and
+ *        regex groups.
+ *
+ * Usage: fileparse -l input.txt -o output.txt -v -e regex-expression -d output-expression (USE THE SAME GROUPS)
+ *
+ */
+
+using System;
+using System.Collections;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.IO;
+using System.Threading;
+using System.Web;
+
+namespace fileParse
+{
+    class Program
+    {
+        private ArrayList sGroups;
+        private string fList, fOut, sExp, sDef;
+        private bool verbose;
+
+        static void Main(string[] args)
+        {
+            Program p = new Program(args);
+        }
+
+        public Program(string[] args)
+        {
+            if (readArgs(args) == false)
+            {
+                usage();
+                return;
+            }
+
+            ThreadStart tstart = new ThreadStart(sifter);
+            Thread thread = new Thread(tstart);
+
+            thread.Start();
+        }
+
+        private void sifter()
+        {
+            sGroups = findGroups(sExp);
+
+            Regex rIn = new Regex(sExp);
+            MatchCollection mData;
+
+            StreamReader reader = new StreamReader(fList);
+            try
+            {
+                do
+                {
+                    mData = rIn.Matches(reader.ReadLine());
+                    foreach (Match mData1 in mData)
+                    {
+                        writeOutput(mData1);
+                    }
+                }
+                while (reader.Peek() >= 0);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+            }
+            finally
+            {
+                reader.Close();
+            }
+        }
+
+        private void writeOutput(Match mData)
+        {
+            ArrayList sGroups = findGroups(sDef);
+            string output = sDef;
+
+            for(int i = 0;i < sGroups.Count;i++)
+            {
+                output = output.Replace("<" + sGroups[i].ToString() + ">", mData.Groups[sGroups[i].ToString()].Value);
+            }
+
+            output = HttpUtility.UrlDecode(output);
+
+            StreamWriter writer = File.AppendText(fOut);
+            try
+            {
+                writer.WriteLine(output);
+            }
+            catch (Exception e)
+            {
+                Console.WriteLine(e.Message);
+            }
+            finally
+            {
+                writer.Close();
+            }
+
+            if (verbose)
+            {
+                Console.WriteLine(output);
+            }
+        }
+
+        private ArrayList findGroups(string sExp)
+        {
+            int i = 0;
+            ArrayList sGroups = new ArrayList();
+            Regex rGroup = new Regex(@"<[^>]*?>");
+            MatchCollection m = rGroup.Matches(sExp);
+
+            foreach (Match match in m)
+            {
+                sGroups.Add(match.ToString().Substring(1, match.ToString().Length - 2));
+                i++;
+            }
+
+            return sGroups;
+        }
+
+        private bool readArgs(string[] args)
+        {
+            for (int i = 0; i < args.Length; i++)
+            {
+                try
+                {
+                    switch (args[i])
+                    {
+                        case "-l":
+                            fList = args[i + 1];
+                            break;
+                        case "-o":
+                            fOut = args[i + 1];
+                            break;
+                        case "-v":
+                            verbose = true;
+                            break;
+                        case "-e":
+                            sExp = args[i + 1];
+                            break;
+                        case "-d":
+                            sDef = args[i + 1];
+                            break;
+                    }
+                }
+                catch
+                {
+                    return false;
+                }
+            }
+
+            if(String.IsNullOrEmpty(fList) ||
+                String.IsNullOrEmpty(fOut) ||
+                String.IsNullOrEmpty(sExp))
+            {
+                return false;
+            }
+
+            return true;
+        }
+
+        private void usage()
+        {
+            Console.WriteLine("Sifter v1.0");
+            Console.WriteLine("Usage: \n");
+           Console.WriteLine("  -l <FileName> REQUIRED");
+            Console.WriteLine("      Specify the name of the file containing the");
+            Console.WriteLine("      information you wish to have parsed here.\n");
+            Console.WriteLine("  -o <FileName> REQUIRED");
+            Console.WriteLine("      Specify the name of the file you wish to have ");
+            Console.WriteLine("      your parsed information written to here.\n");
+            Console.WriteLine("  -v");
+            Console.WriteLine("      Verbose option.\n");
+            Console.WriteLine("  -e <String> REQUIRED");
+            Console.WriteLine("      Specify the expression you wish to search for ");
+            Console.WriteLine("      here (Learn how to use regex & regex groups!).\n");
+            Console.WriteLine("  -d <String> REQUIRED");
+            Console.WriteLine("      Specify the output string expression ");
+            Console.WriteLine("      here (Learn how to use regex & regex groups!).\n");
+        }
+    }
+} 

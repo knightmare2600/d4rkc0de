@@ -1,0 +1,46 @@
+// Decoy IP generator for NMAP
+// by softxor <insertnamehere@gmx.de>
+// for Hollow Chocolate Bunnies From Hell
+// http://bunnies.rootyourbox.org/
+//
+// Usage eg.: nmap -D `decoy 16` 11.22.33.44
+// Scans IP 11.22.33.44 using 16 decoy address to hide own IP and
+// to confuse logfiles. Small but effective ;)
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+int randint(int max, int min)
+{
+	double r = min - max + 1;
+
+	return max + (int) (r * rand() / (RAND_MAX + 1.0));
+}
+
+
+int main()
+{
+
+	char *ipaddr = (char *) malloc((size_t) 18);
+	int i, z;
+
+	if (argc != 2) {
+		(void) fprintf(stderr, "Usage: %s <number of addresses>\n", argv[0]);
+		exit(EXIT_FAILURE);
+	}
+
+	for(z = 0; z <= atoi(argv[1]); ++z) {
+		memset (ipaddr, 0x00, sizeof(ipaddr));
+
+		for (i = 0; i <= 4; ++i) {
+			strcat(ipaddr, (char *) randint(255, 0));
+		}
+		(void) fprintf(stdout, "%s", ipaddr);
+		
+		if ((z + 1) < atoi(argv[1]))
+			(void) fprintf(stdout, ",");
+	}
+
+	exit(EXIT_SUCCESS);
+}

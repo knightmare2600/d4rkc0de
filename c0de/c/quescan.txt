@@ -1,0 +1,104 @@
+ /* Queso-Scanner  v 0.5
+   
+   by Vacuum http://www.technotronic.com
+   10.17.98
+   Queso OS Scan for 255 machines
+   This requires the queso binary from El Apostols
+   If you dont know what that is, you dont need this code.
+   Props to horizon, HoGs HeaD, elr0nd
+*/
+
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <sys/wait.h>
+#include <netinet/in.h>
+#include <errno.h>
+#include <netdb.h>
+#include <signal.h>
+    
+FILE *stream;
+
+#define DEBUG 1
+
+void pingz0r(int first, int second, int third, int pnum, int start, int end) {
+int counter,flag;
+FILE *stream;
+char tempstring[2048];
+char parse[2048];
+
+for (counter=start; counter <end; counter++)
+{
+ flag=0;
+ sprintf(tempstring,"queso %d.%d.%d.%d:%d 2>/dev/null",first,
+                     second, third, counter, pnum);
+ stream=popen(tempstring,"r");
+ while (fgets(parse,sizeof(parse),stream)!=NULL)
+ {
+  if (DEBUG) printf("Results:%s",parse);
+  if (strstr(parse,"DUP"))
+  {
+    flag=1;
+    fclose(stream);
+    break;
+  }
+ }
+ if (flag==1)
+ stream=fopen("os-versions.txt", "a"); 
+ fprintf(stream, "%d.%d.%d.%d:%d\n",first,second,third,counter,pnum);
+ fclose( stream);
+}
+}
+
+main(int argc, char *argv[]) {
+
+ char *curr_ip, *del, *port;
+ int first, second, third, pnum;
+ 
+if (argc!=3)
+ {
+  printf("\nusage : %s <ipaddress> <port>\n\n",argv[0]);
+  exit(0);
+ }
+
+ curr_ip=argv[1];
+   del=(char *)strtok(curr_ip, ".");
+   first=atoi(del);
+   del=(char *)strtok(NULL, ".");
+   second=atoi(del);
+   del=(char *)strtok(NULL, ".");
+   third=atoi(del);
+
+  port=argv[2];
+   del=(char *)strtok(port, "");
+   pnum=atoi(del);
+
+
+if (first==127)
+ {
+ printf("%d is a localhost. You have no clue or are trying to break this program\n",first);
+ exit(0);
+ }
+if (first>254  || first <0)
+ {
+ printf("First octet is: %d. It must be between <1-254>\n",first);
+ exit(0);
+ }
+if (second>254 || second<0)
+ {
+ printf("Second octet is: %d. It must be <1-254>\n",second);
+ exit(0);
+ } 
+if (pnum>32767 || pnum<1)
+ {
+ printf("The port is: %d. It must be <1-32767>\n",pnum);
+ exit(0);
+ } 
+
+printf("Determining OS Version for given ip range.\n");
+printf("Results output to os-versions.txt\n");
+
+	pingz0r(first,second,third,pnum,0,255);
+}
+ 

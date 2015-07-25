@@ -1,0 +1,226 @@
+
+// Simple raw socket sniffer source code
+// for Windows NT5 platforms with raw socket
+// support.
+
+// (C) by rattle
+// .aware security research
+// http://www.awarenetwork.org/
+
+
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <winsock2.h>
+#include <ws2tcpip.h>
+
+#pragma comment (lib, "ws2_32.lib")
+
+#ifndef SIO_RCVALL
+    #define SIO_RCVALL    0x98000001
+#endif
+
+#ifndef IP_HDRINCL
+    #define IP_HDRINCL    0x2
+#endif
+
+#define IpProtocol_ICMP   1
+#define IpProtocol_IGMP   2
+#define IpProtocol_TCP    6
+#define IpProtocol_UDP    17
+
+typedef struct _IpHeader // IPv4 implementation
+{
+    unsigned char        HeaderLength_Version;   // combined Header Length and Version field
+    unsigned char        TypeOfService;          // The TOS field can simply be 0
+    unsigned short       TotalLength;            // Total Length of the datagram.
+    unsigned short       Identification;         // Identification of the packet
+    unsigned short       FragmentationFlags;     // Fragment position in the datagram
+    unsigned char        TTL;                    // Time to Live
+    unsigned char        Protocol;               // The protocol that follows IP
+    unsigned short       CheckSum;               // The checksum
+
+    unsigned int        sourceIPAddress;         // Originating IP Address
+    unsigned int        destIPAddress;           // Destination IP Address
+
+} IpHeader, FAR * LPIpHeader;
+
+#define IpHeaderLength sizeof(IpHeader)
+
+#define uint8_t  unsigned char
+#define uint16_t unsigned short
+#define uint32_t unsigned int
+#define uint64_t unsigned long long
+
+#define ICMPHeaderLength 20
+#define IGMPHeaderLength  8
+#define TCPHeaderLength  20
+#define UDPHeaderLength   8
+
+typedef unsigned long    USLONG;
+typedef unsigned long    IP;
+
+#define VH_WORD(_h,_i)   ((_h >> 2) + (_i << 4))
+#define HEADERL(_wrd)    ((_wrd - ((_wrd >> 4) << 4)) << 2)
+#define VERSION(_wrd)    (_wrd >> 4)
+
+int Error(LPCSTR message)
+{
+    WSACleanup();
+    printf("%s%s\nQuitting, press any key to continue ...",message,"\n\n");
+    getchar();
+
+    return WSAGetLastError();
+}
+
+char* DottedDecimal(long lAddr)
+{
+    in_addr addr;
+    addr.S_un.S_addr=lAddr;
+    return inet_ntoa(addr);
+}
+
+IP GetLocalAddress()
+{
+    HOSTENT*    pNormalHostEnt;
+    char        cHostName[0xFF] = {0};
+
+    if (gethostname(cHostName,0xFF)==SOCKET_ERROR) return 0;
+    if (!(pNormalHostEnt = gethostbyname(cHostName))) return 0;
+    return (((IN_ADDR*)pNormalHostEnt->h_addr_list[0])->S_un.S_addr);
+}
+
+int main(int argc, char* argv[])
+{
+    printf("\n");
+
+    WSADATA          wsa;
+    OSVERSIONINFO    ver;
+
+    if (WSAStartup(MAKEWORD(2,2),&wsa) != 0)
+        return Error("Windows Sockets initialization failed.");
+
+    if ((LOBYTE(wsa.wVersion) < 2) || (HIBYTE(wsa.wVersion) < 2))
+    {
+        char err[50] = {0};
+        sprintf(err,"Winsock DLL Version %d.%d found, "
+            "at least Version 2.2 is required.",
+            LOBYTE(wsa.wVersion), 
+            HIBYTE(wsa.wVersion)
+        );
+
+        return Error(err);
+    }
+
+    ver.dwOSVersionInfoSize = sizeof(OSVERSIONINFO); 
+    if(GetVersionEx((LPOSVERSIONINFO) &ver)) 
+    { 
+        if (!((ver.dwPlatformId > 1) && (ver.dwMajorVersion == 5)))
+        {
+            return Error("This program only works "
+                "on Windows 2000, XP and later OS.");
+        } 
+    } 
+
+    else
+    {
+        return Error("OS Version could not be "
+            "determined. Quitting.");
+    }
+
+    
+    SOCKET  sSockRaw = socket(AF_INET,SOCK_RAW,IPPROTO_IP);
+    BOOL    bIsTrue  = TRUE;
+    USLONG  ulBytes;
+
+    if (sSockRaw == INVALID_SOCKET) 
+        return Error("Could not create Socket.");
+
+    sockaddr_in    soSrc;
+    memset(&soSrc,0,sizeof(soSrc));
+
+    soSrc.sin_family       =  AF_INET;
+    soSrc.sin_port         =  htons ( 0 );
+    soSrc.sin_addr.s_addr  =  (argc > 1) ?    
+        inet_addr(argv[1]) :  GetLocalAddress();
+
+    if(setsockopt(sSockRaw,IPPROTO_IP,IP_HDRINCL, (char*) 
+        &bIsTrue, sizeof(bIsTrue)) == SOCKET_ERROR)
+    {
+        return Error("Unable to set \"Header Included\""
+            "flag. Quitting.");        
+    }
+
+    if (bind(sSockRaw,(sockaddr*)&soSrc,sizeof(soSrc)))
+        return Error("Could not bind socket.");
+
+    if (WSAIoctl(sSockRaw,SIO_RCVALL,&bIsTrue,sizeof(bIsTrue),
+        NULL,0,&ulBytes,NULL,NULL))
+    {
+        return Error("Unable to start sniffer!");
+    }
+
+    printf("Initialization successful. Press any key to "
+        "start sniffing, and use [CTRL]-[C] to cancel "
+        "the program."); getchar();
+
+    while (true)
+    {
+
+    char vBuffer[0xBAD] = {0};
+    
+        sockaddr saConnected;
+        int iTmp = sizeof(saConnected);
+        int iResult=recvfrom(sSockRaw,vBuffer,0xBAD,NULL,
+            &saConnected,&iTmp);
+
+        if (iResult!=SOCKET_ERROR)
+        {
+            memcpy(&soSrc,&saConnected,sizeof(saConnected));
+            LPIpHeader iBuffer = (LPIpHeader) malloc(IpHeaderLength);
+            memcpy((void*) iBuffer, (void*) vBuffer, IpHeaderLength);
+            int  tProtLen = IpHeaderLength;
+            char sProtocol[0x10] = {0};
+
+            switch(iBuffer->Protocol) 
+            {
+                case IpProtocol_ICMP:
+                    tProtLen = ICMPHeaderLength;
+                    sprintf(sProtocol,"ICMP");
+                    break;
+                case IpProtocol_IGMP:
+                    tProtLen = ICMPHeaderLength;
+                    sprintf(sProtocol,"ICMP");
+                    break;
+                case IpProtocol_TCP:
+                    tProtLen = TCPHeaderLength;
+                    sprintf(sProtocol,"TCP");
+                    break;
+                case IpProtocol_UDP:
+                    tProtLen = UDPHeaderLength;
+                    sprintf(sProtocol,"UDP");
+                    break;
+                default:
+                    continue;
+            }
+
+            printf
+            (
+                "\n%s\t[TTL=%3d] [%s -> %s]", 
+                sProtocol,    iBuffer->TTL,
+                DottedDecimal(iBuffer->sourceIPAddress), 
+                DottedDecimal(iBuffer->destIPAddress) 
+            );
+
+            free(iBuffer);
+        }
+
+        else
+        {
+            WSAGetLastError();
+            WSASetLastError(0);
+        }
+    }
+
+    return 0;
+}

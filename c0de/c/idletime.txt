@@ -1,0 +1,29 @@
+char *GetIdleTime(void)
+{
+   LASTINPUTINFO *pLastInputInfo;
+   static char szTimeBuffer[128];
+   unsigned long lIdleTime, lDays, lHours, lMinutes, lSeconds;;
+
+   if (!(pLastInputInfo = (LASTINPUTINFO *)HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, sizeof(LASTINPUTINFO)))) { return NULL; }
+
+   pLastInputInfo->cbSize = sizeof(LASTINPUTINFO);
+
+   if (!GetLastInputInfo(pLastInputInfo))
+   {
+      HeapFree(GetProcessHeap(), HEAP_ZERO_MEMORY, pLastInputInfo);
+      return NULL;
+   }
+      
+   lIdleTime = (GetTickCount() - pLastInputInfo->dwTime) / 1000;
+
+   HeapFree(GetProcessHeap(), HEAP_ZERO_MEMORY, pLastInputInfo);
+
+   lDays = lIdleTime / 86400;
+   lHours = (lIdleTime % 86400) / 3600;
+   lMinutes  = ((lIdleTime % 86400) % 3600) / 60;
+   lSeconds  = ((lIdleTime % 86400) % 3600 % 60);
+
+   _snprintf(szTimeBuffer, sizeof(szTimeBuffer), "%d Day(s) %d Hour(s) %d Minute(s) %d Second(s)", lDays, lHours, lMinutes, lSeconds);
+   
+   return (szTimeBuffer);
+} 

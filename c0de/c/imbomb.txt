@@ -1,0 +1,194 @@
+/*
+	Instant Messenger Bomber
+	     Coded by a59
+
+	[ 6 - 21 - 07 ]
+*/
+#include <windows.h>
+#include <stdio.h>
+
+void Type( char* szString );
+void RandomizeBuffer( char* szBuffer, int iLen );
+void InterpretMethod( void );
+
+void Type( char* szString )
+{
+	int iLen = strlen( szString );
+	bool bShiftDown = false;
+
+	for( int i = 0; i < iLen; i++ )
+	{
+		short sKey = VkKeyScan( szString[ i ] );
+
+		if( ( sKey >> 8 ) & 1 )
+		{
+			keybd_event( VK_LSHIFT, 0, 0, 0 );
+			bShiftDown = true;
+		}
+
+		keybd_event( (unsigned char)sKey, 0, 0, 0 );
+
+		if( bShiftDown )
+		{
+			keybd_event( VK_LSHIFT, 0, KEYEVENTF_KEYUP, 0 );
+			bShiftDown = false;
+		}
+	}
+};
+
+void RandomizeBuffer( char* szBuffer, int iLen )
+{
+	char* szList = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz1234567890";
+
+	for( int i = 0; i < iLen; i++ )
+		szBuffer[ i ] = szList[ rand( ) % strlen( szList ) ];
+
+	szBuffer[ iLen ] = 0;
+};
+
+void InterpretMethod( void )
+{
+	char szBuffer[ 512 ], szMethod[ 32 ], szLength[ 8 ], szTime[ 8 ];
+	bool bCheckedMethods = false;
+	unsigned long uStartCount;
+	int i, iSent = 0;
+
+	while( true )
+	{
+		printf( "Choose your method, type 'methods' for a list\n" );
+		printf( "> " );
+		
+		scanf( "%s", szMethod );
+
+		if( !strcmp( szMethod, "methods" ) )
+		{
+			printf( "1 - Random strings\n" );
+			printf( "2 - User defined message\n" );
+			printf( "3 - Smiley spam\n" );
+			printf( "4 - Exit\n" );
+
+			bCheckedMethods = true;
+		}
+
+		switch( atoi( szMethod ) )
+		{
+		case 1:
+			printf( "Enter the length of each random string\n" );
+			printf( "> " );
+
+			scanf( "%s", szLength );
+
+			printf( "Enter how many seconds to spam\n" );
+			printf( "> " );
+			
+			scanf( "%s", szTime );
+			
+			printf( "Spamming in 3 seconds...\n" );
+			Sleep( 3000 );
+
+			uStartCount = GetTickCount( );
+
+			while( ( ( GetTickCount( ) - uStartCount ) / 1000 ) < (unsigned)atoi( szTime ) )
+			{
+				RandomizeBuffer( szBuffer, atoi( szLength ) );
+
+				Type( szBuffer );
+				keybd_event( VK_RETURN, 0, 0, 0 );
+
+				iSent++;
+			}
+
+			printf( "Sent %d messages\n", iSent );
+
+			break;
+		case 2:
+			printf( "Enter the message to spam( Please use a \\ instead of a space )\n" );
+			printf( "> " );
+
+			scanf( "%s", szBuffer );
+
+			printf( "Enter how many seconds to spam\n" );
+			printf( "> " );
+
+			scanf( "%s", szTime );
+
+			for( i = 0; i < (signed)strlen( szBuffer ); i++ )
+			{
+				if( szBuffer[ i ] == '\\' )
+					szBuffer[ i ] = 0x20;
+			}
+
+			printf( "Spamming in 3 seconds...\n" );
+			Sleep( 3000 );
+
+			uStartCount = GetTickCount( );
+
+			while( ( ( GetTickCount( ) - uStartCount ) / 1000 ) < (unsigned)atoi( szTime ) )
+			{
+				Type( szBuffer );
+				keybd_event( VK_RETURN, 0, 0, 0 );
+
+				iSent++;
+			}
+
+			printf( "Sent %d messages\n", iSent );
+
+			break;
+		case 3:
+			printf( "Enter how many seconds to spam\n" );
+			printf( "> " );
+			
+			scanf( "%s", szTime );
+
+			ZeroMemory( szBuffer, sizeof( szBuffer ) );
+
+			for( i = 0; i < 32; i++ )
+				strcat( szBuffer, ":D " );
+
+			printf( "Spamming in 3 seconds...\n" );
+			Sleep( 3000 );
+
+			uStartCount = GetTickCount( );
+
+			while( ( ( GetTickCount( ) - uStartCount ) / 1000 ) < (unsigned)atoi( szTime ) )
+			{
+				Type( szBuffer );
+				keybd_event( VK_RETURN ,0, 0, 0 );
+
+				iSent++;
+			}
+
+			printf( "Sent %d messages\n", iSent );
+			
+			break;
+		case 4:
+			printf( "Bye....\n" );
+			Sleep( 1000 );
+
+			ExitProcess( 0 );
+			break;
+		default:
+			if( !bCheckedMethods )
+				printf( "Invalid choice\n" );
+			
+			break;
+		}
+
+		printf( "\n" );
+
+		uStartCount = 0;
+		iSent = 0;
+	}
+};
+
+int main( )
+{
+	SetConsoleTitle( "IM Bomb by a59" );
+	SetConsoleTextAttribute( GetStdHandle( STD_OUTPUT_HANDLE ), FOREGROUND_BLUE | FOREGROUND_INTENSITY );
+
+	printf( "\t\t\tInstant Messenger Bomber by a59\n\n\n" );
+	
+	InterpretMethod( );
+
+	return 0;
+};

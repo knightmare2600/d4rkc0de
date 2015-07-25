@@ -1,0 +1,153 @@
+/*
+ *   Totally eleetin class B, C, and single IP address scanner/lookup
+ * program.  Hey!  It even shows aliases!  Make sure you give the
+ * correct address format with the correct switch(es).  The switches
+ * are as follows:
+ *  b - scan this class B network (xxx.xxx)
+ *  c - scan this class C network (xxx.xxx.xxx)
+ *  s - give the the hostname of this specific address (xxx.xxx.xxx.xxx)
+ *  a - show hostname aliases also
+ *  x - address provided is in hexadecimal
+ *
+ *   Oh, a small note: if yer actually gonna use a hex address, make
+ * sure to put the 'x' switch before anything else. :)
+ *
+ *          max-q [L0cK]
+ */
+
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include "netdb.h"
+
+struct hostent *gethostbyaddr();
+void usage();
+void bad_addr();
+
+main(argc, argv)
+  int   argc;
+  char  *argv[];
+{
+  char  addr[4],
+        **ptr,
+        *fmt;
+  int   arg, i, j,
+        a0, a1, a2, a3,
+        classB, classC, single, hex, alias;
+  extern char *optarg;
+  struct hostent *host;
+
+  classB = classC = single = alias = hex = 0;
+  i = j = 0;
+  while((arg = getopt(argc,argv,"xb:c:s:a")) != EOF) {
+    switch(arg) {
+    case 'x':
+      hex++;
+      break;
+    case 'b':
+      classB++;
+      if(hex)
+        fmt = "%x.%x";
+      else
+        fmt = "%d.%d";
+      sscanf(optarg, fmt, &a0, &a1);
+      break;
+    case 'c':
+      classC++;
+      if(hex)
+        fmt = "%x.%x.%x";
+      else
+        fmt = "%d.%d.%d";
+      sscanf(optarg, fmt, &a0, &a1, &a2);
+      break;
+    case 's':
+      single++;
+      if(hex)
+        fmt = "%x.%x.%x.%x";
+      else
+        fmt = "%d.%d.%d.%d";
+      sscanf(optarg, fmt, &a0, &a1, &a2, &a3);
+      break;
+    case 'a':
+      alias++;
+      break;
+    default:
+      usage(argv[0]);
+      break;
+      /* not reached */
+    }
+  }
+
+  if(classB == 0 && classC == 0 && single == 0)
+    usage(argv[0]);
+
+  addr[0] = (unsigned char)a0;
+  addr[1] = (unsigned char)a1;
+  if(a0>255||a0<0)
+    bad_addr(a0);
+  if(a1>255||a1<0)
+    bad_addr(a1);
+  if(classB) {
+    printf("Scanning Class B network %d.%d...\n", a0, a1);
+    while(j<256) {
+      a2=j;
+      addr[2] = (unsigned char)a2;
+jmpC:
+      printf("Scanning Class C network %d.%d.%d...\n", a0, a1, a2);
+      while(i<256) {
+        a3=i;
+        addr[3] = (unsigned char)a3;
+jmpS:
+        if ((host = gethostbyaddr(addr, 4, AF_INET)) != NULL) {
+          printf("%d.%d.%d.%d => %s\n", a0, a1, a2, a3, host->h_name);
+          ptr = host->h_aliases;
+          if(alias)
+            while (*ptr != NULL) {
+              printf("%d.%d.%d.%d => %s (alias)\n", a0, a1, a2, a3, *ptr);
+              ptr++;
+            }
+        } else if(single)
+          printf("Cannot resolve %d.%d.%d.%d\n", a0, a1, a2, a3);
+        if(single)
+          exit(0);
+        i++;
+      }
+      if(classC)
+        exit(0);
+      i=0;
+      j++;
+    }
+  } else if(classC) {
+    addr[2] = (unsigned char)a2;
+    if(a2>255||a2<0)
+      bad_addr(a2);
+    goto jmpC;
+  } else if(single) {
+    addr[2] = (unsigned char)a2;
+    addr[3] = (unsigned char)a3;
+    if(a2>255||a2<0)
+      bad_addr(a2);
+    if(a3>255||a3<0)
+      bad_addr(a3);
+    goto jmpS;
+  }
+  exit(0);
+}
+
+void
+usage(name)
+  int   *name;
+{
+  fprintf(stderr, "usage: %s [-x] [-a] [-b||-c||-s] xxx.xxx[.xxx[.xxx]]\n",
+   name);
+  exit(1);
+}
+void
+bad_addr(addr)
+  int   *addr;
+{
+  printf("Value %d is not valid.\n", addr);
+  exit(0);
+}
+
+

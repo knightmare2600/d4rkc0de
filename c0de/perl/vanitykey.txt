@@ -1,0 +1,362 @@
+#!/usr/bin/perl -w
+
+# openpgp vanity key generator
+# version 1.0, 6-29-2004
+# written by seth hardy - shardy@aculei.net
+#
+# this program will generate an openpgp v4 dsa key pair with a vanity key id.
+# this is accomplished by brute force, randomly selecting key pairs and
+# computing the fingerprint until a matching pair is found.
+#
+# this program was written with a specific someone in mind. you know who you
+# are, and what vanity key you want. use it well. :)
+#
+# copyright (c) 2004 seth hardy <shardy@aculei.net>. all rights reserved.
+# this program is free software; you can redistribute it and/or modify it
+# under the same terms as perl itself.
+
+
+use strict;
+
+use Getopt::Long;
+use Pod::Usage;
+use IO::Socket;
+use Math::Pari;
+use Crypt::OpenPGP::Certificate;
+use Crypt::OpenPGP::UserID;
+use Crypt::OpenPGP::Signature;
+use Crypt::OpenPGP::Armour;
+use Crypt::DSA::KeyChain;
+use Crypt::DSA::Key;
+
+# at least let's print out a message before dying to make things look ok
+$SIG{INT}  = sub {
+  die "control c caught, exiting.\n\n"; 
+}; 
+
+# stuff all the server code here, whee
+sub start_server {
+  my $port = shift;
+  my $keyid = shift;
+  my $key = shift;
+  my $str;
+  my $ssock = new IO::Socket::INET (
+    LocalPort => $port,
+    Proto => 'tcp',
+    Listen => 5, # hardcoded in but seems reasonable
+    Reuse => 1, # i wish this existed in c, gah
+  ) or die " ! could not create socket: $!\n";
+  print " - starting server.\n";
+  my $insock;
+  while( $insock = $ssock->accept() ) {
+    my $mysockaddr = getsockname($insock);
+    my ($p, $addr) = sockaddr_in($mysockaddr);
+    printf "client connection from %s\n", inet_ntoa($addr);
+    # figure out what the client wants to do in an overly simple way
+    chomp ( $str = <$insock> );
+    # the client wants parameters to start number crunching
+    if ( $str eq "param" ) {
+      print $insock $keyid . "\n";
+      print $insock $key->{g} . "\n";
+      print $insock $key->{p} . "\n";
+      print $insock $key->{q} . "\n";
+      printf "client at %s getting parameters.\n", inet_ntoa($addr);
+    }
+    # the client wants to report that it is done
+    elsif ( $str eq "done" ) {
+      printf "client at %s reports success.\n", inet_ntoa($addr);
+    }
+    # otherwise it's crap
+    else {
+      printf "someone at %s is screwing around.\n", inet_ntoa($addr);
+    }
+    close $insock;
+  }
+  close($ssock);
+}
+
+# command line arguments
+my %cl;
+GetOptions(\%cl,
+  "keyid=s",
+  "client",
+  "server",
+  "help|?",
+  "verbose",
+  "keyfile=s",
+  "port=s",
+  "host=s",
+  "keypass=s",
+  "uid=s"
+);
+
+# yar, this be the verbosity level
+my $verbose = 1 if $cl{verbose};
+
+# omg like let's do this over the network kthx
+my $client = 1 if $cl{client};
+my $server = 1 if $cl{server};
+
+# berate the user if she can't figure out how to use the program correctly
+pod2usage(-verbose => 2) if $cl{help};
+pod2usage(
+  -verbose => 0,
+  -message => "\nyou need to specify the vanity keyid to generate.\n"
+) if (!$cl{keyid} and !$client);
+pod2usage(
+  -verbose => 0,
+  -message => "\nyou can't be both the client and the server.\n"
+) if ($cl{client} and $cl{server});
+pod2usage(
+  -verbose => 0,
+  -message => "\nthe keyid must be in hex, without the leading 0x.\n"
+) if ( !$client and $cl{keyid} =~ /[^0-9A-Fa-f]/ );
+
+# need to strip off everything over the keyid 
+my $modulus = PARI 1;
+$modulus = $modulus << 32;
+
+# header
+print "\nopenpgp vanity key generator.\n";
+print "acting as server!\n\n" if $server;
+print "acting as client!\n\n" if $client;
+print "working in standalone mode.\n\n" if !($server or $client);
+
+# key generation variables
+my $kc = Crypt::DSA::KeyChain->new; 
+my $key;
+
+# the desired keyid
+my $target;
+
+# socket to use if we're in client mode
+my $sock;
+
+# if we're the client, get the target and the values of p,q,g from the server
+if ( $client ) {
+  $sock = new IO::Socket::INET (
+    PeerAddr => $cl{host} ? $cl{host} : 'localhost',
+    PeerPort => $cl{port} ? $cl{port} : '9887',
+    Proto => 'tcp',
+  ) or die " ! could not create socket: $!\n" ;
+  $key = Crypt::DSA::Key->new;
+  $key->{size} = 1024;
+  print $sock "param\n";
+  chomp ( $target = <$sock> );
+  chomp ( $key->{g} = <$sock> );
+  chomp ( $key->{p} = <$sock> );
+  chomp ( $key->{q} = <$sock> );
+  print " - parameters received from server.\n";
+  close($sock);
+}
+
+# if we're in standalone mode or the server, generate parameters
+if ( !$client ) {
+  $key = $kc->generate_params (
+    Size => 1024,
+    Verbosity => 0,
+  );
+  print " - parameters generated.\n";
+  $target = $cl{keyid};
+}
+
+# if we're the server, let's get this shit rolling
+if ( $server ) {
+  my $port = $cl{port} ? $cl{port} : '9887';
+  start_server($port,$cl{keyid},$key);
+}
+
+print " - looking for key with fingerprint ending in 0x$target.\n";
+
+# print out the public parameters
+if ( $verbose ) {
+  print " * g = $key->{g}\n";
+  print " * p = $key->{p}\n";
+  print " * q = $key->{q}\n";
+}
+
+# certificate building variables
+my $cert;
+my $sec = Crypt::OpenPGP::Key::Secret->new('DSA');
+my $certpass = $cl{keypass} ? "$cl{keypass}" : "yar!";
+
+# copy over the public parameters to the secret key
+for ( qw( p q g size ) ) {
+  $sec->$_( $key->$_ );
+}
+
+# here's the main loop, and an angsty haiku about it
+#   massive compute job
+#   snow falling on black roses
+#   perl is fucking slow
+do {
+  
+  # generate a public and private key using the above parameters
+  $kc->generate_keys($key);
+  
+  # copy the public and private key values to the private key
+  $sec->x( $key->priv_key );
+  $sec->y( $key->pub_key );
+  
+  # wrap the secret key in a certificate
+  $cert = Crypt::OpenPGP::Certificate->new(
+    Key => $sec,
+    Version => 4,
+    Passphrase => $certpass,
+  ) or die Crypt::OpenPGP::Certificate->errstr;
+
+# and keep going until the fingerprint matches the target
+} while ( substr($cert->public_cert->fingerprint_hex,-1 * length $target)
+  ne $target ); 
+
+# we're done.
+print "\n - found it!\n";
+print " * x = $key->{priv_key}\n" if $verbose;
+print " * y = $key->{pub_key}\n" if $verbose;
+print " - id = 0x" . substr($cert->public_cert->fingerprint_hex,-8) . "\n";
+
+# make a keyblock and add the secret key certificate to the keyblock
+my $kb_sec = Crypt::OpenPGP::KeyBlock->new;
+$kb_sec->add($cert);
+print " - certificate 0x" . $cert->key_id_hex . " added to keyblock.\n";
+
+# add uid
+my $id = Crypt::OpenPGP::UserID->new( 
+  Identity => $cl{uid} ? $cl{uid} : "vanity key"
+);
+$kb_sec->add($id);
+print " - identity added to keyblock.\n";
+
+# create a self-sig on the public key certificate and add to the keyblock
+my $siggy = Crypt::OpenPGP::Signature->new(
+  Data    => [ $cert->public_cert, $id ],
+  Key     => $cert,
+  Version => 4,
+  Type    => 0x13,
+) or die " ! " . Crypt::OpenPGP::Signature->errstr;
+$kb_sec->add($siggy);
+print " - key self signature created and added to keyblock.\n";
+
+# write the keyblock to disk in armored format
+my $kf = $cl{keyfile} ? $cl{keyfile} : "seckey.asc";
+open KEYFILE, ">$kf";
+print KEYFILE Crypt::OpenPGP::Armour->armour(
+  Data => $kb_sec->save,
+  Object => 'PRIVATE KEY BLOCK',
+  Headers => {
+    Comment => 'created by vanity key generator',
+  },
+);
+close KEYFILE;
+print " - key armored and written to disk as $kf.\n\n";
+
+# report in and let the server know we're done, if we're a client
+if ( $client ) {
+  $sock = new IO::Socket::INET (
+    PeerAddr => $cl{host} ? $cl{host} : 'localhost',
+    PeerPort => $cl{port} ? $cl{port} : '9887',
+    Proto => 'tcp',
+  ) or die " ! could not create socket: $!\n" ;
+  print $sock "done\n";
+  print " - informed server of success.\n\n";
+  close($sock);
+}
+
+
+__END__
+
+=head1 NAME
+
+vanitykey.pl - openpgp vanity key generator
+
+=head1 SYNOPSIS
+
+vanitykey.pl [options] --keyid=value
+
+=head1 DESCRIPTION
+
+B<vanitykey.pl> will generate an openpgp v4 dsa key pair with a vanity key id.
+this is accomplished by brute force, randomly selecting key pairs and computing
+the fingerprint until a matching pair is found.
+
+in order to speed the process up, B<vanitykey.pl> can operate in a simple
+distributed mode. the program can perform both the tasks of server and client,
+distributing parameters to other instances of the program or retrieving the
+parameters and performing the brute force number crunching.
+
+when a match is found, B<vanitykey.pl> will write an ascii armored openpgp
+private key block containing a v4 dsa signing key. because the dsa key is the
+primary id, an elgamal encryption key can be generated and attached to the
+dsa key using any openpgp compliant program.
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<--help>
+
+prints out this documentation. but you probably already knew that.
+
+=item B<--verbose>
+
+prints verbose output, for people who like that kind of thing.
+
+=item B<--client>
+
+tells the program to operate as a client. should be used in conjunction
+with B<--host> and B<--port>. this is the only option that overrides the
+need for using the B<--keyid> parameter, as it is sent by the server along
+with the other parameters.
+
+=item B<--server>
+
+tells the program to operate as the server. when using the distributed
+mode, the server process generates the parameters and passes them along
+to any client wishing to do computation. clients that finish will then
+report back to the server, so the user can know where to look for her
+newly generated key.
+
+=item B<--host=hostname>
+
+when running in client mode, this tells the program what host the server is
+running on. this defaults to B<localhost>.
+
+=item B<--port=portnum>
+
+when running in client mode, this tells the program what port the server is
+running on. when running in server mode, this tells the program which port
+to run on. in both cases, this parameter defaults to B<9887>.
+
+=item B<--keyfile=file>
+
+the name of the file which will contain the secret key. this defaults to
+B<seckey.asc>.
+
+=item B<--keypass=password>
+
+the password used to lock the secret key. you'll need this to actually use
+the secret key once you've imported it to your keyring. if no password is 
+specified, this defaults to B<"yar!">.
+
+=item B<--uid=id>
+
+the user id to use in the key. this should take the form of "User Name 
+<user@name.com> (comment)". defaults to B<"vanity key">.
+
+=back
+
+=head1 COPYRIGHT
+
+copyright (c) 2004 seth hardy <shardy@aculei.net>. all rights reserved. this
+program be free software, matey; you can redistribute it and/or modify it under
+the same terms as perl itself.
+
+=head1 WHY AM I WRITING ALL THIS GODDAMN DOCUMENTATION?
+
+i really have no idea. someone please put me out of my misery.
+
+=head1 AUTHOR
+
+written by seth hardy (shardy@aculei.net).
+
+=cut

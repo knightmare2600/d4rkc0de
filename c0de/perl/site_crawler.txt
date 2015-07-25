@@ -1,0 +1,119 @@
+#!/usr/bin/perl 
+# You Must have LibWhisker (http://wiretrip.net/rfp/lw.asp) 
+# Author: Xasulrev 
+# Site Crawler 
+ 
+use strict; 
+use LW2; 
+use Getopt::Std; 
+ 
+my (%opts, @mainarray, @myarray); 
+my ($target, $request, $depth, $proto, $crawler, $path, 
+    $resource, $tmp, $key, $value, $track_hash, $cookie_hash); 
+getopts('h:p:d:s:', \%opts); 
+ 
+# Usage Statement 
+sub usage() { 
+   print "\nUsage :\tperl $0 -h target [-p -d -s]\n" . 
+      "\t -p port_num\n" . 
+      "\t -d depth\n" . 
+      "\t -s [0 | 1] - 0 = HTTP, 1 = HTTPS \n"; 
+   exit; 
+} 
+ 
+# ensure a target host is provided 
+if (!(defined($opts{h}))) { 
+   print "You must specify a host\n"; 
+   usage(); 
+} else { 
+   $target=$opts{h}; 
+} 
+ 
+# use the LW2 new request function 
+$request = LW2::http_new_request( 
+   host=>$target, 
+   method=>'GET', 
+   timeout=>10 
+   ); 
+ 
+# set the port number 
+if (!(defined($opts{p}))) { 
+   print "You did not specify a port, defaulting to 80\n"; 
+   $request->{whisker}->{port} = 80; 
+} else { 
+   $request->{whisker}->{port} = $opts{p}; 
+} 
+ 
+ 
+# change the 'User-Agent' header for identification 
+$request->{'User-Agent'} = 'Xasulrevs Crawler/1.0'; 
+ 
+# ensure everything is protocol-compliant 
+LW2::http_fixup_request($request); 
+ 
+# get or set the depth level 
+if (!(defined($opts{d}))) { 
+   print "You did not specify a depth, defaulting to 2\n"; 
+   $depth = 2; 
+} else { 
+   $depth=$opts{d}; 
+} 
+ 
+# set protocol 
+if (!(defined($opts{s}))) { 
+   print "You did not specify a protocol, HTTP = 0, HTTPS = 1, defaulting to 
+HTTP\n"; 
+   $proto="http://"; 
+} elsif ($opts{s} eq 0) { 
+   $proto="http://"; 
+} elsif ($opts{s} eq 1) { 
+   $proto="https://"; 
+} 
+ 
+# make a new crawler 
+$crawler = LW2::crawl_new( 
+   "$proto$target/",   # start URL 
+   $depth,             # depth 
+   $request            # premade LW request 
+   ); 
+ 
+# tell the crawler that we want it to save all cookies. 
+$crawler->{config}->{save_cookies}=1; 
+# tell the crawler to follow redirects. 
+$crawler->{config}->{follow_moves}=1; 
+# tell the crawler to save all the skipped URLs. 
+$crawler->{config}->{save_skipped}=1; 
+ 
+my $result=$crawler->{crawl}->(); 
+ 
+# The crawler returns once it's crawled all available URLs. 
+if(!defined $result){ 
+   print "There was an error:\n"; 
+   print $crawler->{errors}->[0]; 
+} 
+ 
+$track_hash = $crawler->{track}; 
+ 
+# populate array with only resources 
+while( ($key,$value) = each (%$track_hash) ){ 
+   chomp; 
+   push(@mainarray, $key) unless $key eq ''; 
+} 
+ 
+# push out to hash for sorting and 
+# ensuring uniqueness of data 
+my %hash1 = map { $_ => 1 } @mainarray; 
+my @myarray = sort keys %hash1; 
+ 
+# print resources discovered 
+foreach $tmp (@myarray) { 
+   print "$tmp\n"; 
+} 
+ 
+# print out any cookies (requires save_cookies=1) 
+my $cookie_hash = $crawler->{cookies}; 
+print "\n\nCookie name & value:\n"; 
+while(($key,$value) = each (%$cookie_hash)){ 
+   print "$key:\t$value\n"; 
+} 
+

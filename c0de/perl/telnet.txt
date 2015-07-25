@@ -1,0 +1,33 @@
+#!/usr/bin/perl
+#c0dex by m0x.lk || Fucker Team ||
+#TelPerl || Conector Telnet en Perl
+system ("clear");
+system ("cls");
+system ("color f0");
+print "\n\n";
+print "\t\tc0dex by m0x.lk\t||  Fucker Team  ||";
+print "\n\n";
+print "\t\tTelPerl | Conector Telnet en Perl\n\n";
+sleep 1;
+
+use Net::Telnet ();
+$host=$ARGV[0];
+$user=$ARGV[1];
+$pass=$ARGV[2] || die "[+]Usage: TelPerl.pl Host User Pass\n[+]Example: TelPerl.pl 127.0.0.1 admin 123123\n";
+        $t = new Net::Telnet (Host => $host);
+        eval { $t->login($user, $pass); };
+	if ($@) {
+	
+print "\n[+]Logeado";
+sleep 1;
+
+	}
+	else {
+		print "Login FAILDER!";
+	}
+	
+comand:;
+print "Comando Linea: ";
+$comand=<STDIN>;
+$t->cmd("$comand");
+goto comand;

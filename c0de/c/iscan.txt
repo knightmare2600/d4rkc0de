@@ -1,0 +1,251 @@
+/*
+ *   ident-scan [v0.60]
+ *   This TCP scanner has the additional functionality of retrieving
+ *   the username that owns the daemon running on the specified port.
+ *   It does this by by attempting to connect to a TCP port, and if it
+ *   succeeds, it will send out an ident request to identd on the
+ *   remote host.  I believe this to be a flaw in the design of the
+ *   protocol, and if it is the developers intent to allow 'reverse'
+ *   idents, then it should have been stated clearer in the
+ *   rfc(rfc1413).
+ *
+ *   USES:
+ *   It can be useful to determine who is running daemons on high ports
+ *   that can be security risks.  It can also be used to search for
+ *   misconfigurations such as httpd running as root, other daemons
+ *   running under the wrong uids.
+ *
+ *   COMPILES:
+ *    Compiled on SunOS 4.1.x, OSF/1, Linux and BSDI with:
+ *         cc -o i-scan i-scan.c
+ *    Solaris 2.x worked with:
+ *         cc -o i-scan i-scan.c -lsocket -lnsl
+ *
+ *   CHANGES:
+ *   2/11/96    0.15       Original version.  Usable by other people.
+ *   7/22/96    0.30       Fixed display problem.  Will function like a
+ *                         normal tcp scanner.  Optimized name/addr check.
+ *   6/27/97    0.45       Fixed TCP wrapper segfault.  Gonna gut this
+ *                         pig soon.
+ *   7/26/97    0.60       Major code restructure.  ident check is now in
+ *                         its own function.  Several optimizations.
+ *
+ *   Dave Goldsmith
+ *   <dhg@dec.net>
+ *   http://www.ksrt.org/~dhg
+ *   07/26/97
+ */
+
+#include <stdio.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <unistd.h>
+
+enum errlist
+{
+  BAD_ARGS,BAD_HOST,SOCK_ERR
+};
+
+struct sockaddr_in for_ident, for_scan;
+int len;
+
+void
+usage( error )
+enum errlist error;
+{
+  fprintf(stderr,"ident-scan: ");
+  switch(error)
+  {
+    case BAD_ARGS: fprintf(stderr,"usage: ident-scan hostname [low port] [hi port]\n");
+                   break;
+    case BAD_HOST: fprintf(stderr,"error: cant resolve hostname\n");
+                   break;
+    case SOCK_ERR: fprintf(stderr,"error: socket() failed\n");
+                   break;
+  }
+  exit(-1);
+}
+
+struct hostent *
+fill_host( machine, host )
+char *machine;
+struct hostent *host;
+{
+/* if gethostbyname fails, gethostbyaddr and return */
+
+  if ( ( host = gethostbyname( machine ) ) == NULL )
+     host = gethostbyaddr( machine, 4, AF_INET );
+  return( host );
+}
+
+char *
+ident_check( fd )
+int fd;
+{
+   struct sockaddr_in for_temp;
+   int ret, identfd;
+   char buffer[24], *response;
+
+   ret = getsockname( fd, (struct sockaddr *)&for_temp, &len );
+   if ( ret == 0 )
+   {
+      identfd = socket( AF_INET, SOCK_STREAM, 0 );
+      if ( identfd != -1 )
+      {
+         ret = connect( identfd, (struct sockaddr *)&for_ident, len );
+         if ( ret == 0 )
+         {
+            response= (char *) malloc( 2048 );
+            if ( response != NULL )
+            {
+                memset( response, 0x0, 85 );
+                sprintf ( buffer, "%u,%u\n", htons ( for_scan.sin_port ),
+                          htons ( for_temp.sin_port ) );
+
+                write( identfd, buffer, strlen( buffer ) );
+                ret =  read( identfd, response, 80 );
+                if ( ret != 0 )
+                {
+                   response[ strlen( response) - 1 ] = '\0';
+                   return( response );
+                }
+                else
+                {
+                   /* Most likely TCP wrappers is running, so we can
+                    * connect to the remote machines ident port,
+                    * but we arent getting to actually talk to identd.
+                    */
+                   return( NULL );
+                }
+            }
+            else
+                /* malloc failed */
+                fprintf( stderr, "malloc() failed in ident_check\n");
+         }
+         else
+            /* connect failed */
+            fprintf( stderr, "connect() failed in ident_check\n");
+      }
+      else
+         /* socket failed */
+         fprintf( stderr, "socket() failed in ident_check\n");
+   }
+   else
+     /* getsockname failed */
+     fprintf( stderr, "getsockname() failed in ident_check\n");
+
+   response = NULL;
+   return ( response );
+}
+
+
+
+int
+main( argc, argv )
+int argc;
+char **argv;
+{
+  int i, sockfd, curport, ret;
+  int noident = 0, hiport = 9999, loport = 1;
+  struct servent *service;
+  struct hostent *host;
+  char identbuf[30], recieved[85], *buffer, *uid;
+
+  if ((argc<2) || (argc>4))
+    usage(BAD_ARGS);
+  if (argc>2)
+     loport = atoi(argv[2]);
+  if (argc>3)
+     hiport = atoi(argv[3]);
+  if ( ( host = fill_host( argv[1], host ) ) == NULL )
+    usage(BAD_HOST);
+
+  /* Load up pieces of our sockaddr_in structs */
+
+  len = sizeof(struct sockaddr_in);
+
+  for_scan.sin_family = host->h_addrtype;
+  for_scan.sin_addr.s_addr = *((long *)host->h_addr);
+  for_scan.sin_port = htons( 113 ); /* this if for testing ident */
+
+  for_ident.sin_family = host->h_addrtype;
+  for_ident.sin_addr.s_addr = *((long *)host->h_addr);
+  for_ident.sin_port = htons( 113 );
+
+  /* Check and see if ident is running */
+
+  sockfd = socket( AF_INET, SOCK_STREAM, 0 );
+  if ( sockfd != -1 )
+  {
+     ret = connect( sockfd, (struct sockaddr *)&for_scan, len );
+     if ( ret != 0 )
+     {
+        noident = 1;
+        fprintf( stdout, "ident is not running on %s, performing normal scan\n",
+                 argv[1] );
+     }
+     else
+     {
+       /*
+        * If someone has blocked out identd with tcp wrappers the connect
+        * will succeed, but we wont actually be able to use identd.  This
+        * will make sure we can actually talk to identd properly.
+        */
+       if ( ident_check( sockfd ) == NULL )
+       {
+           noident = 1;
+           close( sockfd );
+           fprintf( stdout, "identd is malfunctioning or TCP wrapped on %s\n",
+                   argv[1]);
+       }
+     }
+  }
+
+  for( curport = loport ; curport <= hiport ; curport++ )
+  {
+     for_scan.sin_port = htons( curport );
+
+     if ( ( sockfd = socket( AF_INET, SOCK_STREAM, 0 ) ) == -1)
+        usage(SOCK_ERR);
+
+     ret = connect( sockfd, (struct sockaddr *)&for_scan, len );
+
+     if ( ret == 0 )
+     {
+        service = getservbyport( for_scan.sin_port, "tcp");
+
+        if ( noident == 0 ) /* we are ident scanning */
+        {
+           buffer = ident_check( sockfd );
+
+           if ( buffer != NULL )
+           {
+              uid = strrchr( buffer, ':' );
+              if ( uid != NULL )
+              {
+                 /*
+                  * Some idents return :username
+                  * others return : username
+                  */
+                 if ( ( *(++uid) )  == ' ' )
+                   uid++;
+                 printf("Port: %3d\tService: %10s\tUserid: %s\n", curport,
+                        ( service == NULL ) ? "(?)" : service->s_name, uid);
+                 free( buffer );
+              }
+              else
+                 fprintf(stderr, "Malformed ident string\n");
+           }
+        }
+        else /* this is just a regular port scan */
+           printf("Port: %3d\tService: %10s\n", curport,
+                  ( service == NULL ) ? "(?)" : service->s_name);
+     }
+     close( sockfd );
+  } /* end for */
+}

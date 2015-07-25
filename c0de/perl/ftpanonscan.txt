@@ -1,0 +1,69 @@
+#! /usr/bin/perl
+#
+# FTP Anon Scanner
+#
+# Coded by Perforin | DarK-CodeZ
+#
+# www.perforins-software.de.vu
+#
+use Net::FTP;
+
+$version = "1.0";
+($ipstart,$ipstop) = @ARGV;
+
+if (@ARGV < 1) {
+print<<README;
+===========================
+== FTP Anon Scanner v$version ==
+===========================
+
+.Simple Scan
+perl Scanner.pl 127.0.0.1
+
+.Range Scan
+perl Scanner.pl 127.0.0.1 127.0.0.255
+
+
+www.perforins-software.de.vu
+README
+exit;
+}
+
+$ipstart =~ m/(\d\d\d?).(\d\d?\d?).(\d\d?\d?).(\d\d?\d?)/; 
+($s1,$s2,$s3,$s4) = ($1,$2,$3,$4); 
+$ipstop =~ m/(\d\d\d?).(\d\d?\d?).(\d\d?\d?).(\d\d?\d?)/; 
+($t1,$t2,$t3,$t4) = ($1,$2,$3,$4);
+$i=$s4;
+open(RES,">>","Results.txt");
+print RES<<BANNER;
+===========================
+== FTP Anon Scanner v$version ==
+===========================
+BANNER
+print <<HEADER;
+===========================
+== FTP Anon Scanner v$version ==
+===========================
+
+HEADER
+&scan;
+sub scan {
+if ($i<$t4+1) {
+$ipstart=$s1.".".$s2.".".$s3.".".$i;
+print "Scanning... $ipstart\n";
+$ftp = Net::FTP->new("$ipstart",Debug => 0,Timeout => 1) || $i++ & &scan;
+$ftp->login("anonymous","welcome@hell.us") || $i++ & &scan;
+$ftp->quit;
+print "FOUND!!!... $ipstart\n";
+print RES "$ipstart\n";
+$i++;
+&scan;
+}
+if ($ipstart =~ $ipstop) { &bye }
+}
+
+sub bye {
+print "\n====> Scan done <====\n";
+exit;
+}
+close(RES);

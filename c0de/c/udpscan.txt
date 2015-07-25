@@ -1,0 +1,199 @@
+/* UDP Scanner (with protocol probes)
+  By: fryxar
+  Compile: gcc scanudp.c -o scanudp
+*/
+#include <stdio.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/select.h>
+#include <netinet/in.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <signal.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <sys/stat.h>
+#include <sys/wait.h>
+#include <sys/time.h>
+#include <netdb.h>
+
+
+#define VERSION "1.0"
+#define MAXBUF 1400
+#define MAXSCAN 100
+#define TIMEOUT 6
+
+typedef struct config {
+  int timeout;
+} config;
+
+typedef struct scan {
+  u_int16_t number;// Number of udp port
+    char *name;// Name of udp port
+    char *outstring;// String to send (protocol dependent)
+    int outstringlen;// Len above
+    char *instring;// String to wait (protocol dependent, NULL for anything)
+    int instringlen;// Len above
+  char match;// Does port match? Allways initialized to 0
+} scan;
+
+// Port scanning probes definitions (protocol dependent)
+struct scan port[] = {
+
+  7, "echo", 
+    "probe", 5, "probe", 5, 0,
+
+    13, "daytime", 
+    "\x0a", 1, NULL, 0, 0,
+
+    19, "chargen", 
+    "\x0a", 1, NULL, 0, 0,
+
+  // dig @ip localhost A
+    53, "dns", 
+    "\x68\x6c\x01\x00\x00\x01\x00\x00\x00\x00\x00\x00\x09\x6c\x6f\x63\x61\x6c\x68\x6f\x73\x74\x00\x00\x01\x00\x01", 27, NULL, 0, 0,
+
+  // echo "get a" | tftp ip
+    69, "tftp", 
+    "\x00\x01\x61\x00\x6e\x65\x74\x61\x73\x63\x69\x69\x00", 13, NULL, 0, 0,
+
+  // ntpq -p ip
+    123, "ntp", 
+    "\x16\x01\x00\x01\x00\x00\x00\x00\x00\x00\x00\x00", 13, NULL, 1, 0,
+
+  // nbtstat -A ip
+    137, "ns-netbios", 
+    "\x98\x38\x00\x00\x00\x01\x00\x00\x00\x00\x00\x00\x20\x43\x4b\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x41\x00\x00\x21\00\01", 50, NULL, 1, 0,
+
+  // snmpwalk ip ILMI
+    161, "snmp(ILMI)", 
+    "\x30\x24\x02\x01\x00\x04\x04\x49\x4c\x4d\x49\xa1\x19\x02\x04\x18\x39\x99\xcd\x02\x01\x00\x02\x01\x00\x30\x0b\x30\x09\x06\x05\x2b\x06\x01\x02\x01\x05\x00", 38, NULL, 0, 0,
+
+  // snmpwalk ip public
+    161, "snmp(public)", 
+    "\x30\x26\x02\x01\x00\x04\x06\x70\x75\x62\x6c\x69\x63\xa1\x19\x02\x04\x2c\x60\x2d\xb6\x02\x01\x00\x02\x01\x00\x30\x0b\x30\x09\x06\x05\x2b\x06\x01\x02\x01\x05\x00", 40, NULL, 0, 0,
+
+   0, NULL, NULL, 0, NULL, 0, 0
+};
+
+void usage(char *program) {
+int i;
+
+  fprintf( stderr,
+  "%s v"VERSION" - by: Franco Pieressa\n"
+  "usage: %s [options] <host>\n\n"
+  "options:\n"
+  " -t <timeout> Set port scanning timeout\n"
+  "\nSupported protocol:\n"
+  , program, program);
+
+  for( i=0; port[i].number; i++)
+    fprintf( stderr, "%s ", port[i].name );
+  fprintf( stderr, "\n\n" );
+
+exit(-1);
+}
+
+struct config conf;
+
+int main(int argc, char *argv[]) {
+charbuf[MAXBUF], opt, *host;
+int fd[MAXSCAN], nread, i, j, maxfd, repeat;
+struct timevaltv;
+struct sockaddr_indest_addr;
+fd_setfdset;
+structhostent *he;
+
+
+// Set defaults
+  conf.timeout = 10;
+
+  if(argc < 2) usage( argv[0] );
+
+  while((opt = getopt(argc, argv, "t:")) != -1) {
+    switch(opt) {
+      case 't':
+        if(strlen(optarg) == 0) usage(argv[0]);
+            conf.timeout = atoi(optarg);
+            break;
+
+      default:
+        usage(argv[0]);
+        break;
+    }
+  }
+
+  host = argv[argc-1];
+
+  if( (he = gethostbyname(host)) == NULL) {
+    fprintf(stderr, "Error: Cannot resolve %s!\n", host);
+    exit(-1);
+  }
+
+
+  FD_ZERO( &fdset );
+    maxfd = 0;
+
+  for( i = 0; port[i].number; i++ ) {
+      if((fd[i] = socket(AF_INET, SOCK_DGRAM, 0)) < 0) {
+      perror(NULL);
+      exit(2);
+    }
+    if( maxfd < fd[i] ) maxfd = fd[i];
+    FD_SET( fd[i], &fdset );
+
+    dest_addr.sin_family = AF_INET;
+    dest_addr.sin_addr = *((struct in_addr *)he->h_addr);
+    dest_addr.sin_port =htons(port[i].number);
+
+    if( connect(fd[i], (struct sockaddr *)&dest_addr, sizeof(dest_addr)) < 0 ) {
+      perror(NULL);
+      close(fd[i]);
+      exit(4);
+    }
+
+    memcpy( buf, port[i].outstring, port[i].outstringlen );
+    if( send(fd[i], buf, port[i].outstringlen, 0) < 0 ) {
+      perror(NULL);
+      close(fd[i]);
+      exit(5);
+    }
+  }
+
+  // Wait for timeout
+  sleep( conf.timeout );
+
+  tv.tv_sec= 0;
+  tv.tv_usec = 0;
+
+  if( select( maxfd+1, &fdset, NULL, NULL, &tv ) < 0 ) {
+    perror(NULL);
+    exit(6);
+  }
+
+  for( i = 0; port[i].number; i++ ) {
+    if( !FD_ISSET( fd[i], &fdset ) ) {
+      close( fd[i] );
+      continue;
+    }
+
+    if( (nread = recv(fd[i], buf, MAXBUF, 0)) <= 0 ) {
+      close( fd[i] );
+      continue;
+    }
+
+    if( port[i].instring == NULL || !memcmp( buf, port[i].instring, port[i].instringlen ) ) {
+      for( repeat = 0, j = 0; j < i; j++ ) 
+      if( port[i].number == port[j].number && port[j].match > 0 ) repeat = 1;
+
+      if( !repeat ) {
+        printf( "%s\t%d/udp\n", host, port[i].number );
+        port[i].match++;
+      }
+      close( fd[i] );
+    }
+  }
+
+exit(0);
+}
+

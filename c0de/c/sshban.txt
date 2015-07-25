@@ -1,0 +1,217 @@
+/* SshXn - ssh banner scanner by DrSnake
+ *
+ *  Code uses non-blocking sockets and select() to enhance speed
+ *  problems?: leaves sockets behind momentarily in CLOSE state after finishing
+ *  leaves 1 or 2 TIME_WAIT state sockets behind	
+ *  may not have to close() sockets before next connect()
+ *  timeouts might be better off checking against the current time
+ *  lots of sockets will never timeout if every select() call finds a ready socket
+ *  may have to play with timeout length changes due to changes in the # of sockets
+ *
+ *****************************************************************************
+ * ShoutZ to D0SeD , {ULTIMATE  , Jenkinz , HaShoo & #LinuxPakistan
+ * ideas (sshscan). This code is a mess....
+ */
+
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <time.h>
+#include <string.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <sys/time.h>
+#include <fcntl.h>
+
+//syntax ./sshxn <num socks> <first ip> <last ip>
+
+char *text_ptr; //buffer for the banner
+
+//this sets up 
+void prep_addr(struct sockaddr_in *target, unsigned long curip)
+{
+	  		memset(target, 0, sizeof(struct sockaddr_in));
+                        target->sin_family = AF_INET;
+                        target->sin_port = htons(22);
+                        target->sin_addr.s_addr = curip;
+}
+
+//this creates a non-blocking socket and connects to it
+int startconsock(struct sockaddr_in *target, int *sockdp)
+{
+	   	if ((*sockdp = socket(AF_INET, SOCK_STREAM, 0)) == -1)	//create a socket
+                {
+			return -1;	//return error indicator
+                }
+                else	//socket call succesful
+                {
+                        fcntl(*sockdp, F_SETFL, fcntl(*sockdp, F_GETFL) | O_NONBLOCK);	//set socket to be non-blocking
+                                                 
+                        if (connect(*sockdp, (struct sockaddr *)target, sizeof(struct sockaddr)) == -1)		//connect to socket
+                        {
+                        }
+		}
+}
+
+int main(int argc, char *argv[])
+{
+	int *sockdp, x, numsocks, *timeouts;
+	unsigned long firstip, lastip, curip, *iplist, timedout = 0;
+	struct sockaddr_in target;
+
+	if (argc < 4)  //syntax check
+	{
+		printf("syntax %s <num socks> <first ip> <last ip>\n", argv[0]); // print syntax
+		exit(1);	//die
+	}	
+
+	numsocks = atoi(argv[1]);	//number of sockets is first arg
+
+	firstip = inet_addr(argv[2]);	//first ip address is second arg
+	lastip = inet_addr(argv[3]);	//third ip address if third arg
+
+	sockdp = malloc((sizeof(int)) * numsocks);	//allocate memory for socket array
+	iplist = malloc((sizeof(int)) * numsocks);	//allocate memory for ip list
+	timeouts = malloc((sizeof(int)) * numsocks);	//allocate memory for tracking timeouts
+
+	/* Connect sockets for the first time */
+
+	curip = firstip;	//initialize current ip address to the first ip adress	
+
+	for (x = 0; x < numsocks; x++)		//initialize sockets with their first connection
+	{
+		prep_addr(&target, curip);	//setup sockaddr_in target for connect to current ip address
+
+		startconsock(&target, &sockdp[x]);	//create and connect socket
+		
+		iplist[x] = curip;	//set the socket's ip address in the ip list
+		curip = htonl(ntohl(curip) + 1);	//increment current ip address
+	}
+
+	memset(timeouts, 0, sizeof(int) * numsocks);	//set all timeout counts to 0
+	while(1)//infinite loop, leaves with exit()
+	{	
+		if ((ntohl(firstip) + timedout) >= ntohl(lastip))	//if we have more or the same timeouts
+		{						// as the total number of ips we are scanning
+			FUCK:		//things jump here to die
+			for (x = 0; x < numsocks; x++)	//close all sockets
+				if (sockdp[x] != 0) close(sockdp[x]);
+			free(sockdp);	//free memory used by socket array
+			free(iplist);	//free memory used by ip list
+			free(timeouts);		//free memeory used by timeout account array
+			exit(1);
+		}
+		text_ptr = malloc(1024);	//allocate memory for holding the recieved banner
+		if((x = chkdata(sockdp, numsocks)) == -1)	//if no ready sockets were found
+		{
+			for(x = 0; x < numsocks; x++)	//step through all sockets, incrememnt the timeout counters & check for timeout
+			{
+				timeouts[x]++;		//increment the timeout counter for the given
+				
+				//modify these , multiply by select() timeout to get approx packet timeout
+				if (timeouts[x] == 2) goto FUCK; 	//if any socket's timeout should already be dead, die. 	
+				if (timeouts[x] == 1) 	//if this socket is timed out
+				{
+					timedout++;	//increment total number of hosts completed count
+					timeouts[x] = 0;	//set this timeout back to 0
+					close(sockdp[x]);	//close old socket
+ 		                	sockdp[x] = 0;		//null out old socket
+                        		if (curip <= lastip)	//if we have not already tried all ip addres
+                        		{
+         					prep_addr(&target, curip);	//prepare target for connect to current ip address
+		                       	 	startconsock(&target, &sockdp[x]);	//start and connect socket
+                        			iplist[x] = curip;	//update ip address list
+						curip  = htonl(ntohl(curip) + 1);	//increment current ip address
+					}
+				}
+			}
+			continue;	//go through next step in the loop
+		} 
+		else 
+		{		
+			prep_addr(&target, iplist[x]);		//prepare target for connect to current ip
+
+			if (text_ptr != NULL)	//if the read length from target is not 0
+			{
+				printf("%s %s", inet_ntoa(target.sin_addr), text_ptr); 	//display IP address and banner
+				free(text_ptr); 	//free memory used by banner holder
+			}
+			
+			if (target.sin_addr.s_addr == lastip) 	//if we just read from the last ip address
+				goto FUCK;		         //die
+
+			timedout++;	//increment total ip's checked counter
+
+			prep_addr(&target, curip);	//prepare target to connect to current ip address
+
+			close(sockdp[x]);	//close socket
+			sockdp[x] = 0;		//null out socket
+			if (curip <= lastip)	//if we are not on the last ip address
+			{
+				startconsock(&target, &sockdp[x]);	//create and connect to socket
+				iplist[x] = curip;	//set current ip address in address list
+				curip = htonl(ntohl(curip) + 1);	//increment current ip address
+			}
+		}
+	}
+	free(sockdp);	//free memeory used by socket array
+	free(iplist);	//free memory used by ip list
+	free(timeouts);		//free memory used by timeouts list
+}
+
+//this function checks the socket array for sockets that are ready to read from
+//if it finds a socket that it is ready to read from it returns the socket's index
+//in the socket array.  If it finds no sockets ready to read from it returns a -1
+int  chkdata(int *socklist, int numsocks)
+{
+        fd_set rfds; 	//file descriptor set 
+        struct timeval tv;	//timeout struture for select	
+	char buf[1024];		//character buffer for read()
+	int numready, x;       //indicater of the # of sockets read for read, random counter    
+
+        FD_ZERO(&rfds);		//null out file descriptor set
+
+	for (x = 0; x < numsocks; x++)	//loop through sockets and insert into file descriptor set
+	{
+		if (socklist[x] != 0)	//if a real socket
+		{
+			FD_SET(socklist[x], &rfds); 	//insert socket file descriptor set
+		}
+	} 
+
+        /* Modify this to change select's timeout */
+        tv.tv_sec = 10;	//timeout in seconds
+        tv.tv_usec = 0;		//timeout in milliseconds
+
+        numready = select(numsocks, &rfds, NULL, NULL,&tv);	//wait for a socket to be ready or timeout
+	{
+		if (numready > 0)	//if a socket is actually ready
+		{
+			for (x = 0; x < numsocks ; x++)		//scroll through sockets to find first ready socket
+			{
+				if (FD_ISSET(socklist[x], &rfds))	//check if socket is set
+				{
+					memset(buf, 0, 1024);	//clear out buffer for read
+					if (read(socklist[x],buf, 1024) > 0)	//read, and if there is actually data
+					{
+						text_ptr = malloc(strlen(buf)+2);	//allocate memory for banner holder
+						strncpy(text_ptr,buf, strlen(buf)+1);	//copy buf from read to banner holder
+					}
+					else { free(text_ptr); text_ptr = NULL; }	//free text buffer and set to NULL
+					return(x);	//return the index
+				}
+			}
+		}
+		else if (numready == 0)		//if no sockets were ready
+		{
+			 free(text_ptr);	//free text buffer 
+			 text_ptr = NULL;	//set text_ptr to NULL
+			 return -1;	//return -1 indicatr
+		}
+	}	
+
+	free(text_ptr);		//free memory for banner holder
+	text_ptr = NULL;	//set text_ptr to NULL
+	return(0);	//return 0 indicator
+}                          

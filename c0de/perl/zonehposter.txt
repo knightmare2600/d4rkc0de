@@ -1,0 +1,80 @@
+#!/usr/bin/perl
+#
+# ZONE-H.ORG CHECK REDEFACEMENTS AND POST.
+#
+# by W4n73d  [ Red Eye Crew. ]
+#
+# ( ONLY WORK IN LINUX. )
+#
+#
+# # # # # # #
+use HTTP::Request;
+use LWP::UserAgent;
+use IO::Socket::INET;
+# # # # # # #
+if ($#ARGV != 1) {
+        print "\n\n [xxxxxxxxxxxxxxx] ZONE-H CHECK AND POST [xxxxxxxxxxxxxxxx] \n";
+        print " [x] C0de by W4n73d\n";
+        print " [x] \n";
+        print " [x] $0 Dominios.txt Defacer-Nick\n\n";
+        exit;
+}
+
+
+
+$dominio=$ARGV[0];
+$grupo=$ARGV[1];
+
+$remote='http://www.zone-h.org/component/option,com_attacks/Itemid,43/filter_domain,';
+
+print "\n [x] Removing the redefacements and posting the sites! Wait..\n\n";
+
+open(HOSTS, "<$dominio") || die ("Not found!");
+@hosts= <HOSTS>;
+close(HOSTS);
+
+foreach $vitima (@hosts) {
+chomp($vitima);
+if($vitima =~ http) { substr($vitima, 0, 7) =""; }
+
+$url2="$remote$vitima";
+my $req=HTTP::Request->new(GET=>$url2);
+my $sockz=LWP::UserAgent->new();
+$sockz->timeout(10);
+my $response=$sockz->request($req);
+
+if ($response->is_success) {
+if( $response->content =~ /No results were found/ ) {
+open(FILE,">> ok.txt");
+print FILE "$vitima\n";
+close(FILE);
+}
+# # # # # #
+$arq = 'ok.txt';
+chomp $grupo;
+open(a,"<$arq");
+@site = <a>;
+close(a);
+$b = scalar(@site);
+for($a=0;$a<=$b;$a++)
+{chomp $site[$a];
+$sock = IO::Socket::INET->new(PeerAddr => "www.zone-h.org", PeerPort => 80, Proto => "tcp") or next;
+print $sock "POST /component/option,com_notify/Itemid,89/task,single/ HTTP/1.0\r\n";
+print $sock "Accept: */*\r\n";
+print $sock "Referer: http://www.zone-h.org/component/option,com_notify/Itemid,89/task,single/\r\n";
+print $sock "Accept-Language: pt-br\r\n";
+print $sock "Content-Type: application/x-www-form-urlencoded\r\n";
+print $sock "Connection: Keep-Alive\r\n";
+print $sock "User-Agent: Mozilla/5.0 (X11; U; Linux i686; pt-BR; rv:1.8.1.3)\r\n";
+print $sock "Host: www.zone-h.org\r\n";
+$length=length("defacer=$grupo&domain=http%3A%2F%2 F$site[$a]&method=22&reason=5&option=com_notify");
+print $sock "Content-Length: $length\r\n";
+print $sock "Pragma: no-cache\r\n";
+print $sock "\r\n";
+print $sock "defacer=$grupo&domain=http%3A%2F%2F$site[$a]&method=22&reason=5&option=com_notify\r\n";
+close($sock);
+system('rm -rf ok.txt');
+}
+}
+}
+

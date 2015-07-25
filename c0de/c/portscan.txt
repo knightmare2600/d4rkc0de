@@ -1,0 +1,89 @@
+#include <stdio.h>
+#include <winsock.h>
+
+void Usage(char *boo);                //initialize functions
+int startWinsock();
+
+int main(int argc, char **argv)
+{
+  struct sockaddr_in target;          //declare struct..see reference
+  int start_port, end_port, sox;
+ 
+  if(argc != 4)
+  {
+    Usage(argv[0]);                   //check if correct arugments are passed
+    return -1;
+  }
+ 
+ 
+  if(startWinsock() == -1)            //call function startWinsock()
+  {
+    printf("\nUnable to start Winsock.\n");
+    return -1;
+  }
+ 
+  start_port = atoi(argv[2]);              //convert argv[2] to int
+  end_port = atoi(argv[3]);                //convert argv[3] to int
+ 
+  if(start_port > end_port)
+  {
+    Usage(argv[0]);
+    return -1;             
+  }
+ 
+  sox = socket(AF_INET, SOCK_STREAM, 0);  //get socket descriptor
+
+  target.sin_family = AF_INET;
+  target.sin_addr.s_addr = inet_addr(argv[1]);  //check reference
+  memset(&(target.sin_zero), '\0', 8);
+ 
+  if(sox == -1)                       //check socket descriptor
+  {
+    printf("\nError opening socket.\n\n");
+    printf("Exiting...");
+    return -1;     
+  }
+ 
+  printf("Ports:\n");
+ 
+  for(start_port;start_port < end_port+1;start_port++)
+  {
+    target.sin_port = htons(start_port);              //set port to incrementing
+                                                      //variable (start_port)
+    if(connect(sox, (struct sockaddr *)&target, sizeof(struct sockaddr)) == 0)
+    {
+      printf("%d OPEN", start_port);               //try to connect to port
+    }
+    else
+    {
+      printf("%d closed\n", start_port);           //if can't connect, not open
+    }
+  }
+ 
+  printf("\n\nScan complete...\n");
+  closesocket(sox);                                //close socket
+  WSACleanup();                                    //clean up winsock
+  return 0;           
+}
+
+
+
+int startWinsock()
+{
+  WSADATA wsaData;       
+  if (WSAStartup(MAKEWORD(1, 1), &wsaData) != 0)   //make call to WSAStartup
+  {
+    return -1;                                    //if fails, return with errors
+  }
+  printf("Winsock started...\n\n");              //else winsock is started
+  return 0;
+}
+
+
+void Usage(char *boo)
+{
+  printf("Simple Windows Port Scanner\n");
+  printf("Coded by: NoUse\n\n\n");
+  printf("Usage:  %s <ip address> <starting port> <end port>\n\n", boo);
+  printf("Example: pscan.exe 127.0.0.1 1 200\n\n\n"); 
+}

@@ -1,0 +1,277 @@
+/*
+ * phelon.c
+ *
+ * Copyright (c) 2001 awnex <awnex@sneakerz.org>
+ *
+ * This is an IRC bot that I coded up a while ago.
+ * It includes a debug option that prints out all incoming
+ * and outgoing information. It's really useful when you
+ * want to see who has been trying to access it without
+ * your permission and to analyze all traffic.
+ *
+ * To use this bot you have to specify certain options.
+ * phelon will read any message that you send it. Then it
+ * will execute what it receives, aslong as you include CMD:
+ * before you specify what you want it to execute.
+ * If you want, you can change the CMD to anything
+ * that you want. Just to prevent others from
+ * accesing this program. I will be adding authentication
+ * in the near future, so look out for the new phelon.
+ *
+ * This bot will execute the raw function of the command.
+ * Here are a couple of examples on how to use the bot
+ * once it is connected to an irc server:
+ *
+ * /msg bot CMD: join #channel
+ * /msg bot CMD: join #channel channelkey
+ * /msg bot CMD: mode #channel +s
+ * /msg bot CMD: mode #channel +o yournick
+ * /msg bot CMD: privmsg #channel uNF!
+ * /msg bot CMD: privmsg yournick hi_sexy_bitch!!!
+ *
+ * When you want phelon to write a message to a channel,
+ * or a specific nick, you have to use underscores in your
+ * message. Otherwise it will only print out the first word,
+ * and not the entire phrase.
+ *
+ * Here is an example on how to initialze phelon:
+ *
+ * % ./phelon -h
+ *
+ * [ phelon by awnex (c) 2001 ]
+ *
+ * usage: ./phelon <-n nick> <-c chan> [-k key] <-s server> [-d]
+ *
+ * As you can see the -d flag has no variable to use, that is because
+ * once it is initialized it will print out all information that is being
+ * sent to it. You can use phelon successfully without the -d flag if you want.
+ * It is only there to debug the program while it is running.
+ *
+ * You do not have to use the -k flag for the key if you dont need to.
+ * But if the chan that you want phelon to join does have a key you need to use
+ * it.
+ *
+ * Shouts: Gersh (sexy BSD kernel hax0r)
+ */
+
+#include <stdio.h>
+#include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+
+#define PORT 6667
+#define BOTT "phelon"
+
+void 
+usage (program)
+
+    char *program;
+{
+    fprintf (stdout, "\n[ phelon by awnex (c) 2001 ]\n");
+    fprintf (stdout, "\nusage: %s <-n nick> <-c chan> <-k key> <-s server> [-d]
+\n\n", program); 
+    exit(-1);
+}
+
+int main (argc, argv)
+
+    int argc;
+    char **argv;
+{
+    struct hostent *he;
+    struct sockaddr_in address;
+
+    int x, opt, sockfd, debugging = 0;
+ 
+    char *nick, *chan, *key, *ping, *server, *insert, *output;
+
+    nick = chan = key = ping = server = NULL;
+
+    insert = malloc(1024);
+    output = malloc(1024);
+    bzero (insert, 1024);
+    bzero (output, 1024);
+
+    while ((opt = getopt(argc, argv, "n:c:k:s:d")) != EOF) 
+    {
+        switch (opt) 
+        {
+            case 'n': 
+                nick = strdup(optarg);
+            break;
+
+            case 'c': 
+            {
+                chan = strdup(optarg);
+
+                if (*chan != '#' && *chan != '&')
+                {
+                    fprintf (stderr, "Channel must be prefixed with '#' or '&'\
+n");
+                    exit (-1);
+                }
+            }
+            break;
+
+            case 'k': 
+                key = strdup(optarg); 
+            break;
+
+            case 's': 
+                server = strdup(optarg); 
+            break;
+
+            case 'd': 
+                debugging = 1;
+            break;
+
+            default:
+                usage (argv[0]); 
+            break; 
+        }
+    }
+
+    if (!server)
+    {
+        fprintf(stderr, "Need to specify a server\n");
+        exit (-1);
+    }
+
+    if (!nick)
+    {
+        fprintf(stderr, "Need to specify a nick\n");
+        exit (-1);
+    }
+
+    if ((he = gethostbyname (server)) == NULL)
+    {
+        herror ("hostname");
+        exit (-1); 
+    }
+
+    if ((sockfd = socket (AF_INET, SOCK_STREAM, 0)) < 0) 
+    {
+        perror ("socket");
+        exit (-1); 
+    }
+
+    address.sin_family = AF_INET;
+    address.sin_port   = htons (PORT);
+    address.sin_addr   = * ((struct in_addr *) he -> h_addr);
+
+    bzero (& (address.sin_zero), 8);
+
+    if (connect (sockfd, (struct sockaddr *) &address, 
+        sizeof(struct sockaddr)) < 0) 
+    {
+        perror ("connect");
+        exit (-1); 
+    }
+
+    /*
+     *  
+     *  Set phelons nick.
+     *
+     */
+  
+    sleep (1);
+
+    snprintf (output, 1024, "USER %s phelon phelon %s\n", nick, BOTT);
+
+    if ((send(sockfd, output, strlen(output), 0)) < 0) 
+    {
+        perror ("USER");
+        return (1); 
+    }
+
+    snprintf (output, 1024, "NICK %s\n", nick);
+
+    if ((send (sockfd, output, strlen(output), 0)) < 0)
+        return (1); 
+
+    /*
+     *
+     *  Check to see if we own the nick.
+     *
+     */
+
+    bzero (insert, 1024);
+    recv (sockfd, insert, 1024, 0);
+    insert [strlen(insert) + 1] = '\0';
+
+    if (strstr (insert, "ickname")) 
+    {
+        fprintf (stderr, "nickname: already in use\n");
+        return (1); 
+    }
+
+    /*
+     *
+     *  Join the default channel.
+     *
+     */
+
+    sleep (1);
+
+    snprintf (output, 1024, "JOIN %s %s\n", chan, key);
+
+    if ((send (sockfd, output, strlen(output), 0)) < 0) 
+    {
+        perror ("join");
+        return (1); 
+    }
+
+    fprintf (stdout, "\n\n- phelons status -\n\n");
+    fprintf (stdout, "nick: %s\n", nick);
+    fprintf (stdout, "chan: %s\n", chan);
+    fprintf (stdout, "serv: %s\n\n", server);
+
+    while (1) 
+    {
+        bzero (insert, 1024);
+
+        recv (sockfd, insert, 1024, 0);
+        insert [strlen(insert) + 1] = '\0';
+
+        if (debugging)
+            printf("%s\n", insert);
+
+        if (strncmp(insert, "PING", 4) == 0) 
+        {
+            bzero (output, 1024);
+
+            snprintf (output, 1024, "PONG :%s\n", ping);
+
+            if (debugging)
+                printf("%s\n", output);
+
+            send (sockfd, output, strlen(output), 0); 
+        }
+
+        /*
+         *
+         *  Read message and execute.
+         *
+         */
+
+        if (strstr(insert, "CMD"))
+        {
+            char *ptr1 = insert, *ptr2;
+
+            while ((ptr2 = strsep(&ptr1, ":")) != NULL)
+            {
+                if (!strncmp(ptr2, "CMD", 3))
+                {
+                    snprintf(output, 1024, "%s\n", ptr1);
+                    send(sockfd, output, strlen(output), 0); 
+                }
+            }
+        }
+    }
+}
+

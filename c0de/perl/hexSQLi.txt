@@ -1,0 +1,23 @@
+#!/usr/bin/perl 
+ 
+if ($#ARGV<0) { 
+  print "Enter string to encode: "; 
+  $str= <STDIN>; chomp $str; 
+} else { 
+  $str = "@ARGV[0]"; 
+} 
+ 
+$enc = encode($str); print "Hex Encoded value: 0x$enc\n"; 
+ 
+sub encode { #Sub to encode 
+@subvar= @_; 
+my $sqlstr = $subvar[0]; 
+ 
+@ASCII = unpack("C*", $sqlstr); 
+foreach $line (@ASCII) { 
+ 
+$encoded = sprintf('%lx',$line); 
+$encoded_command .= $encoded; 
+} 
+return $encoded_command; 
+}

@@ -1,0 +1,89 @@
+
+<?php
+
+$testa = $_POST['veio'];
+
+if($testa != "") {
+
+                                //$to = $_POST['emails'];
+
+                                // que buscar La puta madre !!!
+
+
+                                $handle = fopen ($emails, "r");
+
+                                $to = fread ($handle, filesize ($emails));
+
+                                fclose ($handle);
+
+
+
+                                $message = $_POST['html'];
+
+                                $subject = $_POST['assunto'];
+
+                                $de = $_POST['de'];
+                                $RealName = $_POST['RealName'];
+                                //$respuesta = $_POST['respuesta'];
+                                   //PAgina web de los juakers C-group.org
+                             // desactivas cuando kieras invisible//$RealName = "";
+
+
+
+
+
+
+                                $headers  = "MIME-Version: 1.0\r\n";
+
+                                $headers .= "Content-type: text/html; charset=iso-8859-1\r\n";
+
+
+                                $email = explode("\n", $to);
+
+                $headers .= "From: ".$RealName." <".$de.">\r\n";
+
+                                //$headers .= "Reply-To: ".$respuesta."\r\n";
+
+
+
+
+
+                                $message = stripslashes($message);
+
+
+
+                                $i = 0;
+
+                                while($email[$i]) {
+
+
+
+                                $ok = "Para Ti Lamer!";
+
+
+
+
+
+                                if(mail($email[$i], $subject, $message, $headers))
+
+                                        echo "<font color=green face=verdana size=1>* $i - ".$email[$i]."</font> <font color=green face=verdana size=1>A ESPERAR QUE CAIGAN LOS GILES, ENVIADO PERFECTO</font><br>";
+
+                                else
+
+                                        echo "* $i  ".$email[$i]." <font color=red>NO</font><br><hr>";
+
+
+
+                                $i++;
+
+                                }
+
+
+
+if($ok == "ok")
+
+        echo "<script> alert('Termino Exitosamente tu Envio SALUDOS C-GROUP'); </script>";
+
+}
+
+?>

@@ -1,0 +1,294 @@
+#!/usr/bin/perl
+
+# Faster @emails Rob v.1
+# Code by JosS
+# Contact: sys-project[at]hotmail.com
+# Spanish Hackers Team
+# www.spanish-hackers.com
+
+use IO::Socket::INET;
+use LWP::UserAgent;
+use HTTP::Request;
+use LWP::Simple;
+
+sub lw
+{
+
+my $SO = $^O;
+my $linux = "";
+if (index(lc($SO),"win")!=-1){
+		   $linux="0";
+	    }else{
+		    $linux="1";
+	    }
+		if($linux){
+system("clear");
+}
+else{
+system("cls");
+system ("title Faster \@emails Rob v.1 - By JosS");
+system ("color 02");
+}
+}
+
+menu:;
+
+
+#*************************** Menu ******************************
+
+&lw;
+
+print "\t\t########################################################\n\n";
+print "\t\t#    Faster @emails Rob v.1 - Spanish Hackers Team     #\n\n";
+print "\t\t#                        by JosS                       #\n\n";
+print "\t\t########################################################\n\n";
+
+my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+
+$year += 1900;
+$mon++;
+
+print "\t\t\t\t$mday/$mon/$year $hour:$min:$sec\n\n";
+
+print "Menu:\n";
+print "\n";
+
+print "1. Sesion simple\n";
+print "2. Multi sesion\n";
+print "3. Creditos\n";
+print "4. Salir\n";
+
+
+print "Opcion:";
+$opcion=<STDIN>;
+
+if ($opcion!=1 && $opcion!=2 && $opcion!=3 && $opcion!=4){
+print "Opción Incorrecta\n";
+goto menu;
+}
+if ($opcion==1)
+{
+&primero
+}
+if ($opcion==2)
+{
+&segundo
+}
+if ($opcion==3)
+{
+&tercero
+}
+if ($opcion==4)
+{
+&cuarto
+}
+
+#*************************** Opción 1 ******************************
+
+
+sub primero
+
+{ #S1
+
+&lw;
+
+print "\t\t########################################################\n\n";
+print "\t\t#    Faster @emails Rob v.1 - Spanish Hackers Team     #\n\n";
+print "\t\t#                        by JosS                       #\n\n";
+print "\t\t########################################################\n\n";
+
+my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+
+$year += 1900;
+$mon++;
+
+print "\t\t\t\t$mday/$mon/$year $hour:$min:$sec\n\n";
+
+print "Introduce la url:";
+$url=<STDIN>;
+
+chop $url;
+
+my $final = $url;
+print "\n\n";
+print "Buscando en: $final\n\n";
+my $ua = LWP::UserAgent->new;
+my $req = HTTP::Request->new(GET => $final);
+$doc = $ua->request($req)->as_string;
+
+if ($doc =~ m{(\w+\@[\w.]+)})
+
+{ #I1
+
+(@email) = $doc =~ m{(\w+\@[\w.]+)}g; 
+
+
+foreach $email (@email)
+{
+print "$email\n";
+}
+
+} # xI1
+
+print "\n\n";
+
+print "Guardar (Y/N):";
+$guardar=<STDIN>;
+
+chop $guardar;
+
+if ($guardar eq "y")
+
+{ #I2
+
+print "Introduce nombre del archivo a crear:";
+$archivo=<STDIN>;
+
+open (archivo,">$archivo");
+
+foreach $guardar (@email)
+{
+print archivo "$guardar\n";
+}
+
+print "Archivo guardado: $archivo\n\n";
+
+} #xI2
+
+
+goto menu;
+
+
+} #xS1
+
+
+#*************************** Opción 2 ******************************
+
+sub segundo
+
+{ #S2
+
+&lw;
+
+print "\t\t########################################################\n\n";
+print "\t\t#    Faster @emails Rob v.1 - Spanish Hackers Team     #\n\n";
+print "\t\t#                        by JosS                       #\n\n";
+print "\t\t########################################################\n\n";
+
+my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+
+$year += 1900;
+$mon++;
+
+print "\t\t\t\t$mday/$mon/$year $hour:$min:$sec\n\n";
+
+
+print "Introduce el archivo de las urls:";
+$arch=<STDIN>;
+
+open (arch,"$arch");
+
+@webs=<arch>;
+
+for ( $i = 0; $i < @webs; $i++ )
+{ #F1
+
+my $final = @webs[$i];
+print "\n\n";
+print "Buscando en: $final\n\n";
+my $ua = LWP::UserAgent->new;
+my $req = HTTP::Request->new(GET => $final);
+$doc = $ua->request($req)->as_string;
+
+if ($doc =~ m{(\w+\@[\w.]+)})
+
+{ #I1
+
+(@email) = $doc =~ m{(\w+\@[\w.]+)}g; 
+
+
+foreach $email (@email)
+{
+print "$email\n";
+}
+
+} # xI1
+
+print "\n\n";
+
+print "Guardar (Y/N):";
+$guardar=<STDIN>;
+
+chop $guardar;
+
+if ($guardar eq "y")
+
+{ #I2
+
+print "Introduce nombre del archivo a crear:";
+$archivo=<STDIN>;
+
+open (archivo,">$archivo");
+
+foreach $guardar (@email)
+{
+print archivo "$guardar\n";
+}
+
+print "Archivo guardado: $archivo\n\n";
+
+} #xI2
+
+} # xF1
+
+print "Pulse la tecla Enter para volver al menu.";
+$volver=<STDIN>;
+goto menu;
+
+} #xS2
+
+#*************************** Opción 3 ******************************
+
+
+sub tercero
+
+{
+
+&lw;
+
+print "\t\t########################################################\n\n";
+print "\t\t#    Faster @emails Rob v.1 - Spanish Hackers Team     #\n\n";
+print "\t\t#                        by JosS                       #\n\n";
+print "\t\t########################################################\n\n";
+
+my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+
+$year += 1900;
+$mon++;
+
+print "\t\t\t\t$mday/$mon/$year $hour:$min:$sec\n\n";
+
+print " Programador: JosS & Jose Luis Gongora Fernandez\n\n";
+print " Greetz To: All Hackers\n\n";
+
+print "Pulse la tecla Enter para volver al menu.";
+$volver=<STDIN>;
+goto menu;
+
+}
+
+#*************************** Opción 4 ******************************
+
+sub cuarto
+
+{
+
+&lw;
+
+exit(1);
+
+}
+
+
+
+

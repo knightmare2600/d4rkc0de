@@ -1,0 +1,222 @@
+Code:
+.486
+.model flat, stdcall
+option casemap:none
+
+include \masm32\include\windows.inc
+include \masm32\include\kernel32.inc
+includelib \masm32\lib\kernel32.lib
+include \masm32\include\user32.inc
+includelib \masm32\lib\user32.lib
+
+.data
+szMsgTitle db "IAT Hook", 0
+szModule db "user32.dll", 0
+szTargetFunc db "GetForegroundWindow", 0
+szHooked db "This is in the hooked function - Seems to have worked.", 0
+szFail db "Failed.", 0
+
+.data?
+
+IATHook PROTO STDCALL :DWORD, :DWORD, :DWORD
+HookProc PROTO STDCALL :LPVOID
+
+.code
+   HookProc proc Arg1:LPVOID
+      invoke MessageBox, NULL, addr szHooked, addr szMsgTitle, MB_OK
+      ret
+   HookProc endp
+
+   IATHook proc pDLLName:LPVOID, pOldAddr:LPVOID, pNewAddr:LPVOID
+   LOCAL hModule:HANDLE
+   LOCAL dwVirtualAddr:DWORD
+   LOCAL dwOrigProtect:DWORD
+   LOCAL dwDllFound:DWORD
+   LOCAL dwFunctionFound:DWORD
+   ;Local variables
+   
+   .if pDLLName == NULL
+   ;Check for NULL pointer
+      xor eax, eax
+      ret
+   .endif
+   .if pOldAddr == NULL
+   ;Check for NULL pointer
+      xor eax, eax
+      ret
+   .endif
+   .if pOldAddr == NULL
+   ;Check for NULL pointer
+      xor eax, eax
+      ret
+   .endif
+   
+   mov dwDllFound, 0
+   mov dwFunctionFound, 0
+   ;Initialize
+   
+   invoke GetModuleHandle, NULL
+   ;Get the main module's base address
+   mov hModule, eax
+   ;Copy it into hModule
+   
+   mov edi, hModule
+   assume edi:ptr IMAGE_DOS_HEADER
+   ;Make edi act as IMAGE_DOS_HEADER struct
+   .if edi == NULL
+   ;Check for NULL pointer
+      xor eax, eax
+      ret
+      ;Return 0
+   .endif
+   
+   .if [edi].e_magic != IMAGE_DOS_SIGNATURE
+   ;0x4D 0x5A (MZ)
+      xor eax, eax
+      ret
+      ;Return 0
+   .endif
+   
+   add edi, [edi].e_lfanew
+   ;pNtHeader = (IMAGE_NT_HEADERS*)((DWORD)pDosHeader + (DWORD)pDosHeader->e_lfanew);
+   
+   assume edi:ptr IMAGE_NT_HEADERS
+   ;Make edi act as IMAGE_NT_HEADERS struct
+   .if edi == NULL
+   ;Check for NULL pointer
+      xor eax, eax
+      ret
+      ;Return 0
+   .endif
+   
+   .if [edi].Signature != IMAGE_NT_SIGNATURE
+   ;If it's an invalid NT header
+   ;0x50 0x45 0x00 0x00 (PE\0\0)
+      xor eax, eax
+      ret
+      ;Return 0
+   .endif
+   
+   mov edx, [edi].OptionalHeader.DataDirectory[sizeof IMAGE_DATA_DIRECTORY].VirtualAddress
+   mov dwVirtualAddr, edx
+   ;Copy the VirtualAddress into dwVirtualAddr
+   
+   .if dwVirtualAddr == 0
+   ;Invalid virtual address
+      xor eax, eax
+      ret
+      ;Return 0
+   .endif   
+
+   mov edi, hModule
+   add edi, dwVirtualAddr
+   ;pImportHeader = (IMAGE_IMPORT_DESCRIPTOR*)((DWORD)pDosHeader + dwVirtualAddr);
+   
+   assume edi:ptr IMAGE_IMPORT_DESCRIPTOR
+   ;Make edi act as IMAGE_IMPORT_DESCRIPTOR struct
+   .if edi == NULL
+   ;Check for NULL pointer
+      xor eax, eax
+      ret
+      ;Return 0
+   .endif
+   
+   .while [edi].Name1 != NULL
+      mov ecx, hModule
+      add ecx, [edi].Name1
+      ;pModuleLabel = (char*)((DWORD)pDosHeader + (DWORD)pImportHeader->Name);
+
+      mov edx, pDLLName
+      invoke lstrcmpi, ecx, edx
+      ;Check if this is the DLL we are looking for
+      
+      .if eax == 0
+      ;This is the DLL we are looking for
+         mov dwDllFound, 1
+         ;Set ecx to 0, so we know later if the DLL was found
+         .break
+      .endif
+      
+      add edi, sizeof IMAGE_IMPORT_DESCRIPTOR
+      ;Next DLL
+   .endw
+   
+   .if dwDllFound != 1
+   ;If the DLL wasn't found
+      xor eax, eax
+      ret
+      ;Return 0
+   .endif
+   
+   mov edi, [edi].FirstThunk
+   add edi, hModule
+   ;pThunkData = (IMAGE_THUNK_DATA*)((DWORD)pDosHeader + (DWORD)pImportHeader->FirstThunk);
+   
+   assume edi:ptr IMAGE_THUNK_DATA
+   ;Make edi act as IMAGE_THUNK_DATA struct
+   
+   .while [edi].u1.Function != NULL
+      mov ecx, hModule
+      add ecx, [edi].u1.Function
+      
+      mov edx, [edi].u1.Function
+      ;Copies the current functions address (in the IAT table) into edx
+      
+      .if pOldAddr == edx
+      ;If this is the function we are going to hook
+            lea ebx, [edi].u1.Function
+            ;Copy the address in the table that the function is stored in, into ebx
+            
+            invoke VirtualProtect, ebx, 4, PAGE_WRITECOPY, addr dwOrigProtect
+            ;Unprotect the memory where we are going to overwrite (We need 4 bytes --- DWORD = 4 bytes)
+            
+            mov eax, pNewAddr
+            ;Copy the address we are going to replace it with into eax
+            mov [ebx], eax
+            ;Patch the address
+                        
+            invoke VirtualProtect, ebx, 4, addr dwOrigProtect, NULL
+            ;Restore the original protection level
+            
+            mov dwFunctionFound, 1
+            ;Set the value, for later
+            
+            .break
+      .endif
+      
+      add edi, sizeof IMAGE_THUNK_DATA
+      ;Next thunk
+   .endw
+   
+   .if dwFunctionFound != 1
+   ;If the function wasn't found
+      xor eax, eax
+      ret
+      ;Return 0
+   .endif
+   
+      
+   mov eax, 1
+   ret
+   ;Return 1
+   
+   ;Success
+   IATHook endp
+
+start:
+   invoke GetModuleHandle, addr szModule
+   invoke GetProcAddress, eax, addr szTargetFunc
+   
+   mov ebx, HookProc
+   
+   invoke IATHook, addr szModule, eax, ebx      ;Redirect GetForegroundWindow (eax) to HookProc (ebx)
+   .if eax == 0
+      invoke MessageBox, NULL, addr szFail, addr szMsgTitle, MB_OK
+      invoke ExitProcess, 0
+   .endif
+
+   ;Is now hooked, hopefully.. so lets call it
+   invoke GetForegroundWindow
+   
+   invoke ExitProcess, 0
+end start

@@ -1,0 +1,78 @@
+/* 
+
+Sys-project
+http://www.spanish-hackers.com/
+
+Descripcion: Bueno esta herramienta es muy nesesaria a la hora de estar codeando
+ya sea un exploit ya q es muy util si nesesitamos algun salto de una libreria para q salte
+a nuestra shellcode :)...aclaro q esta tool solo busca jmp  y call al registro esp
+
+*/
+
+#include <windows.h>
+
+
+void uso() //uso
+{
+     printf("\nSys-Project\n");
+     printf("Find-Call esp By c3r0x\n");
+     printf("Uso:\n");
+     printf("Find-call [libreria] \n");
+     exit (-1);
+}
+
+int main (int argc, char **argv)  //main
+{
+    HMODULE dll;  //variable para LoadLibrary
+    char *cmp;  //puntero a la dir de LoadLibrary
+    int i;
+    char jmp_esp[2][2] = { 0xFF, 0xe4 };  //opcode de jmp esp
+    char call_esp[2][2]= { 0xFF,0xD4};     //               call esp
+
+    
+    if(argc != 2){  //si los argumentosson = distinto a dos
+            uso();   //llamamos a uso
+            return 0;
+            }
+            
+    printf("\nLibreria : %s\n", argv[1]);   //printeamo la libreria
+
+    
+    if((dll=LoadLibrary(argv[1]))== NULL)  //la cargamos  si hay error
+    {
+      printf("Error: No se Pudo Cargar la Libreria\n"); //error
+      return 1;
+    }
+    
+        
+    cmp = (char *)dll;  //cmp apunta a dll
+    printf("Buscando salto en la libreria %s\n\n", argv[1]);
+    sleep(1000);
+       
+      while(1) //bucle 
+      {
+  
+      
+        if( !memcmp(cmp,jmp_esp,2))  //comparamos si hay un jmp esp
+        {
+            printf(" 0x%x JMP ESP \n", (int)cmp); //lo mostramos
+            
+        }
+
+           
+        if( !memcmp(cmp,call_esp,2)) //comparamos si hay un call esp
+        {
+            printf(" 0x%x CALL ESP \n", (int)cmp); //printeamos
+           return 1;
+        }
+
+
+            cmp++;
+            }
+      
+                                                        
+                                                                      
+                   
+                   return 0; 
+                   }
+

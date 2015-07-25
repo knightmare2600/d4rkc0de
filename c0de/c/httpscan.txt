@@ -1,0 +1,81 @@
+/* 
+ * httpscan.c - httpd HEAD scanner
+ * 
+ * This program will try to grab the httpd head on the specified
+ * port at the target host, and strip the information to what's
+ * behind the "Server:".
+ * 
+ * Aug. 19, '02 necrose@truncode.org,
+ *              necrose@ellicit.org
+ *
+ * s0wwy, you n33d t0 c0mp1l3 k1dz!
+ * $ gcc -o httpscan httpscan.c
+ * 
+ * th1s 1s h0w y0u 5c4n M$, k3w1 h3h!?
+ * e.g: ./httpscan microsoft.com 80
+ *
+ * note: this code was originally a test of a function for a
+ *       project, but it was released when some guy in #C @
+ *       irc.openprojects.net asked me to share it.
+ *
+ * lets r0ck!
+*/
+
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+#include <netdb.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+
+#define MAXHTTPDBLEN 1000
+#define DFLTHTTPDPRT 80
+
+int main(int argc, char *argv[]) { 
+ int sock, conn, byte, ctra, ctrb, sendbytes, rcvdbytes, port;
+ char banner[MAXHTTPDBLEN];
+ char *httpdsptr, *httpdbptr;
+ char ip_addr[16];
+ struct sockaddr_in addr;
+ struct hostent *host;
+
+ if(argc==1) { 
+  printf("usage: %s <host> [port]\n", argv[0]);
+ exit(0); }
+
+ host = gethostbyname(argv[1]);
+ strcpy(ip_addr, inet_ntoa(*((struct in_addr *)host->h_addr)));
+
+ if(argc==3) { port=atoi(argv[2]); } else { port=DFLTHTTPDPRT; }
+
+ sock = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+
+ addr.sin_family=AF_INET;
+ addr.sin_port=htons(port);
+ addr.sin_addr.s_addr=inet_addr(ip_addr);
+
+ conn = connect(sock,(struct sockaddr *)&addr, sizeof(struct sockaddr));
+ if(conn==-1) { 
+  printf("could not connect to port: %d\n", port); exit(0); }
+ 
+ sendbytes = send(sock, "HEAD / HTTP/1.0\n\n", 19, 0);
+ rcvdbytes = recv(sock, banner, MAXHTTPDBLEN, 0);
+ rcvdbytes = recv(sock, banner, MAXHTTPDBLEN, 0);
+
+ httpdsptr = strstr(banner,"Server");
+ if(httpdsptr==(NULL)) {
+  printf("no webserver running at port: %d\n", port); exit(0); }
+ 
+ for(ctra=0;ctra!=strlen(httpdsptr);ctra++) {
+  if(httpdsptr[ctra]=='\n') { httpdsptr[ctra]='\0'; break; } }
+
+ httpdbptr = (char *)malloc(ctra-8);
+
+ for(ctrb=0;ctrb!=ctra;ctrb++) {
+  httpdbptr[ctrb]=httpdsptr[ctrb+8];
+ if(httpdsptr[ctrb+8]=='\0') { break; } }
+
+ printf("%s\n",httpdbptr); 
+}

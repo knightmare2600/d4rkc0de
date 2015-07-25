@@ -1,0 +1,211 @@
+<?php
+// Stegasaurus v.1.9: 
+// 		Encrypts a given string with a randomly
+//		generated one-time-pad and hides it 
+//		inside of a carrier image.
+// REQUIRED: PNG Image, PHP >= 4.3.0
+// -disruptiv 2007
+
+if(isset($_GET['display'])) displayImage($_GET['display']);
+if(isset($_GET['dl'])) downloadFile($_GET['dl'], $_GET['dlname']);
+
+$submitted = false;						// # Display the forms
+$image_url = "http://www.example.com/image.png";
+$hideme = "http://www.example.com/somefile.txt";
+$key = "7:eXaMpLe";
+$newfile = "somefile.txt";
+if(isset($_POST['submit'])) {
+	$submitted = true;
+	$image_url = $_POST['image_url'];
+	if(isset($_POST['hideme'])) $hideme = $_POST['hideme'];
+	if(isset($_POST['key'])) $key = $_POST['key'];
+	if(isset($_POST['newfile'])) $newfile = $_POST['newfile'];
+}
+echo "<form action='".$_SERVER['PHP_SELF']."' method='post' name='encrypt'>";
+echo "<b>ENCRYPT:</b><br><input type='hidden' name='action' value='encrypt'>";
+echo "Image: <input type='text' name='image_url' value='$image_url' size=35><br>";
+echo "File to Hide: <input type='text' name='hideme' value='$hideme' size=50><br>";
+echo "<input type='submit' name='submit' value='Encrypt It'></form><br><br>";
+echo "<form action='".$_SERVER['PHP_SELF']."' method='post' name='decrypt'>";
+echo "<b>DECRYPT:</b><br><input type='hidden' name='action' value='decrypt'>";
+echo "Image: <input type='text' name='image_url' value='$image_url' size=35><br>";
+echo "Key: <input type='text' name='key' value='$key' size=35><br>";
+echo "New Filename: <input type='text' name='newfile' value='$newfile' size=35><br>";
+echo "<input type='submit' name='submit' value='Decrypt It'></form><br><br>";
+
+if($submitted) {						// # Encrypt / Decrypt something
+	if($_POST['action'] == "encrypt") hideString($_POST['image_url'], $_POST['hideme']);
+	else showString($_POST['image_url'], $_POST['key'], $_POST['newfile']);
+}
+
+// Converts decimal into binary string of a FIXED SIZE
+function d2b($var, $len) {
+	if($len == 8) $output .= ($var & 128) ? '1' : '0';
+	$output .= ($var & 64) ? '1' : '0';
+	$output .= ($var & 32) ? '1' : '0';
+	$output .= ($var & 16) ? '1' : '0';
+	$output .= ($var & 8) ? '1' : '0';
+	$output .= ($var & 4) ? '1' : '0';
+	$output .= ($var & 2) ? '1' : '0';
+	$output .= ($var & 1) ? '1' : '0';
+	return $output;
+}
+
+// Returns random lowercase string
+function randomString($length) {
+	for($i = 0; $i < $length; $i++) $string .= chr(rand(97,122));
+	return $string;
+}
+
+// Return an array of rgb values for each pixel
+function getPixels($image, $width, $height) {
+	for($y = 0; $y < $height; $y++) {
+		for($x = 0; $x < $width; $x++) {
+			$pixels[] = imagecolorsforindex($image, imagecolorat($image, $x, $y));
+		}
+	}
+	return $pixels;
+}
+// Saves an image created from $newPixels
+function savePixels($newPixels, $width, $height, $filename) {
+	$curx = 0;
+	$cury = 0;
+	$image = imagecreatetruecolor($width, $height);
+	foreach($newPixels as $pixel) {
+		if($curx > $width-1) {
+			$cury++;
+			$curx = 0;
+		}
+		if($cury > $height-1) break 2;
+		$color = imagecolorallocate($image, $pixel["red"], $pixel["green"], $pixel["blue"]);
+		imagesetpixel($image, $curx, $cury, $color);
+		$curx++;
+	}
+	imagepng($image, $filename);
+}
+
+// Replace the 3 least significant image bits
+// With the 3 most significant string bits
+function hideBits($pixels, $hideString) {
+	$colors = array("red", "green", "blue");
+	$imagelen = count($pixels);
+	$stringlen = strlen($hideString);
+	for($i = 0; $i < $stringlen; $i++) $binstr .= d2b(ord($hideString[$i]), 7);
+	$stringlen *= 7;
+	$curpixel = 0;
+	$curcolor = 0;
+	$curbit = 0;
+	for($i = 0; $i < $stringlen; $i++) {
+		if($curpixel > $imagelen) {
+			echo "<br><font color='red'>FATAL ERROR:</font> Hidden data is larger than image can hide";
+			die;
+		}		
+		if($curbit == 3) {
+			$curbit = 0;
+			$curcolor++;
+		}
+		if($curcolor == 3) {
+			$curcolor = 0;
+			$curpixel++;
+		}
+		$binpixel = d2b($pixels[$curpixel][$colors[$curcolor]], 8);
+		$binpixel[strlen($binpixel)-(1+$curbit)] = $binstr[$i];
+		$pixels[$curpixel][$colors[$curcolor]] = bindec($binpixel);
+		$curbit++;
+	}
+	return $pixels;
+}
+// Combine the 3 least significant bits of an image to form a string
+function showBits($pixels, $hidelen) {
+	$colors = array("red", "green", "blue");
+	$imagelen = count($pixels);
+	$hidelen *= 7;
+	$curpixel = 0;
+	$curcolor = 0;
+	$curbit = 0;
+	for($i = 0; $i < $hidelen; $i++) {
+		if($curpixel > $imagelen) {
+			echo "<br><font color='red'>FATAL ERROR:</font> Hidden data is larger than image can hide";
+			die;
+		}
+		if($curbit == 3) {
+			$curbit = 0;
+			$curcolor++;
+		}
+		if($curcolor == 3) {
+			$curcolor = 0;
+			$curpixel++;
+		}
+		$binpixel = d2b($pixels[$curpixel][$colors[$curcolor]],8);
+		$binstr .= $binpixel[strlen($binpixel)-(1+$curbit)];
+		$curbit++;
+	}
+	for($i = 0; $i < $hidelen; $i+=7) $string .= chr(bindec(substr($binstr, $i, 7)));
+	return $string;
+}
+
+function displayImage($imagepath) {
+	header("Content-type: image/png");
+	echo file_get_contents($imagepath);
+	unlink($imagepath);
+	die;
+}
+function downloadFile($filepath, $dlname) {
+	header("Content-type: application/octet-stream");
+	header("Content-length: ".filesize($filepath));
+	header("Content-disposition: attachment; filename=\"".$dlname."\";");
+	$file = fopen($filepath, "rb");
+	echo fread($file, filesize($filepath));
+	fclose($file);
+	unlink($filepath);
+	die;
+}
+
+function hideString($imagepath, $hidemepath) {
+	$image = imagecreatefrompng($imagepath);
+	$width = imagesx($image);
+	$height = imagesy($image);
+	$pixels = getPixels($image, $width, $height);
+
+	$file = @fopen($hidemepath, "rb");
+	if(!$file) {
+		echo "<br><font color='red'>FATAL ERROR:</font> Can't open file <i>$hideme</i><br>";
+		die;
+	}
+	while(!feof($file)) $hideme .= fread($file, 8192);
+	fclose($file);
+
+	$hiddenlen = strlen($hideme);	
+	$key = randomString($hiddenlen);
+	for($i = 0; $i < $hiddenlen; $i++) $xored .= $hideme[$i] ^ $key[$i];
+	$hideme = base64_encode($xored);
+	$hiddenlen = strlen($hideme);
+
+	$pixels = hideBits($pixels, $hideme);
+	$filename = randomString(8).".png";
+	savePixels($pixels, $width, $height, $filename);
+	echo "<br><B>Key:</B><br><textarea style='overflow:visible;width:100%;'>".$hiddenlen.':'.$key."</textarea><br>";
+	echo "<b><font color='blue'>Stego-Image:</font></b><br>";
+	echo "<img src='".$_SERVER['PHP_SELF']."?display=".$filename."'><br>";
+}
+function showString($imagepath, $key, $dlname) {
+	$image = @imagecreatefrompng($imagepath);
+	if(!$image) {
+		echo "<br><font color='red'>FATAL ERROR:</font> Can't open image <i>$imagepath</i><br>";
+		die;
+	}
+	$width = imagesx($image);
+	$height = imagesy($image);
+	$pixels = getPixels($image, $width, $height);
+
+	list($hiddenlen,$key) = explode(":", $key);
+	$keylen = strlen($key);
+	$hidden = base64_decode(showBits($pixels, $hiddenlen));
+	for($i = 0; $i < $keylen; $i++) $xored .= $hidden[$i] ^ $key[$i];
+
+	$filename = randomString(8);
+	$file = fopen($filename, "wb");
+	fwrite($file, $xored, $keylen);
+	echo "<iframe src='".$_SERVER['PHP_SELF']."?dl=".$filename."&dlname=".$dlname."' style='display:none'><br>";
+}
+?>

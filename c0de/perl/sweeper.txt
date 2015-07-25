@@ -1,0 +1,130 @@
+#!/usr/bin/perl -w
+# port scanner sweepr.
+# by nobot (for edu purposes ...)
+use strict;
+use List::Util          qw(shuffle);
+use Net::RawIP;
+use Net::Pcap;
+use NetPacket::Ethernet qw(eth_strip);
+use NetPacket::IP       qw(ip_strip);
+use NetPacket::TCP;
+use Time::HiRes         qw(sleep);
+use subs qw(time);
+
+my (@ports, $daddr, $saddr, $data, $dev, $tscan, $err, $pid);
+my $tcpflags = {fin => 0, rst => 0, psh => 0,
+            syn => 0, ack => 0, urg => 0,};
+
+&Usage() if($ARGV[0] eq "-h");
+$daddr = $ARGV[0];
+
+for (my $i = 1; $i < $#ARGV; $i += 2) {
+   if ($ARGV[$i] eq "-p") {
+      if ($ARGV[$i+1] =~ /-/) {
+            push(@ports, $_) for($` .. $');
+         } elsif ($ARGV[$i+1] =~ /,/) {
+           @ports = split(/,/, $ARGV[$i+1]);
+        } else {
+            push(@ports, $ARGV[$i+1]);
+         }
+       @ports = shuffle(@ports); #be sneaky
+   } elsif ($ARGV[$i] eq "-f") {
+      $tcpflags->{$_} = 1 for(split(/,/, $ARGV[$i+1]));
+   } elsif ($ARGV[$i] eq "-s") {
+      $saddr = $ARGV[$i+1];
+        } elsif ($ARGV[$i] eq "-i") {
+      $dev = $ARGV[$i+1];
+        } elsif ($ARGV[$i] eq "-t") {
+      $tscan = $ARGV[$i+1];
+        } elsif ($ARGV[$i] eq "-d") {
+      $data = $ARGV[$i+1];
+        }
+}
+
+unless(defined($dev)) {
+   $dev = Net::Pcap::lookupdev(\$err);
+}
+unless(defined($saddr)) {
+   `ifconfig $dev` =~ /inet addr:([\d.]+)/;
+   $saddr = $1;   
+}
+unless(defined($tscan)) {
+   $tscan = 0.1 * ($#ports + 1);
+}
+unless(defined($data)) {
+   $data = 0;
+}
+
+if ($pid = fork()) {
+        sleep(0.5); #give pcap a chans to start
+   my $raw   = Net::RawIP->new || die "$!\n";
+   my $stime = $tscan / ($#ports+1);
+   my $sport = 10001;
+   for (@ports) {
+      $raw->set({ip  => {saddr  => $saddr,
+                     daddr  => $daddr,},
+                tcp => {source => $sport,
+                              dest     => $_,
+                    check  => 0, #autocorrect cksum
+                         psh      => $tcpflags->{psh},
+                    syn      => $tcpflags->{syn},
+                    urg      => $tcpflags->{urg},
+                    ack      => $tcpflags->{ack},
+                    rst       => $tcpflags->{rst},
+                    fin       => $tcpflags->{fin},
+                    data     => $data,},
+               });
+       $raw->send();
+   sleep($stime);
+   }
+   waitpid($pid, 0);
+} else {
+
+        my ($pcap, $filter, $net, $mask, $kid);
+   my %n = ('4' => 'RST', '18' => 'SYN_ACK', '20' => 'ACK_RST');
+   
+   $pcap = Net::Pcap::open_live($dev, 1500, 0, 0, \$err) || die "$err\n";
+   Net::Pcap::lookupnet($dev, \$net, \$mask, \$err);
+   Net::Pcap::compile($pcap, \$filter, "tcp and src host $daddr", 1, $mask);
+        Net::Pcap::setfilter($pcap, $filter);
+   Net::Pcap::setnonblock($pcap, 0, \$err);
+
+   if ($kid = fork()) { #cause nonblocking reads doesnt work
+      sleep(1.0 + $tscan);
+      kill(1, $kid);
+   } else {
+      while(1) {
+         Net::Pcap::dispatch($pcap, -1, \&HandlePkt, '');
+      }
+      exit;
+   }
+   Net::Pcap::close($pcap);
+
+   sub HandlePkt {
+      my($res, $hdr, $pkt) = @_;
+      my $tcp = NetPacket::TCP->decode(ip_strip(eth_strip($pkt)));
+      print "port: $tcp->{src_port}\n";
+      print "resp: $n{$tcp->{flags}}\n";
+      print "data: $tcp->{data}\n\n" if ($tcp->{data});
+   }   
+   exit;
+}
+
+
+sub Usage() {
+   print "\n Usage:\n";
+   print " perl sweepr.pl [TARGET] -p [PORTS] -f [FLAGS] -d [DATA] -i [NIC] -s [SOURCE] -t [TIME]\n";
+   print "  TARGET (mandatory) : ip address of target on the form a.b.c.d\n";
+   print "  PORTS    (mandatory) : specify ports to scan like: a OR  a-b OR a,b,c,d \n";
+   print "  FLAGS     (mandatory) : comma separated list of tcp flags to set\n";
+   print "  DATA       (optional)     : tcp payload to be included in sent packets\n";
+   print "  NIC          (optional)     : network interface card to use.\n";
+   print "  SOURCE  (optional)     : ip address of source. your own if not specified\n";
+   print "  TIME       (optional)     : do a slow scan. specify time to spend scanning\n";
+   print " Examples :\n";
+   print "  Spend 1 hour syn scanning ports 20 to 139 on target 192.168.1.1\n";
+   print "   >perl sweepr.pl 192.168.1.1 -p 20-139 -f syn -t 3600\n";
+   print "  Do a syn,psh on target 192.168.1.1 and include a payload of crap\n";
+   print "   >perl sweepr.pl 192.168.1.1 -p 139 -f syn,psh -d 'CRAP'\n";
+   exit;
+} 

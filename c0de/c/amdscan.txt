@@ -1,0 +1,142 @@
+/*
+ * AMD (amd V1) Automountd tiny Scanner by Bjunk <bjunk@diinf.usach.cl>
+ *
+ * Run on mode <iphost> for a specific iphost
+ * or <net> for Class C networkz.
+ *
+ * Compiled: gcc -o amdscan amdscan.c
+ *
+ * Examples: ./amdscan 192.168.20.5         (for a specific hostip)
+ *           ./amdscan ppp-342.internik.net (for a specific hostname)
+ *           ./amdscan 127.0.1.-            (for a specific Class C networkz)
+ *           ./amdscan 224.0.2.- > logfile  (hehe!)
+ *
+ * This scanner obviously can be enhanced, thatz yourz w0rkz kidz
+ * 
+ * calculate_sleep ripped from nmap by Fyodor =)
+ *
+ */
+
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+#include <netdb.h>
+#include <rpc/rpc.h>
+#include <sys/time.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+
+#define AMQ_PROGRAM ((u_long)300019)
+#define AMQ_VERSION ((u_long)1)
+
+int net_mode=0;
+void finderz(char *host);
+unsigned long calculate_sleep(char *host);
+
+int main(int argc,char *argv[])
+{
+        char host[1000];
+        char net[1000];
+        int i;
+	int sleep=0;
+
+        if(argc < 2)
+        {
+                printf("AMD Automountd tiny scanner by Bjunk\n");
+                printf("Usage: %s <host> or <net>\n",argv[0]);
+                exit(0);
+        }
+
+        strncpy(host,argv[1],999);
+        if(host[strlen(host)-1] == '-')
+        {
+                net_mode=1;
+                host[strlen(host)-1]=0x0;
+        }
+
+        if(net_mode==0)
+	{
+		sleep=calculate_sleep(host);
+		if(sleep < 500000 )
+                	finderz(host);
+	}
+        else
+                for(i=1;i<256;i++)
+                {
+                        sprintf(net,"%s%d",host,i);
+			sleep=calculate_sleep(net);
+			if(sleep < 500000)
+                        	finderz(net);
+			else
+				printf("Skipping (%s) appear to be down..\n",net);
+                }
+}
+
+void finderz(char *host)
+{
+  struct sockaddr_in saddr;
+  struct hostent *h0zt;
+  struct timeval tv;
+  CLIENT *cl;
+  int flag=0;
+  int sd, portz=0;
+
+        h0zt = gethostbyname(host);
+        saddr.sin_family = AF_INET;
+        if(!h0zt)
+        {
+                if((saddr.sin_addr.s_addr = inet_addr(host)) == INADDR_NONE)
+                {
+                        printf ( "hozt not foundz!\n");
+                        exit(0);
+                }
+        }
+
+        bcopy(h0zt->h_addr,(struct in_addr *)&saddr.sin_addr,h0zt->h_length);
+        saddr.sin_port = htons(portz);
+        sd = RPC_ANYSOCK;
+        tv.tv_sec = 0;
+        tv.tv_usec = 100;
+
+        if((cl = clnttcp_create(&saddr,AMQ_PROGRAM,AMQ_VERSION,&sd, 0, 0)) == NULL)
+                printf("Amd not founded at (%s) on TCP MODE shit!!@#!\n",host);
+        else
+                flag=1;
+        if(flag==0)
+        if((cl = clntudp_create(&saddr, AMQ_PROGRAM, AMQ_VERSION, tv, &sd)) == NULL)
+                printf("Amd not founded at (%s) on UDP MODE shit!#@$\n",host);
+	else
+		flag=1;
+	
+	if(flag==1)
+        {
+                printf ("Amd Running found at (%s) on %d portz, YEAH#@$!@!\n",host,ntohs(saddr.sin_port));
+		clnt_destroy(cl);
+        }
+}
+
+
+unsigned long calculate_sleep(char *host) {
+struct timeval begin, end;
+int sd;
+struct sockaddr_in sock;
+int res;
+
+if ((sd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1)
+  {perror("Socket troubles"); exit(1);}
+
+sock.sin_family = AF_INET;
+sock.sin_addr.s_addr = inet_addr(host);
+sock.sin_port = htons((random()%65535));
+
+gettimeofday(&begin, NULL);
+if ((res = connect(sd, (struct sockaddr *) &sock,
+                   sizeof(struct sockaddr_in))) != -1)
+  fprintf(stderr, "WARNING: You might want to use a different value of -g (or change o.magic_port in the include file), as it seems to be listening on the target host!\n");
+close(sd);
+gettimeofday(&end, NULL);
+if (end.tv_sec - begin.tv_sec > 5 ) /*uh-oh!*/
+  return 0;
+return (end.tv_sec - begin.tv_sec) * 1000000 + (end.tv_usec - begin.tv_usec);
+}
+

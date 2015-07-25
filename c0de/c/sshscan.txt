@@ -1,0 +1,109 @@
+/* sshscan.c - scans port 22 for server type and version  */
+/*                                                        */
+/* compile: host:~$ gcc sshscan.c -o sshscan              */ 
+/* usage: host:~$ ./sshscan infile > outfile              */
+/*							  */
+/* based on wscan.c					  */
+/* CHANGES:						  */
+/* -aesthetics 						  */
+/* -modified serv function				  */
+/*							  */
+/* 2.18.01 spaceork@dhp.com                               */        
+
+
+#include <stdio.h>
+#include <netdb.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <sys/types.h>
+#include <netinet/in.h>
+
+#define ERROR -1
+
+int sock;
+char buffer[1024];
+void usage(char *s);
+void scan(char *i);
+
+int serv(char *host);
+unsigned long int res(char *p);
+
+void usage(char *s)
+{
+	printf("Usage: %s <inputfile>\n", s);
+	exit(ERROR);
+}
+
+int main(int argc, char **argv)
+{ 
+	printf("sshscan - a ssh server information grabber, by spaceork@dhp.com\n");
+
+ 	if (argc != 2) 
+		usage(argv[0]);
+	
+	printf("\n-Getting version information-\n\n");
+	scan(argv[1]);
+}
+
+void scan(char *i)
+{
+	FILE *iff;
+	char buf[512];
+  
+  	if((iff = fopen(i, "r")) == NULL)
+    		return;
+  	
+	while(fgets(buf, 512, iff) != NULL) 
+ 	{ 
+  		buf[strlen(buf) - 1] = 0; 
+  		serv(buf);
+        }
+ 
+	fclose(iff);
+}
+
+int serv(char *host)
+{
+	struct sockaddr_in target;
+
+	target.sin_addr.s_addr = res(host);
+	target.sin_family = AF_INET;
+	target.sin_port = htons(22);
+
+	sock=socket(AF_INET, SOCK_STREAM, 0);
+	if (sock < 0) 
+	{ 
+		printf("error in creating socket\n");
+ 		exit(-1);  
+	}
+
+	if (!connect(sock, (struct sockaddr *) &target, sizeof(target))) 
+	{
+ 		recv(sock, buffer, sizeof(buffer), 0);
+ 		printf("Host %s\n", host);
+ 		printf("Version:\n%s\n", buffer);
+	} 
+
+	else
+  		printf("could not connect to %s port 22\n\n", host);
+   
+  	close(sock);
+}   
+
+/* generic DNS resolving function */
+unsigned long int res(char *p)
+{
+	struct hostent *h;
+	unsigned long int rv;
+    
+	h=gethostbyname(p);
+   	if(h!=NULL)
+     	memcpy(&rv, h->h_addr, h->h_length);
+ 
+	else
+     		rv=inet_addr(p);
+	
+	return rv;
+}
+                   

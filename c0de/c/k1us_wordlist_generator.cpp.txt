@@ -1,0 +1,59 @@
+#include <iostream>
+#include <cstdlib>
+#include <fstream>
+
+/*
+K1u's Wordlist Generator
+Author: K1u.
+Site: k0h.org.
+Description: Creates user defined wordlist.
+Disclaimer: I am not responsible for any damages this program my create.
+I am not responsible for how you use this program.
+*/
+
+using namespace std;
+
+int main(void)
+{
+   int timesPrint;
+   int pwLen;
+   
+   /* Seed the RG. */
+   srand(time(NULL));
+   
+   /* Characters to be randomized. */
+   char randPw[256] = { 0 };
+   
+   /* Location of file, app flag to append to end of file, so files
+   are not overwritten on multiple goes. */
+   ofstream putout0 ("C:\\DEFINE\\PATH\\WORDLISTFTW.txt", ios::app);
+     
+   cout << "Welcome to K1u's wordlist generator Cheesy"
+   << "\n\n"
+   << "Please enter lines of passwords you would like.\n";
+     
+   cin >> timesPrint;
+   
+   cout << "\nWhat would you like randomized?\n"
+   << "Example: 1234567890\n";
+   
+   cin >> randPw;
+   
+   cout << "\nHow long would you like each password to be?\n";
+   
+   cin >> pwLen;
+   
+   /* Program will crash if string length not shown to RG. */
+   char pwRand = strlen(randPw);
+   for(int i = 0; i < timesPrint; i++)
+   {
+           for(int i = 0; i < pwLen; i++)
+           {
+           putout0 << (randPw[rand() % pwRand]);
+           }
+   putout0 << "\n";
+   }
+   
+   system("PAUSE");
+   return 0;
+}
